@@ -29,10 +29,16 @@ def _get_global_config() -> iree_runtime.system_api.Config:
 class Builder:
   """An input module under construction."""
 
-  def __init__(self, context: Optional[ir.Context] = None):
+  def __init__(self,
+               *,
+               context: Optional[ir.Context] = None,
+               parse_asm: Union[bytes, str] = None):
     self.context = context if context else ir.Context()
     self.current_loc: Optional[ir.Location] = None
-    self.input_module = ir.Module.create(loc=self.loc)
+    if parse_asm:
+      self.input_module = ir.Module.parse(parse_asm, context=self.context)
+    else:
+      self.input_module = ir.Module.create(loc=self.loc)
     self.module_op = self.input_module.operation.opview
     self.ip = ir.InsertionPoint(self.module_op.body)
 
@@ -42,19 +48,23 @@ class Builder:
     chlo.register_chlo_dialect(self.context)
 
     # Compiler API.
-    self.compiler_options = compiler_driver.CompilerOptions()
-    self.compiler_options.set_input_dialect_mhlo()
-    self.compiler_options.add_target_backend("cpu")
+    self.default_compiler_options = compiler_driver.CompilerOptions()
+    self.default_compiler_options.set_input_dialect_mhlo()
+    self.default_compiler_options.add_target_backend("cpu")
 
-  def compile_module_to_binary(self) -> memoryview:
+  def compile_module_to_binary(
+      self,
+      compiler_options: Optional[compiler_driver.CompilerOptions] = None
+  ) -> memoryview:
     """Compiles an input MLIR module to a binary blob."""
     # TODO: Wire in diagnostics/error handling (just dumps to stderr as is).
+    compiler_options = compiler_options or self.default_compiler_options
     with self.context:
       pm = passmanager.PassManager()
-      compiler_driver.build_iree_vm_pass_pipeline(self.compiler_options, pm)
+      compiler_driver.build_iree_vm_pass_pipeline(compiler_options, pm)
       pm.run(self.input_module)
       bytecode_io = io.BytesIO()
-      compiler_driver.translate_module_to_vm_bytecode(self.compiler_options,
+      compiler_driver.translate_module_to_vm_bytecode(compiler_options,
                                                       self.input_module,
                                                       bytecode_io)
       return bytecode_io.getbuffer()
