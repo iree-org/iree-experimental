@@ -1,0 +1,83 @@
+# Lint as: python3
+# Copyright 2021 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+"""Test architecture for a set of tflite tests."""
+
+import absl
+import absl.testing as testing
+import iree.compiler.tflite as iree_tflite_compile
+import iree.runtime as iree_rt
+import numpy as np
+import tensorflow.compat.v2 as tf
+import urllib.request
+
+FLAGS = absl.flags.FLAGS
+
+class TFLiteModelTest(testing.absltest.TestCase):
+  def __init__(self, model_path, *args, **kwargs):
+    super(TFLiteModelTest, self).__init__(*args, **kwargs)
+    self.model_path = model_path
+
+  def setUp(self):
+    self.workdir = FLAGS.test_tmpdir
+    self.tflite_file = '/'.join([self.workdir, 'model.tflite'])
+    self.tflite_ir = '/'.join([self.workdir, 'tflite.mlir'])
+
+    urllib.request.urlretrieve(self.model_path, self.tflite_file)
+    self.binary = '/'.join([self.workdir, 'imported.mlir'])
+
+  def compile_and_execute(self):
+    self.assertIsNotNone(self.model_path)
+
+    absl.logging.info("Setting up for IREE")
+    iree_tflite_compile.compile_file(
+      self.tflite_file, input_type="tosa",
+      output_file=self.binary,
+      save_temp_tfl_input=self.tflite_ir,
+      target_backends=iree_tflite_compile.DEFAULT_TESTING_BACKENDS,
+      import_only=False)
+
+    absl.logging.info("Setting up tflite interpreter")
+    tflite_interpreter = tf.lite.Interpreter(model_path=self.tflite_file)
+    tflite_interpreter.allocate_tensors()
+    input_details = tflite_interpreter.get_input_details()
+    output_details = tflite_interpreter.get_output_details()
+
+    absl.logging.info("Setting up test inputs")
+    args = []
+    for input in input_details:
+      absl.logging.info("\t%s, %s", str(input["shape"]), input["dtype"].__name__)
+      args.append(np.zeros(shape=input["shape"], dtype=input["dtype"]))
+
+    absl.logging.info("Invoking TFLite")
+    for i, input in enumerate(args):
+      tflite_interpreter.set_tensor(input_details[i]['index'], input)
+    tflite_interpreter.invoke()
+    tflite_results = []
+    for output_detail in output_details:
+      tflite_results.append(np.array(tflite_interpreter.get_tensor(
+        output_detail['index'])))
+    
+
+    absl.logging.info("Invoke IREE")
+    iree_results = None
+    with open(self.binary, 'rb') as f:
+      config = iree_rt.Config("dylib")
+      ctx = iree_rt.SystemContext(config=config)
+      vm_module = iree_rt.VmModule.from_flatbuffer(f.read())
+      ctx.add_vm_module(vm_module)
+      invoke = ctx.modules.module["main"]
+      iree_results = invoke(*args)
+
+    self.assertEqual(
+      len(iree_results), len(tflite_results), "Number of results do not match")
+
+    for i, (iree_result, tflite_result) in enumerate(zip(iree_results, tflite_results)):
+      self.assertEqual(iree_result.shape, tflite_result.shape)
+      maxError = np.max(np.abs(iree_result - tflite_result))
+      absl.logging.info("Max error (%d): %f", i, maxError)
+
+    return (iree_results, tflite_results)
