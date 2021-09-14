@@ -22,12 +22,33 @@ class TFLiteModelTest(testing.absltest.TestCase):
     self.model_path = model_path
 
   def setUp(self):
-    self.workdir = FLAGS.test_tmpdir
+    self.workdir = self.workdir = FLAGS.test_tmpdir
     self.tflite_file = '/'.join([self.workdir, 'model.tflite'])
     self.tflite_ir = '/'.join([self.workdir, 'tflite.mlir'])
 
     urllib.request.urlretrieve(self.model_path, self.tflite_file)
     self.binary = '/'.join([self.workdir, 'module.bytecode'])
+
+  def generate_inputs(self, input_details):
+    args = []
+    for input in input_details:
+      absl.logging.info("\t%s, %s", str(input["shape"]), input["dtype"].__name__)
+      args.append(np.zeros(shape=input["shape"], dtype=input["dtype"]))
+    return args
+
+  def compare_results(self, iree_results, tflite_results, details):
+    self.assertEqual(
+      len(iree_results), len(tflite_results), "Number of results do not match")
+
+    for i in range(len(details)):
+      iree_result = iree_results[i]
+      tflite_result = tflite_results[i]
+      dtype = details[i]["dtype"]
+      iree_result = iree_result.astype(dtype)
+      tflite_result = tflite_result.astype(dtype)
+      self.assertEqual(iree_result.shape, tflite_result.shape)
+      maxError = np.max(np.abs(iree_result - tflite_result))
+      absl.logging.info("Max error (%d): %f", i, maxError)
 
   def compile_and_execute(self):
     self.assertIsNotNone(self.model_path)
@@ -47,10 +68,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
     output_details = tflite_interpreter.get_output_details()
 
     absl.logging.info("Setting up test inputs")
-    args = []
-    for input in input_details:
-      absl.logging.info("\t%s, %s", str(input["shape"]), input["dtype"].__name__)
-      args.append(np.zeros(shape=input["shape"], dtype=input["dtype"]))
+    args = self.generate_inputs(input_details)
 
     absl.logging.info("Invoking TFLite")
     for i, input in enumerate(args):
@@ -74,12 +92,12 @@ class TFLiteModelTest(testing.absltest.TestCase):
       if not isinstance(iree_results, tuple):
         iree_results = (iree_results,)
 
-    self.assertEqual(
-      len(iree_results), len(tflite_results), "Number of results do not match")
+    # Fix type information for unsigned cases.
+    iree_results = list(iree_results)
+    tflite_results = list(tflite_results)
+    for i in range(len(output_details)):
+      dtype = output_details[i]["dtype"]
+      iree_results[i] = iree_results[i].astype(dtype)
+      tflite_results[i] = tflite_results[i].astype(dtype)
 
-    for i, (iree_result, tflite_result) in enumerate(zip(iree_results, tflite_results)):
-      self.assertEqual(iree_result.shape, tflite_result.shape)
-      maxError = np.max(np.abs(iree_result - tflite_result))
-      absl.logging.info("Max error (%d): %f", i, maxError)
-
-    return (iree_results, tflite_results)
+    self.compare_results(iree_results, tflite_results, output_details)
