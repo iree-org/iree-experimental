@@ -27,7 +27,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
     self.tflite_ir = '/'.join([self.workdir, 'tflite.mlir'])
 
     urllib.request.urlretrieve(self.model_path, self.tflite_file)
-    self.binary = '/'.join([self.workdir, 'imported.mlir'])
+    self.binary = '/'.join([self.workdir, 'module.bytecode'])
 
   def compile_and_execute(self):
     self.assertIsNotNone(self.model_path)
@@ -71,6 +71,8 @@ class TFLiteModelTest(testing.absltest.TestCase):
       ctx.add_vm_module(vm_module)
       invoke = ctx.modules.module["main"]
       iree_results = invoke(*args)
+      if not isinstance(iree_results, tuple):
+        iree_results = (iree_results,)
 
     self.assertEqual(
       len(iree_results), len(tflite_results), "Number of results do not match")
