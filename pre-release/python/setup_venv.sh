@@ -25,8 +25,10 @@ source "$venv_dir/bin/activate" || die "Could not activate venv"
 python -m pip install --upgrade pip || die "Could not upgrade pip"
 
 # Install local binaries.
-python -m pip install iree-compiler-api --force-reinstall -f "$td/binaries" || die "Could not install iree compiler API"
-python -m pip install iree-runtime-snapshot iree-tools-xla-snapshot --upgrade -f "https://github.com/google/iree/releases" || die "Could not install IREE runtime"
+python -m pip install \
+  -f https://github.com/google/iree/releases --upgrade \
+  iree-compiler-snapshot \
+  iree-runtime-snapshot
 
 # Install dependencies.
 python -m pip install --upgrade "jax[cpu]" || die "Could not install JAX"
