@@ -6,7 +6,7 @@ import urllib.request
 
 from PIL import Image
 
-model_path = "https://tfhub.dev/agripredict/lite-model/disease-classification/1?lite-format=tflite"
+model_path = "https://tfhub.dev/tensorflow/lite-model/mobilenet_v2_1.0_224_quantized/1/default/1?lite-format=tflite"
 
 class MobilenetQuantTest(test_util.TFLiteModelTest):
   def __init__(self, *args, **kwargs):
@@ -17,8 +17,8 @@ class MobilenetQuantTest(test_util.TFLiteModelTest):
     self.assertTrue(numpy.isclose(iree_results[0], tflite_results[0], atol=1e-6).all())
 
   def generate_inputs(self, input_details):
-    img_path = "https://storage.googleapis.com/tfhub-visualizers/agripredict/disease-classification/1/image_1_thumb.jpg"
-    local_path = "/".join([self.workdir, "image.jpeg"])
+    img_path = "https://github.com/google-coral/test_data/raw/master/cat.bmp"
+    local_path = "/".join([self.workdir, "cat.bmp"])
     urllib.request.urlretrieve(img_path, local_path)
 
     shape = input_details[0]["shape"]
@@ -31,4 +31,3 @@ class MobilenetQuantTest(test_util.TFLiteModelTest):
 
 if __name__ == '__main__':
   absl.testing.absltest.main()
-
