@@ -68,7 +68,7 @@ if __name__ == "__main__":
     flatbuffer_blob = compile_str(compiler_module, target_backends=["dylib-llvm-aot"])
     # Save module as MLIR file in a directory
     vm_module = ireert.VmModule.from_flatbuffer(flatbuffer_blob)
-    tracer = ireert.Tracer("/tmp/")
+    tracer = ireert.Tracer(os.getcwd())
     config = ireert.Config("dylib",tracer)
     ctx = ireert.SystemContext(config=config)
     ctx.add_vm_module(vm_module)
