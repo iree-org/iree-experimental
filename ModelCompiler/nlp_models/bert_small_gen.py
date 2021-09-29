@@ -71,7 +71,7 @@ if __name__ == "__main__":
     compiler_module = tfc.compile_module(BertModule(), exported_names = ["learn"], import_only=True)
     print(type(compiler_module))
     # Save module as MLIR file in a directory
-    ARITFACTS_DIR = "/tmp"
+    ARITFACTS_DIR = os.getcwd()
     mlir_path = os.path.join(ARITFACTS_DIR, "model.mlir")
     with open(mlir_path, "wt") as output_file:
         output_file.write(compiler_module.decode('utf-8'))
