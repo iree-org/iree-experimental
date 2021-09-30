@@ -14,6 +14,8 @@ class ManualTest(test_util.TFLiteModelTest):
     super(ManualTest, self).compare_results(iree_results, tflite_results, details)
 
   def test_compile_tflite(self):
+    if self.model_path is None:
+      return
     self.compile_and_execute()
 
 if __name__ == '__main__':

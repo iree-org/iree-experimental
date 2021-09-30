@@ -2,8 +2,8 @@
 # XFAIL: *
 
 import absl.testing
-import numpy
 import test_util
+import unittest
 
 model_path = "https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/3?lite-format=tflite"
 
@@ -13,6 +13,7 @@ class LightningTest(test_util.TFLiteModelTest):
   def __init__(self, *args, **kwargs):
     super(LightningTest, self).__init__(model_path, *args, **kwargs)
 
+  @unittest.expectedFailure
   def test_compile_tflite(self):
     self.compile_and_execute()
 

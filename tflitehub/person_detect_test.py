@@ -4,6 +4,7 @@
 import absl.testing
 import numpy
 import test_util
+import unittest
 import urllib.request
 
 from PIL import Image
@@ -28,6 +29,7 @@ class PersonDetectTest(test_util.TFLiteModelTest):
     args = [im.reshape(shape)]
     return args
 
+  @unittest.expectedFailure
   def test_compile_tflite(self):
     # tflite.interpreter python API has problem rendering this file. Issue filed.
     # The example would fail after the iree_tflite_compile.compile_file.
