@@ -4,15 +4,12 @@
 import absl.testing
 import numpy
 import test_util
-import unittest
 import urllib.request
 
 from PIL import Image
 
 model_path = "https://tfhub.dev/google/lite-model/aiy/vision/classifier/birds_V1/3?lite-format=tflite"
 
-# Failing until the dense operations correctly select their pre-scale type.
-# Work is in flight.
 class BirdClassifierTest(test_util.TFLiteModelTest):
   def __init__(self, *args, **kwargs):
     super(BirdClassifierTest, self).__init__(model_path, *args, **kwargs)
@@ -31,7 +28,6 @@ class BirdClassifierTest(test_util.TFLiteModelTest):
     args = [im.reshape(shape)]
     return args
 
-  @unittest.expectedFailure
   def test_compile_tflite(self):
     self.compile_and_execute()
 

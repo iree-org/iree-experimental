@@ -2,8 +2,8 @@
 # XFAIL: *
 
 import absl.testing
+import numpy
 import test_util
-import unittest
 
 model_path = "https://tfhub.dev/google/lite-model/spice/1?lite-format=tflite"
 
@@ -14,7 +14,6 @@ class SpiceTest(test_util.TFLiteModelTest):
   def __init__(self, *args, **kwargs):
     super(SpiceTest, self).__init__(model_path, *args, **kwargs)
 
-  @unittest.expectedFailure
   def test_compile_tflite(self):
     self.compile_and_execute()
 

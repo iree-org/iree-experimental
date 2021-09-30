@@ -17,4 +17,3 @@ Pillow
 # Testing and support.
 lit
 pyyaml
-unittest

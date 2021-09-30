@@ -4,7 +4,6 @@
 import absl.testing
 import numpy
 import test_util
-import unittest
 import urllib.request
 
 from PIL import Image
@@ -29,7 +28,6 @@ class MobilenetQuantTest(test_util.TFLiteModelTest):
     args = [im.reshape(shape)]
     return args
 
-  @unittest.expectedFailure
   def test_compile_tflite(self):
     self.compile_and_execute()
 
