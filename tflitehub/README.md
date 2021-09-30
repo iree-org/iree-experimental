@@ -10,6 +10,6 @@ Or, use something like the following to collect all artifacts and traces,
 which can be fed to other tools:
 
 ```
-export IREE_SAVE_TEMPS="/tmp/ireedumps/{main}/{id}"
-for i in *.py; do export IREE_SAVE_CALLS=/tmp/calls/$i; python $i; done
+export IREE_SAVE_TEMPS="/tmp/iree/models/{main}/{id}"
+for i in *.py; do export IREE_SAVE_CALLS=/tmp/iree/traces/$i; python $i; done
 ```
