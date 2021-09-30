@@ -32,6 +32,8 @@ config.substitutions.extend([
     ('%PYTHON', sys.executable),
 ])
 
+config.environment['PYTHONPATH'] = ":".join(sys.path)
+
 project_root = os.path.dirname(os.path.dirname(__file__))
 
 # Enable features based on -D FEATURES=hugetest,vulkan

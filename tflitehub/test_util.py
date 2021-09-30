@@ -23,6 +23,8 @@ class TFLiteModelTest(testing.absltest.TestCase):
     self.model_path = model_path
 
   def setUp(self):
+    if self.model_path is None:
+      return
     exe_basename = os.path.basename(sys.argv[0])
     self.workdir = os.path.join(os.path.dirname(__file__), "tmp", exe_basename)
     print(f"TMP_DIR = {self.workdir}")
