@@ -1,0 +1,32 @@
+name: Daily regression tests
+
+on:
+  schedule:
+    - cron: '0 4,16 * * *'
+  workflow_dispatch:
+
+jobs:
+  tfhubmodels:
+    name: "Regression test TF hub models"
+    runs-on: ubuntu-18.04
+    # Don't run this in everyone's forks.
+    if: github.repository == 'google/iree-samples'
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+
+      - name: Install Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      - name: Install Deps
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run Tests
+        shell: bash
+        run: |
+          lit -v -D FEATURES=hugetest tflitehub
