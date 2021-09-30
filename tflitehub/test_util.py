@@ -17,11 +17,6 @@ import sys
 import tensorflow.compat.v2 as tf
 import urllib.request
 
-FLAGS = absl.flags.FLAGS
-
-absl.flags.DEFINE_boolean("bypass_compare_results", False,
-                          "Bypass result comparison with TFLite Interpreter.")
-
 class TFLiteModelTest(testing.absltest.TestCase):
   def __init__(self, model_path, *args, **kwargs):
     super(TFLiteModelTest, self).__init__(*args, **kwargs)
@@ -46,10 +41,6 @@ class TFLiteModelTest(testing.absltest.TestCase):
     for input in input_details:
       absl.logging.info("\t%s, %s", str(input["shape"]), input["dtype"].__name__)
       args.append(np.zeros(shape=input["shape"], dtype=input["dtype"]))
-    return args
-
-  def generate_inputs(self):
-    args = np.zeros([1, 1], dtype=np.float)
     return args
 
   def compare_results(self, iree_results, tflite_results, details):
@@ -78,30 +69,23 @@ class TFLiteModelTest(testing.absltest.TestCase):
       target_backends=iree_tflite_compile.DEFAULT_TESTING_BACKENDS,
       import_only=False)
 
-    # Some models may not be TFLite Python API compatible.
-    # Bypass the comparison check.
-    if not FLAGS.bypass_compare_results:
-      absl.logging.info("Setting up tflite interpreter")
-      tflite_interpreter = tf.lite.Interpreter(model_path=self.tflite_file)
-      tflite_interpreter.allocate_tensors()
-      input_details = tflite_interpreter.get_input_details()
-      output_details = tflite_interpreter.get_output_details()
+    absl.logging.info("Setting up tflite interpreter")
+    tflite_interpreter = tf.lite.Interpreter(model_path=self.tflite_file)
+    tflite_interpreter.allocate_tensors()
+    input_details = tflite_interpreter.get_input_details()
+    output_details = tflite_interpreter.get_output_details()
 
-      absl.logging.info("Setting up test inputs")
-      args = self.generate_inputs(input_details)
+    absl.logging.info("Setting up test inputs")
+    args = self.generate_inputs(input_details)
 
-      absl.logging.info("Invoking TFLite")
-      for i, input in enumerate(args):
-        tflite_interpreter.set_tensor(input_details[i]['index'], input)
-      tflite_interpreter.invoke()
-      tflite_results = []
-      for output_detail in output_details:
-        tflite_results.append(np.array(tflite_interpreter.get_tensor(
-          output_detail['index'])))
-    else:
-      # Still generate inputs so we can run IREE invocation.
-      # The model test class needs to provide the right input.
-      args = self.generate_inputs()
+    absl.logging.info("Invoking TFLite")
+    for i, input in enumerate(args):
+      tflite_interpreter.set_tensor(input_details[i]['index'], input)
+    tflite_interpreter.invoke()
+    tflite_results = []
+    for output_detail in output_details:
+      tflite_results.append(np.array(tflite_interpreter.get_tensor(
+        output_detail['index'])))
 
 
     absl.logging.info("Invoke IREE")
@@ -116,13 +100,12 @@ class TFLiteModelTest(testing.absltest.TestCase):
       if not isinstance(iree_results, tuple):
         iree_results = (iree_results,)
 
-    if not FLAGS.bypass_compare_results:
-      # Fix type information for unsigned cases.
-      iree_results = list(iree_results)
-      tflite_results = list(tflite_results)
-      for i in range(len(output_details)):
-        dtype = output_details[i]["dtype"]
-        iree_results[i] = iree_results[i].astype(dtype)
-        tflite_results[i] = tflite_results[i].astype(dtype)
+    # Fix type information for unsigned cases.
+    iree_results = list(iree_results)
+    tflite_results = list(tflite_results)
+    for i in range(len(output_details)):
+      dtype = output_details[i]["dtype"]
+      iree_results[i] = iree_results[i].astype(dtype)
+      tflite_results[i] = tflite_results[i].astype(dtype)
 
-      self.compare_results(iree_results, tflite_results, output_details)
+    self.compare_results(iree_results, tflite_results, output_details)

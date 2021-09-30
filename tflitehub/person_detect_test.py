@@ -28,9 +28,6 @@ class PersonDetectTest(test_util.TFLiteModelTest):
     args = [im.reshape(shape)]
     return args
 
-  def generate_inputs(self):
-    args = numpy.random.randint(low=-128, high=127, size=[1, 96, 96, 1], dtype=numpy.int8)
-
   def test_compile_tflite(self):
     # tflite.interpreter python API has problem rendering this file. Issue filed.
     # The example would fail after the iree_tflite_compile.compile_file.
