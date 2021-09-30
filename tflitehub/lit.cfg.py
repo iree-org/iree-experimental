@@ -25,6 +25,7 @@ config.excludes = [
   'lit.cfg.py',
   'lit.site.cfg.py',
   'test_util.py',
+  'manual_test.py',
 ]
 
 config.substitutions.extend([
@@ -32,4 +33,9 @@ config.substitutions.extend([
 ])
 
 project_root = os.path.dirname(os.path.dirname(__file__))
-config.environment["FILECHECK_OPTS"] = "--dump-input=fail"
+
+# Enable features based on -D FEATURES=hugetest,vulkan
+# syntax.
+features_param = lit_config.params.get('FEATURES')
+if features_param:
+  config.available_features.update(features_param.split(','))

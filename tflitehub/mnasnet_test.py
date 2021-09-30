@@ -1,3 +1,5 @@
+# RUN: %PYTHON %s
+
 import absl.testing
 import numpy
 import test_util

@@ -13,3 +13,13 @@ via:
 ./setup_venv.sh
 source iree-samples.venv/bin/activate
 ```
+
+## Running sample test suites
+
+```
+# Run quick tests.
+lit -v tflitehub
+
+# Enable all tests.
+lit -v -D FEATURES=hugetest tflitehub
+```

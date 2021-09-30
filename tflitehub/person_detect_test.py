@@ -1,5 +1,6 @@
 # RUN: %PYTHON %s
 # XFAIL: *
+
 import absl.testing
 import numpy
 import test_util

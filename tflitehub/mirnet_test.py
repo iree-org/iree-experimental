@@ -1,4 +1,5 @@
 # RUN: %PYTHON %s
+# REQUIRES: hugetest
 
 import absl.testing
 import numpy
