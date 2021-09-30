@@ -11,10 +11,10 @@ import absl.testing as testing
 import iree.compiler.tflite as iree_tflite_compile
 import iree.runtime as iree_rt
 import numpy as np
+import os
+import sys
 import tensorflow.compat.v2 as tf
 import urllib.request
-
-FLAGS = absl.flags.FLAGS
 
 class TFLiteModelTest(testing.absltest.TestCase):
   def __init__(self, model_path, *args, **kwargs):
@@ -22,7 +22,10 @@ class TFLiteModelTest(testing.absltest.TestCase):
     self.model_path = model_path
 
   def setUp(self):
-    self.workdir = self.workdir = FLAGS.test_tmpdir
+    exe_basename = os.path.basename(sys.argv[0])
+    self.workdir = os.path.join(os.path.dirname(__file__), "tmp", exe_basename)
+    print(f"TMP_DIR = {self.workdir}")
+    os.makedirs(self.workdir, exist_ok=True)
     self.tflite_file = '/'.join([self.workdir, 'model.tflite'])
     self.tflite_ir = '/'.join([self.workdir, 'tflite.mlir'])
 
@@ -78,7 +81,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
     for output_detail in output_details:
       tflite_results.append(np.array(tflite_interpreter.get_tensor(
         output_detail['index'])))
-    
+
 
     absl.logging.info("Invoke IREE")
     iree_results = None

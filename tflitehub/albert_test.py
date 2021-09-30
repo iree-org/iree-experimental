@@ -1,3 +1,4 @@
+# RUN: %PYTHON %s
 
 import absl.testing
 import numpy

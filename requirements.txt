@@ -1,0 +1,19 @@
+# IREE Python API
+-f https://github.com/google/iree/releases
+iree-compiler-snapshot
+iree-runtime-snapshot
+iree-tools-tflite-snapshot
+iree-tools-xla-snapshot
+iree-tools-tf-snapshot
+
+# TensorFlow and JAX.
+tensorflow
+jax[cpu]
+
+
+# tflitehub dependencies.
+Pillow
+
+# Testing and support.
+lit
+pyyaml

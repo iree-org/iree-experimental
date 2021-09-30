@@ -23,23 +23,7 @@ source "$venv_dir/bin/activate" || die "Could not activate venv"
 
 # Upgrade pip.
 python -m pip install --upgrade pip || die "Could not upgrade pip"
-
-# Install local binaries.
-python -m pip install \
-  -f https://github.com/google/iree/releases --upgrade \
-  iree-compiler-snapshot \
-  iree-runtime-snapshot \
-  iree-tools-tflite-snapshot \
-  iree-tools-xla-snapshot \
-  iree-tools-tf-snapshot \
-  || die "Could not install IREE deps"
-
-# Install dependencies.
-python -m pip install --upgrade tensorflow || die "Could not install TensorFlow"
-python -m pip install --upgrade "jax[cpu]" || die "Could not install JAX"
-
-# tflitehub dependencies.
-python -m pip install Pillow || die "Could not install Pillow"
+python -m pip install -r "$td/requirements.txt"
 
 echo "Activate venv with:"
 echo "  source $venv_dir/bin/activate"
