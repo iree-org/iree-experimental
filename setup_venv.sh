@@ -23,7 +23,7 @@ source "$venv_dir/bin/activate" || die "Could not activate venv"
 
 # Upgrade pip.
 python -m pip install --upgrade pip || die "Could not upgrade pip"
-python -m pip install -r "$td/requirements.txt"
+python -m pip install --upgrade -r "$td/requirements.txt"
 
 echo "Activate venv with:"
 echo "  source $venv_dir/bin/activate"
