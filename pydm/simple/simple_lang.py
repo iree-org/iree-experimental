@@ -9,6 +9,7 @@ from typing import List, Optional
 
 import io
 import functools
+import sys
 
 from iree.compiler.api import driver
 from iree.compiler.dialects.iree_pydm.importer import (
@@ -19,6 +20,10 @@ from iree.compiler.dialects.iree_pydm.importer import (
     ImportContext,
     ImportStage,
 )
+from iree.compiler.dialects.iree_pydm.rtl import (
+    get_std_rtl_asm,
+)
+
 from iree.compiler.dialects import builtin as builtin_d
 from iree.compiler.dialects import iree_pydm as pydm_d
 from iree.compiler import (ir, passmanager, transforms as unused_transforms)
@@ -40,11 +45,13 @@ class SimpleModule:
   ```
   """
 
-  def __init__(self, name: str = "module"):
+  def __init__(self, name: str = "module", debug: bool = False):
     self.name = name
+    self.debug = debug
     self.exported_funcs: List[FuncProvidingIntrinsic] = []
     self._compiled_binary = None
     self._loaded_module = None
+    self._exports = None
 
   def export_pyfunc(self,
                     f=None,
@@ -79,7 +86,7 @@ class SimpleModule:
 
   def compile(self, context: Optional[ir.Context] = None) -> "Compiler":
     """Compiles the module given the exported and internal functions."""
-    compiler = Compiler(context)
+    compiler = Compiler(context, debug=self.debug)
     compiler.import_module(self)
     compiler.compile()
     self._compiled_binary = compiler.translate()
@@ -102,20 +109,69 @@ class SimpleModule:
       self._loaded_module = load_vm_module(vm_module, system_config)
     return self._loaded_module
 
+  @property
+  def exports(self):
+    if self._exports: return self._exports
+    self._exports = PyWrapperModule()
+    native_module = self.loaded_module
+    for name in native_module.vm_module.function_names:
+      setattr(self._exports, name,
+          _create_py_wrapper(getattr(native_module, name)))
+    return self._exports
+
   def save(self, filename: str):
     with open(filename, "wb") as f:
       f.write(self.compiled_binary)
 
 
+class PyWrapperModule:
+  ...
+
+
+def _create_py_wrapper(native_func):
+  """Wraps a native func so that it does arg/result translation."""
+  def invoke(*args, **kwargs):
+    exc_code, result = native_func(*args, **kwargs)
+    if exc_code == 0:
+      return result
+    elif exc_code == -1:
+      raise StopIteration()
+    elif exc_code == -2:
+      raise StopAsyncIteration()
+    elif exc_code == -3:
+      raise RuntimeError()
+    elif exc_code == -4:
+      raise ValueError()
+    elif exc_code == -5:
+      raise NotImplementedError()
+    elif exc_code == -6:
+      raise KeyError()
+    elif exc_code == -7:
+      raise IndexError()
+    elif exc_code == -8:
+      raise AttributeError()
+    elif exc_code == -9:
+      raise TypeError()
+    elif exc_code == -10:
+      raise UnboundLocalError()
+    else:
+      raise RuntimeError(f"Unmapped native exception code: {exc_code}")
+  return invoke
+
+
 class Compiler:
   """A module being compiled."""
 
-  def __init__(self, context: Optional[ir.Context] = None):
-    self.context = context if context else create_context()
+  def __init__(self, context: Optional[ir.Context] = None, debug: bool = False):
+    self.debug = debug
+    self.context = context if context else create_context(debug=debug)
     self.hooks = DefaultImportHooks()
     self.root_module = ir.Module.create(
         ir.Location.unknown(context=self.context))
     self.module_op = self.root_module.operation
+    self.rtl_asm = get_std_rtl_asm()
+
+    # IREE compiler options.
     self.options = driver.CompilerOptions()
     self.options.add_target_backend("cpu")
 
@@ -139,7 +195,13 @@ class Compiler:
     with self.context:
       # TODO: Create a real pass pipeline to do first stage optimizations.
       pm = passmanager.PassManager.parse("builtin.module(canonicalize,cse)")
-      pydm_d.build_lower_to_iree_pass_pipeline(pm)
+      if self.debug:
+        pm.enable_ir_printing()
+      pydm_d.build_lower_to_iree_pass_pipeline(pm, link_rtl_asm=self.rtl_asm)
+      pm.run(self.root_module)
+      #self.root_module.operation.print(enable_debug_info=True)
+
+      pm = passmanager.PassManager()
       driver.build_iree_vm_pass_pipeline(self.options, pm)
       pm.run(self.root_module)
 
