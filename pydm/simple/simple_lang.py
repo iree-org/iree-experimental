@@ -45,11 +45,13 @@ class SimpleModule:
   ```
   """
 
-  def __init__(self, name: str = "module"):
+  def __init__(self, name: str = "module", debug: bool = False):
     self.name = name
+    self.debug = debug
     self.exported_funcs: List[FuncProvidingIntrinsic] = []
     self._compiled_binary = None
     self._loaded_module = None
+    self._exports = None
 
   def export_pyfunc(self,
                     f=None,
@@ -84,7 +86,7 @@ class SimpleModule:
 
   def compile(self, context: Optional[ir.Context] = None) -> "Compiler":
     """Compiles the module given the exported and internal functions."""
-    compiler = Compiler(context)
+    compiler = Compiler(context, debug=self.debug)
     compiler.import_module(self)
     compiler.compile()
     self._compiled_binary = compiler.translate()
@@ -107,15 +109,60 @@ class SimpleModule:
       self._loaded_module = load_vm_module(vm_module, system_config)
     return self._loaded_module
 
+  @property
+  def exports(self):
+    if self._exports: return self._exports
+    self._exports = PyWrapperModule()
+    native_module = self.loaded_module
+    for name in native_module.vm_module.function_names:
+      setattr(self._exports, name,
+          _create_py_wrapper(getattr(native_module, name)))
+    return self._exports
+
   def save(self, filename: str):
     with open(filename, "wb") as f:
       f.write(self.compiled_binary)
 
 
+class PyWrapperModule:
+  ...
+
+
+def _create_py_wrapper(native_func):
+  """Wraps a native func so that it does arg/result translation."""
+  def invoke(*args, **kwargs):
+    exc_code, result = native_func(*args, **kwargs)
+    if exc_code == 0:
+      return result
+    elif exc_code == -1:
+      raise StopIteration()
+    elif exc_code == -2:
+      raise StopAsyncIteration()
+    elif exc_code == -3:
+      raise RuntimeError()
+    elif exc_code == -4:
+      raise ValueError()
+    elif exc_code == -5:
+      raise NotImplementedError()
+    elif exc_code == -6:
+      raise KeyError()
+    elif exc_code == -7:
+      raise IndexError()
+    elif exc_code == -8:
+      raise AttributeError()
+    elif exc_code == -9:
+      raise TypeError()
+    elif exc_code == -10:
+      raise UnboundLocalError()
+    else:
+      raise RuntimeError(f"Unmapped native exception code: {exc_code}")
+  return invoke
+
+
 class Compiler:
   """A module being compiled."""
 
-  def __init__(self, context: Optional[ir.Context] = None, debug: bool = True):
+  def __init__(self, context: Optional[ir.Context] = None, debug: bool = False):
     self.debug = debug
     self.context = context if context else create_context(debug=debug)
     self.hooks = DefaultImportHooks()
