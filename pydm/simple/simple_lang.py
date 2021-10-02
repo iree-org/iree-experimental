@@ -19,6 +19,10 @@ from iree.compiler.dialects.iree_pydm.importer import (
     ImportContext,
     ImportStage,
 )
+from iree.compiler.dialects.iree_pydm.rtl import (
+    get_std_rtl_asm,
+)
+
 from iree.compiler.dialects import builtin as builtin_d
 from iree.compiler.dialects import iree_pydm as pydm_d
 from iree.compiler import (ir, passmanager, transforms as unused_transforms)
@@ -110,12 +114,16 @@ class SimpleModule:
 class Compiler:
   """A module being compiled."""
 
-  def __init__(self, context: Optional[ir.Context] = None):
-    self.context = context if context else create_context()
+  def __init__(self, context: Optional[ir.Context] = None, debug: bool = True):
+    self.debug = debug
+    self.context = context if context else create_context(debug=debug)
     self.hooks = DefaultImportHooks()
     self.root_module = ir.Module.create(
         ir.Location.unknown(context=self.context))
     self.module_op = self.root_module.operation
+    self.rtl_asm = get_std_rtl_asm()
+
+    # IREE compiler options.
     self.options = driver.CompilerOptions()
     self.options.add_target_backend("cpu")
 
@@ -139,8 +147,10 @@ class Compiler:
     with self.context:
       # TODO: Create a real pass pipeline to do first stage optimizations.
       pm = passmanager.PassManager.parse("builtin.module(canonicalize,cse)")
-      pydm_d.build_lower_to_iree_pass_pipeline(pm)
+      pydm_d.build_lower_to_iree_pass_pipeline(pm, link_rtl_asm=self.rtl_asm)
       driver.build_iree_vm_pass_pipeline(self.options, pm)
+      if self.debug:
+        pm.enable_ir_printing()
       pm.run(self.root_module)
 
   def translate(self):

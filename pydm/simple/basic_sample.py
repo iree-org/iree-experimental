@@ -10,9 +10,13 @@ M = SimpleModule()
 
 
 @M.export_pyfunc
-def return_arg(a: int) -> int:
-  return a
+def return_arg(a: int, b: int, c: int) -> int:
+  #return a if b else c
+  if b:
+    return a
+  else:
+    return c
 
 
 M.save("/tmp/basic_sample.vmfb")
-print(M.loaded_module.return_arg(5))
+print(M.loaded_module.return_arg(5, 0, 1))
