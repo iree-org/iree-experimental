@@ -131,7 +131,15 @@ class PyWrapperModule:
 def _create_py_wrapper(native_func):
   """Wraps a native func so that it does arg/result translation."""
   def invoke(*args, **kwargs):
-    exc_code, result = native_func(*args, **kwargs)
+    try:
+      exc_code, result = native_func(*args, **kwargs)
+    except IndexError as e:
+      # The VM raises this on an out of bounds list access, which happens
+      # when a variables is read before assignment. This suits us for now,
+      # since error reporting is better through the VM than gencode right now.
+      # This is a bit imprecise, though.
+      raise UnboundLocalError() from e
+
     if exc_code == 0:
       return result
     elif exc_code == -1:
