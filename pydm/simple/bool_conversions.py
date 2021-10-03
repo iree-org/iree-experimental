@@ -35,14 +35,6 @@ def object_as_bool_float(condition: float, true_value: int, false_value: int) ->
     return false_value
 
 
-@M.export_pyfunc
-def type_error_on_return(condition: bool, true_value: int, false_value: float) -> int:
-  if condition:
-    return true_value
-  else:
-    return false_value
-
-
 class BranchAndCastTest(unittest.TestCase):
 
   def test_object_as_bool_int(self):
@@ -56,11 +48,6 @@ class BranchAndCastTest(unittest.TestCase):
   def test_object_as_bool_float(self):
     self.assertEqual(2, M.exports.object_as_bool_float(0.0, 1, 2))
     self.assertEqual(1, M.exports.object_as_bool_float(1.0, 1, 2))
-
-  def test_type_error_on_return(self):
-    with self.assertRaises(ValueError):
-      M.exports.type_error_on_return(0, 1, 2.0)
-    self.assertEqual(1, M.exports.type_error_on_return(1, 1, 2.0))
 
 
 if __name__ == '__main__':
