@@ -9,6 +9,7 @@ from typing import List, Optional
 
 import io
 import functools
+import sys
 
 from iree.compiler.api import driver
 from iree.compiler.dialects.iree_pydm.importer import (
@@ -147,10 +148,14 @@ class Compiler:
     with self.context:
       # TODO: Create a real pass pipeline to do first stage optimizations.
       pm = passmanager.PassManager.parse("builtin.module(canonicalize,cse)")
-      pydm_d.build_lower_to_iree_pass_pipeline(pm, link_rtl_asm=self.rtl_asm)
-      driver.build_iree_vm_pass_pipeline(self.options, pm)
       if self.debug:
         pm.enable_ir_printing()
+      pydm_d.build_lower_to_iree_pass_pipeline(pm, link_rtl_asm=self.rtl_asm)
+      pm.run(self.root_module)
+      #self.root_module.operation.print(enable_debug_info=True)
+
+      pm = passmanager.PassManager()
+      driver.build_iree_vm_pass_pipeline(self.options, pm)
       pm.run(self.root_module)
 
   def translate(self):

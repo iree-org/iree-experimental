@@ -4,7 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+print("Starting...")
 from simple_lang import SimpleModule
+print("Loaded.")
 
 M = SimpleModule()
 
@@ -17,6 +19,7 @@ def return_arg(a: int, b: int, c: int) -> int:
   else:
     return c
 
-
+print("Saving...")
 M.save("/tmp/basic_sample.vmfb")
+print("Saved.")
 print(M.loaded_module.return_arg(5, 0, 1))
