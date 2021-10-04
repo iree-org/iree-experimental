@@ -14,5 +14,5 @@ Setup the venv for running:
 
 Run the torch-mlir e2e test suite for TorchScript:
 ```
-(iree-samples.venv) $ "${TORCHMLIR_SRC_ROOT}/tools/torchscript_e2e_test.sh" -c external --external-config "${IREE_SAMPLES_SRC_ROOT}/torch-iree/torchscript_e2e_config.py"
+(iree-samples.venv) $ "${TORCHMLIR_SRC_ROOT}/tools/torchscript_e2e_test.sh" -c external --external-config "${IREE_SAMPLES_SRC_ROOT}/iree-torch/torchscript_e2e_config.py"
 ```
