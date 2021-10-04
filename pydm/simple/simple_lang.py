@@ -21,7 +21,7 @@ from iree.compiler.dialects.iree_pydm.importer import (
     ImportStage,
 )
 from iree.compiler.dialects.iree_pydm.rtl import (
-    get_std_rtl_asm,
+    get_std_rtl_source_bundle,
 )
 
 from iree.compiler.dialects import builtin as builtin_d
@@ -177,7 +177,7 @@ class Compiler:
     self.root_module = ir.Module.create(
         ir.Location.unknown(context=self.context))
     self.module_op = self.root_module.operation
-    self.rtl_asm = get_std_rtl_asm()
+    self.rtl_source_bundle = get_std_rtl_source_bundle()
 
     # IREE compiler options.
     self.options = driver.CompilerOptions()
@@ -205,7 +205,9 @@ class Compiler:
       pm = passmanager.PassManager.parse("builtin.module(canonicalize,cse)")
       if self.debug:
         pm.enable_ir_printing()
-      pydm_d.build_lower_to_iree_pass_pipeline(pm, link_rtl_asm=self.rtl_asm)
+      lowering_options = pydm_d.LoweringOptions()
+      lowering_options.link_rtl(self.rtl_source_bundle)
+      pydm_d.build_lower_to_iree_pass_pipeline(pm, lowering_options)
       pm.run(self.root_module)
       #self.root_module.operation.print(enable_debug_info=True)
 
