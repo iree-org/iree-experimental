@@ -59,6 +59,28 @@ class TFLiteModelTest(testing.absltest.TestCase):
       maxError = np.max(np.abs(iree_result - tflite_result))
       absl.logging.info("Max error (%d): %f", i, maxError)
 
+  def setup_tflite(self):
+    absl.logging.info("Setting up tflite interpreter")
+    self.tflite_interpreter = tf.lite.Interpreter(model_path=self.tflite_file)
+    self.tflite_interpreter.allocate_tensors()
+    self.input_details = self.tflite_interpreter.get_input_details()
+    self.output_details = self.tflite_interpreter.get_output_details()
+
+  def invoke_tflite(self, args):
+    absl.logging.info("Invoking TFLite")
+    for i, input in enumerate(args):
+      self.tflite_interpreter.set_tensor(self.input_details[i]['index'], input)
+    self.tflite_interpreter.invoke()
+    tflite_results = []
+    for output_detail in self.output_details:
+      tflite_results.append(np.array(self.tflite_interpreter.get_tensor(
+        output_detail['index'])))
+
+    for i in range(len(self.output_details)):
+      dtype = self.output_details[i]["dtype"]
+      tflite_results[i] = tflite_results[i].astype(dtype)
+    return tflite_results
+
   def compile_and_execute(self):
     self.assertIsNotNone(self.model_path)
 
@@ -71,24 +93,13 @@ class TFLiteModelTest(testing.absltest.TestCase):
       target_backends=iree_tflite_compile.DEFAULT_TESTING_BACKENDS,
       import_only=False)
 
-    absl.logging.info("Setting up tflite interpreter")
-    tflite_interpreter = tf.lite.Interpreter(model_path=self.tflite_file)
-    tflite_interpreter.allocate_tensors()
-    input_details = tflite_interpreter.get_input_details()
-    output_details = tflite_interpreter.get_output_details()
+    self.setup_tflite()
 
     absl.logging.info("Setting up test inputs")
-    args = self.generate_inputs(input_details)
+    args = self.generate_inputs(self.input_details)
 
     absl.logging.info("Invoking TFLite")
-    for i, input in enumerate(args):
-      tflite_interpreter.set_tensor(input_details[i]['index'], input)
-    tflite_interpreter.invoke()
-    tflite_results = []
-    for output_detail in output_details:
-      tflite_results.append(np.array(tflite_interpreter.get_tensor(
-        output_detail['index'])))
-
+    tflite_results = self.invoke_tflite(args)
 
     absl.logging.info("Invoke IREE")
     iree_results = None
@@ -104,10 +115,9 @@ class TFLiteModelTest(testing.absltest.TestCase):
 
     # Fix type information for unsigned cases.
     iree_results = list(iree_results)
-    tflite_results = list(tflite_results)
-    for i in range(len(output_details)):
-      dtype = output_details[i]["dtype"]
+    for i in range(len(self.output_details)):
+      dtype = self.output_details[i]["dtype"]
       iree_results[i] = iree_results[i].astype(dtype)
-      tflite_results[i] = tflite_results[i].astype(dtype)
 
-    self.compare_results(iree_results, tflite_results, output_details)
+
+    self.compare_results(iree_results, tflite_results, self.output_details)
