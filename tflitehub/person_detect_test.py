@@ -1,10 +1,7 @@
 # RUN: %PYTHON %s
 # XFAIL: *
 
-import absl
 import absl.testing
-import iree.compiler.tflite as iree_tflite_compile
-import iree.runtime as iree_rt
 import numpy
 import test_util
 import urllib.request
@@ -19,7 +16,7 @@ class PersonDetectTest(test_util.TFLiteModelTest):
 
   def compare_results(self, iree_results, tflite_results, details):
     super(PersonDetectTest, self).compare_results(iree_results, tflite_results, details)
-    self.assertTrue(numpy.isclose(iree_results[0], tflite_results[0], atol=2).all())
+    self.assertTrue(numpy.isclose(iree_results[0], tflite_results[0], atol=1e-3).all())
 
   # TFLite is broken with this model so we hardcode the input/output details.
   def setup_tflite(self):
