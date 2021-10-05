@@ -32,10 +32,10 @@ class TFLiteModelTest(testing.absltest.TestCase):
     self.tflite_file = '/'.join([self.workdir, 'model.tflite'])
     self.tflite_ir = '/'.join([self.workdir, 'tflite.mlir'])
     self.iree_ir = '/'.join([self.workdir, 'tosa.mlir'])
-    if os.path.exists(self.model_path):
-      shutil.copy(self.model_path, self.tflite_file)
-    else:
-      urllib.request.urlretrieve(self.model_path, self.tflite_file)
+    # if os.path.exists(self.model_path):
+    #   shutil.copy(self.model_path, self.tflite_file)
+    # else:
+    #   urllib.request.urlretrieve(self.model_path, self.tflite_file)
     self.binary = '/'.join([self.workdir, 'module.bytecode'])
 
   def generate_inputs(self, input_details):
