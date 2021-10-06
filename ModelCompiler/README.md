@@ -21,6 +21,7 @@ source ~/ModelCompilerEnv/bin/activate
 ```bash
 pip install tensorflow
 pip install gin-config
+pip install transformers
 ```
 ### Installing IREE-Python
 ```bash
