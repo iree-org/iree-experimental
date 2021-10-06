@@ -8,7 +8,7 @@ import urllib.request
 
 from PIL import Image
 
-model_path = "https://github.com/tensorflow/tflite-micro/raw/main/tensorflow/lite/micro/models/person_detect.tflite"
+model_path = "https://github.com/tensorflow/tflite-micro/raw/aeac6f39e5c7475cea20c54e86d41e3a38312546/tensorflow/lite/micro/models/person_detect.tflite"
 
 class PersonDetectTest(test_util.TFLiteModelTest):
   def __init__(self, *args, **kwargs):
@@ -35,7 +35,7 @@ class PersonDetectTest(test_util.TFLiteModelTest):
     return [numpy.array([[-113, 113]], dtype=numpy.int8)]
 
   def generate_inputs(self, input_details):
-    img_path = "https://github.com/tensorflow/tflite-micro/raw/main/tensorflow/lite/micro/examples/person_detection/testdata/person.bmp"
+    img_path = "https://github.com/tensorflow/tflite-micro/raw/aeac6f39e5c7475cea20c54e86d41e3a38312546/tensorflow/lite/micro/examples/person_detection/testdata/person.bmp"
     local_path = "/".join([self.workdir, "person.bmp"])
     urllib.request.urlretrieve(img_path, local_path)
 
@@ -45,8 +45,6 @@ class PersonDetectTest(test_util.TFLiteModelTest):
     return args
 
   def test_compile_tflite(self):
-    # tflite.interpreter python API has problem rendering this file. Issue filed.
-    # The example would fail after the iree_tflite_compile.compile_file.
     self.compile_and_execute()
 
 if __name__ == '__main__':
