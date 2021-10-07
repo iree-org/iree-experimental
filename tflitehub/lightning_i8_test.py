@@ -44,6 +44,7 @@ class LightningI8Test(test_util.TFLiteModelTest):
 
   def compare_results(self, iree_results, tflite_results, details):
     super(LightningI8Test, self).compare_results(iree_results, tflite_results, details)
+    self.assertTrue(numpy.isclose(iree_results[0], tflite_results[0], atol=1e-3).all())
     # self.plot_results(iree_results, tflite_results, details)
 
   def generate_inputs(self, input_details):
