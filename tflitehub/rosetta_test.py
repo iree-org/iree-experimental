@@ -7,7 +7,7 @@ import test_util
 
 model_path = "https://tfhub.dev/tulasiram58827/lite-model/rosetta/dr/1?lite-format=tflite"
 
-# Note this one takes forever right now. Great for performance work!
+# tfl.padv2 cannot be lowered to tosa.pad. May be possible to switch tosa.concat
 class RosettaTest(test_util.TFLiteModelTest):
   def __init__(self, *args, **kwargs):
     super(RosettaTest, self).__init__(model_path, *args, **kwargs)

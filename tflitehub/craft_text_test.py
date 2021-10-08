@@ -6,6 +6,8 @@ import test_util
 
 model_path = "https://tfhub.dev/tulasiram58827/lite-model/craft-text-detector/dr/1?lite-format=tflite"
 
+# Failure: Resize lowering does not handle inferred dynamic shapes. Furthermore, the entire model
+# requires dynamic shape support.
 class CraftTextTest(test_util.TFLiteModelTest):
   def __init__(self, *args, **kwargs):
     super(CraftTextTest, self).__init__(model_path, *args, **kwargs)
