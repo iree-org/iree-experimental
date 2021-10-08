@@ -8,7 +8,7 @@ import test_util
 model_path = "https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/tflite/float16/4?lite-format=tflite"
 
 # Currently failing further in the linalg stack:
-#   Tosa does not support fp16, we need to find a workaround.
+#   Bug related to linalg fusion. Collapsing dimension despite linalg index.
 class LightningFp16Test(test_util.TFLiteModelTest):
   def __init__(self, *args, **kwargs):
     super(LightningFp16Test, self).__init__(model_path, *args, **kwargs)
