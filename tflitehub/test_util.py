@@ -15,6 +15,7 @@ import os
 import shutil
 import sys
 import tensorflow.compat.v2 as tf
+import time
 import urllib.request
 
 class TFLiteModelTest(testing.absltest.TestCase):
@@ -67,11 +68,13 @@ class TFLiteModelTest(testing.absltest.TestCase):
     self.output_details = self.tflite_interpreter.get_output_details()
 
   def invoke_tflite(self, args):
-    absl.logging.info("Invoking TFLite")
     for i, input in enumerate(args):
       self.tflite_interpreter.set_tensor(self.input_details[i]['index'], input)
+    start = time.perf_counter()
     self.tflite_interpreter.invoke()
+    end = time.perf_counter()
     tflite_results = []
+    absl.logging.info(f"Invocation time: {end - start:0.4f} seconds")
     for output_detail in self.output_details:
       tflite_results.append(np.array(self.tflite_interpreter.get_tensor(
         output_detail['index'])))
@@ -109,7 +112,10 @@ class TFLiteModelTest(testing.absltest.TestCase):
       vm_module = iree_rt.VmModule.from_flatbuffer(f.read())
       ctx.add_vm_module(vm_module)
       invoke = ctx.modules.module["main"]
+      start = time.perf_counter()
       iree_results = invoke(*args)
+      end = time.perf_counter()
+      absl.logging.info(f"Invocation time: {end - start:0.4f} seconds")
       if not isinstance(iree_results, tuple):
         iree_results = (iree_results,)
 
