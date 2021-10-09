@@ -31,6 +31,21 @@ from iree import runtime as iree_runtime
 from iree.runtime.system_api import load_vm_module
 
 
+def jit(f=None, debug: bool = False):
+  """Jit compiles a single function to IREE."""
+
+  if not f:
+    return functools.partial(jit, debug=debug)
+
+  def wrapped(*args, **kwargs):
+    return getattr(wrapped.module.exports, "main")(*args, **kwargs)
+
+  wrapped.module = SimpleModule(debug=debug)
+  wrapped.module.export_pyfunc(f, symbol="main")
+  wrapped.__name__ = __name__
+  return wrapped
+
+
 class SimpleModule:
   """Declares a runtime library module.
 
@@ -140,6 +155,7 @@ def _create_py_wrapper(native_func):
       # This is a bit imprecise, though.
       raise UnboundLocalError() from e
 
+    msg = "Raised from compiled function"
     if exc_code == 0:
       return result
     elif exc_code == -1:
@@ -147,21 +163,21 @@ def _create_py_wrapper(native_func):
     elif exc_code == -2:
       raise StopAsyncIteration()
     elif exc_code == -3:
-      raise RuntimeError()
+      raise RuntimeError(msg)
     elif exc_code == -4:
-      raise ValueError()
+      raise ValueError(msg)
     elif exc_code == -5:
-      raise NotImplementedError()
+      raise NotImplementedError(msg)
     elif exc_code == -6:
-      raise KeyError()
+      raise KeyError(msg)
     elif exc_code == -7:
-      raise IndexError()
+      raise IndexError(msg)
     elif exc_code == -8:
-      raise AttributeError()
+      raise AttributeError(msg)
     elif exc_code == -9:
-      raise TypeError()
+      raise TypeError(msg)
     elif exc_code == -10:
-      raise UnboundLocalError()
+      raise UnboundLocalError(msg)
     else:
       raise RuntimeError(f"Unmapped native exception code: {exc_code}")
   return invoke
@@ -212,6 +228,8 @@ class Compiler:
       #self.root_module.operation.print(enable_debug_info=True)
 
       pm = passmanager.PassManager()
+      # if self.debug:
+      #   pm.enable_ir_printing()
       driver.build_iree_vm_pass_pipeline(self.options, pm)
       pm.run(self.root_module)
 
