@@ -93,7 +93,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
       output_file=self.binary,
       save_temp_tfl_input=self.tflite_ir,
       save_temp_iree_input=self.iree_ir,
-      target_backends=["vulkan-spirv"],
+      target_backends=iree_tflite_compile.DEFAULT_TESTING_BACKENDS,
       import_only=False)
 
     self.setup_tflite()
@@ -107,7 +107,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
     absl.logging.info("Invoke IREE")
     iree_results = None
     with open(self.binary, 'rb') as f:
-      config = iree_rt.Config("vulkan")
+      config = iree_rt.Config("dylib")
       ctx = iree_rt.SystemContext(config=config)
       vm_module = iree_rt.VmModule.from_flatbuffer(f.read())
       ctx.add_vm_module(vm_module)
