@@ -34,7 +34,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
     self.tflite_ir = '/'.join([self.workdir, 'tflite.mlir'])
     self.iree_ir = '/'.join([self.workdir, 'tosa.mlir'])
     if os.path.exists(self.model_path):
-      shutil.copy(self.model_path, self.tflite_file)
+      self.tflite_file = self.model_path
     else:
       urllib.request.urlretrieve(self.model_path, self.tflite_file)
     self.binary = '/'.join([self.workdir, 'module.bytecode'])
