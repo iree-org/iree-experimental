@@ -7,16 +7,28 @@
 """Test architecture for a set of tflite tests."""
 
 import absl
+from absl.flags import FLAGS
 import absl.testing as testing
 import iree.compiler.tflite as iree_tflite_compile
 import iree.runtime as iree_rt
 import numpy as np
 import os
-import shutil
 import sys
 import tensorflow.compat.v2 as tf
 import time
 import urllib.request
+
+targets = {
+  'dylib' : 'dylib-llvm-aot',
+  'vulkan' : 'vulkan-spirv',
+}
+
+configs = {
+  'dylib' : 'dylib',
+  'vulkan' : 'vulkan',
+}
+
+absl.flags.DEFINE_string('config', 'dylib', 'model path to execute')
 
 class TFLiteModelTest(testing.absltest.TestCase):
   def __init__(self, model_path, *args, **kwargs):
@@ -93,7 +105,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
       output_file=self.binary,
       save_temp_tfl_input=self.tflite_ir,
       save_temp_iree_input=self.iree_ir,
-      target_backends=iree_tflite_compile.DEFAULT_TESTING_BACKENDS,
+      target_backends=[targets[absl.flags.FLAGS.config]],
       import_only=False)
 
     self.setup_tflite()
@@ -107,7 +119,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
     absl.logging.info("Invoke IREE")
     iree_results = None
     with open(self.binary, 'rb') as f:
-      config = iree_rt.Config("dylib")
+      config = iree_rt.Config(configs[absl.flags.FLAGS.config])
       ctx = iree_rt.SystemContext(config=config)
       vm_module = iree_rt.VmModule.from_flatbuffer(f.read())
       ctx.add_vm_module(vm_module)
