@@ -25,7 +25,9 @@ class EfficientNetTest(test_util.TFLiteModelTest):
 
   def compare_results(self, iree_results, tflite_results, details):
     super(EfficientNetTest, self).compare_results(iree_results, tflite_results, details)
-    self.assertTrue(numpy.isclose(iree_results[0], tflite_results[0], atol=2).all())
+    iree = iree_results[0].flatten().astype(numpy.single) 
+    tflite = tflite_results[0].flatten().astype(numpy.single)
+    self.assertTrue(numpy.isclose(iree, tflite, atol=8).all())
 
   def test_compile_tflite(self):
     self.compile_and_execute()
