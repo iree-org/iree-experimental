@@ -1,5 +1,5 @@
 # RUN: %PYTHON %s
-# REQUIRES: hugetest
+# REQUIRES: horrendoustest
 
 import absl.testing
 import numpy
@@ -7,6 +7,7 @@ import test_util
 
 model_path = "https://s3.amazonaws.com/models.huggingface.co/bert/gpt2-64.tflite"
 
+# This test is a massive download and excluded due to causing timeouts.
 class GPT2Test(test_util.TFLiteModelTest):
   def __init__(self, *args, **kwargs):
     super(GPT2Test, self).__init__(model_path, *args, **kwargs)
