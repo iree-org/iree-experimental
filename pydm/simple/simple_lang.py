@@ -217,15 +217,15 @@ class Compiler:
   def compile(self):
     """Compiles the module."""
     with self.context:
-      # TODO: Create a real pass pipeline to do first stage optimizations.
-      pm = passmanager.PassManager.parse("builtin.module(canonicalize,cse)")
-      if self.debug:
+      pm = passmanager.PassManager.parse("pydm-post-import-pipeline")
+      if self.debug > 1:
         pm.enable_ir_printing()
       lowering_options = pydm_d.LoweringOptions()
       lowering_options.link_rtl(self.rtl_source_bundle)
       pydm_d.build_lower_to_iree_pass_pipeline(pm, lowering_options)
       pm.run(self.root_module)
-      #self.root_module.operation.print(enable_debug_info=True)
+      if self.debug:
+        self.root_module.operation.print(enable_debug_info=True)
 
       pm = passmanager.PassManager()
       # if self.debug:

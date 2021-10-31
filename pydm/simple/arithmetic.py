@@ -24,7 +24,7 @@ class ArithmeticTest(unittest.TestCase):
     self.assertEqual(-1, add(3, 4))
 
   def test_int_arithmetic(self):
-    @jit
+    @jit(debug=2)
     def compute(a: int, b: int, c: int) -> int:
       if a - b:
         return 3 * a + 22 * b
