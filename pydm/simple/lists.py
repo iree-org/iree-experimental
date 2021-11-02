@@ -43,11 +43,32 @@ class ListsTest(unittest.TestCase):
     self.assertEqual(9, compute(1, 7))
 
   def test_list_multiply(self):
-    @jit(debug=2)
+    @jit(debug=0)
     def compute(count: int, index: int) -> int:
       lst = [1, 2, 3] * count
       return lst[index]
-    compute(5, 4)
+    full_list = [compute(5, i) for i in range(15)]
+    self.assertEqual(full_list, [1, 2, 3] * 5)
+    with self.assertRaises(IndexError):
+      compute(5, 15)
+    with self.assertRaises(IndexError):
+      compute(0, 0)
+    with self.assertRaises(IndexError):
+      compute(-1, 0)
+
+  def test_list_setitem(self):
+    @jit(debug=2)
+    def compute(write: int, value: int, read: int) -> int:
+      lst = [1, 2, 3]
+      lst[write] = value
+      return lst[read]
+    self.assertEqual(99, compute(1, 99, -2))
+    self.assertEqual(100, compute(-2, 100, 1))
+    with self.assertRaises(IndexError):
+      compute(3, 100, 0)
+    with self.assertRaises(IndexError):
+      compute(-4, 100, 0)
+
 
 if __name__ == '__main__':
     unittest.main()
