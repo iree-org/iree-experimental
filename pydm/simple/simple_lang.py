@@ -213,6 +213,9 @@ class Compiler:
     for f in m.exported_funcs:
       # Getting the symbol implies exporting it into the module.
       f.get_or_create_provided_func_symbol(stage)
+    if not self.root_module.operation.verify():
+      raise RuntimeError(
+        f"Imported Python module did not verify: {self.root_module}")
 
   def compile(self):
     """Compiles the module."""
