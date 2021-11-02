@@ -36,12 +36,18 @@ class ListsTest(unittest.TestCase):
       compute(1, 7, 4)
 
   def test_construct_literal_index_imm(self):
-    @jit(debug=2)
+    @jit(debug=0)
     def compute(a: int, b: int) -> int:
       lst = [a, b, 9]
       return lst[-1]
     self.assertEqual(9, compute(1, 7))
 
+  def test_list_multiply(self):
+    @jit(debug=2)
+    def compute(count: int, index: int) -> int:
+      lst = [1, 2, 3] * count
+      return lst[index]
+    compute(5, 4)
 
 if __name__ == '__main__':
     unittest.main()
