@@ -2,7 +2,7 @@
 
 This repository contains various samples and prototypes associated with the [IREE](https://github.com/google/iree) project.
 
-Contact the [IREE Team](iree-discuss@googlegroups.com) for questions about this repository.
+Contact the [IREE Team](https://github.com/google/iree#communication-channels) for questions about this repository.
 
 ## Setting up a venv
 
