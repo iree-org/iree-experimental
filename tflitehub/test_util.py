@@ -78,6 +78,14 @@ class TFLiteModelTest(testing.absltest.TestCase):
     self.input_details = self.tflite_interpreter.get_input_details()
     self.output_details = self.tflite_interpreter.get_output_details()
 
+  def setup_iree(self):
+    absl.logging.info("Setting up iree runtime")
+    with open(self.binary, 'rb') as f:
+      config = iree_rt.Config(configs[absl.flags.FLAGS.config])
+      self.iree_context = iree_rt.SystemContext(config=config)
+      vm_module = iree_rt.VmModule.from_flatbuffer(f.read())
+      self.iree_context.add_vm_module(vm_module)
+
   def invoke_tflite(self, args):
     for i, input in enumerate(args):
       self.tflite_interpreter.set_tensor(self.input_details[i]['index'], input)
@@ -95,6 +103,16 @@ class TFLiteModelTest(testing.absltest.TestCase):
       tflite_results[i] = tflite_results[i].astype(dtype)
     return tflite_results
 
+  def invoke_iree(self, args):
+    invoke = self.iree_context.modules.module["main"]
+    start = time.perf_counter()
+    iree_results = invoke(*args)
+    end = time.perf_counter()
+    absl.logging.info(f"Invocation time: {end - start:0.4f} seconds")
+    if not isinstance(iree_results, tuple):
+      iree_results = (iree_results,)
+    return iree_results
+
   def compile_and_execute(self):
     self.assertIsNotNone(self.model_path)
 
@@ -108,6 +126,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
       import_only=False)
 
     self.setup_tflite()
+    self.setup_iree()
 
     absl.logging.info("Setting up test inputs")
     args = self.generate_inputs(self.input_details)
@@ -116,19 +135,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
     tflite_results = self.invoke_tflite(args)
 
     absl.logging.info("Invoke IREE")
-    iree_results = None
-    with open(self.binary, 'rb') as f:
-      config = iree_rt.Config(configs[absl.flags.FLAGS.config])
-      ctx = iree_rt.SystemContext(config=config)
-      vm_module = iree_rt.VmModule.from_flatbuffer(f.read())
-      ctx.add_vm_module(vm_module)
-      invoke = ctx.modules.module["main"]
-      start = time.perf_counter()
-      iree_results = invoke(*args)
-      end = time.perf_counter()
-      absl.logging.info(f"Invocation time: {end - start:0.4f} seconds")
-      if not isinstance(iree_results, tuple):
-        iree_results = (iree_results,)
+    iree_results = self.invoke_iree(args)
 
     # Fix type information for unsigned cases.
     iree_results = list(iree_results)
