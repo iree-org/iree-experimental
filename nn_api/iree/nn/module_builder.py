@@ -22,7 +22,7 @@ from iree.compiler.dialects import (
 )
 
 
-class ModuleImporter:
+class ModuleBuilder:
   """Helpers for constructing an IREE input module."""
 
   def __init__(self, ic: Optional[ir_utils.ImportContext] = None):
@@ -156,9 +156,9 @@ class ModuleImporter:
 class FunctionBuilder:
   """Helpers for populating a function."""
 
-  def __init__(self, importer: ModuleImporter, func_op: builtin_d.FuncOp):
-    self.importer = importer
-    self.ic = self.importer.ic
+  def __init__(self, mb: ModuleBuilder, func_op: builtin_d.FuncOp):
+    self.mb = mb
+    self.ic = self.mb.ic
     self.func_op = func_op
     self.ip = ir.InsertionPoint(self.func_op.entry_block)
     self.return_types = None
@@ -186,7 +186,7 @@ class FunctionBuilder:
   def emit_call(self, name: str,
                 arguments: Sequence[ir.Value]) -> Sequence[ir.Value]:
     ic = self.ic
-    target_ftype = self.importer.get_function_type(name)
+    target_ftype = self.mb.get_function_type(name)
     with ic.loc, self.ip:
       return std_d.CallOp(target_ftype.results, name, arguments).results
 

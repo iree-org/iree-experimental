@@ -7,8 +7,8 @@
 from iree.compiler import ir
 from iree.nn.jax_utils import (
     JaxImportContext,)
-from iree.nn.module_importer import (
-    ModuleImporter,)
+from iree.nn.module_builder import (
+    ModuleBuilder,)
 
 import jax.numpy as jnp
 from jax import jit, grad, random
@@ -31,13 +31,13 @@ def run(f):
 
 @run
 def basic():
-  imp = ModuleImporter(JaxImportContext())
+  imp = ModuleBuilder(JaxImportContext())
   print(imp)
 
 
 @run
 def jax_params():
-  imp = ModuleImporter(JaxImportContext())
+  imp = ModuleBuilder(JaxImportContext())
   init_random_params, predict = stax.serial(Dense(1024), Relu, Dense(1024),
                                             Relu, Dense(10), LogSoftmax)
   rng = random.PRNGKey(0)
