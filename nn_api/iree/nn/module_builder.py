@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from . import ir_utils
@@ -22,22 +23,73 @@ from iree.compiler.dialects import (
 )
 
 
+@dataclass(frozen=True)
+class ImportedGlobal:
+  """Encapsulates an imported global.
+
+  An imported global is an association between an original Python value and
+  the sequence of global ops that it expands to. It is identified by a unique
+  logical identifier.
+  """
+  identifier: str
+  py_value: Any
+  component_symbols: Tuple[ir.StringAttr]
+  component_ops: Tuple[iree_input_d.GlobalOp]
+
+  @property
+  def types(self) -> Sequence[ir.Type]:
+    types: List[ir.Type] = []
+    for op in self.component_ops:
+      type_attr = ir.TypeAttr(op.attributes["type"])
+      types.append(type_attr.value)
+    return types
+
+
+@dataclass(frozen=True)
+class ImportedGlobalGroup:
+  """Encapsulates a linearized sequence of globals which are used as a group."""
+  identifier: str
+  linear_py_values: Tuple[Any]
+  globals: Tuple[ImportedGlobal]
+
+  @property
+  def flattened_symbols(self) -> Sequence[ir.StringAttr]:
+    symbols = []
+    for g in self.globals:
+      symbols.extend(g.component_symbols)
+    return symbols
+
+  @property
+  def flattened_types(self) -> Sequence[ir.Type]:
+    types = []
+    for g in self.globals:
+      types.extend(g.types)
+    return types
+
+  @property
+  def flattened_symbol_refs(self) -> Sequence[ir.FlatSymbolRefAttr]:
+    return [
+        ir.FlatSymbolRefAttr.get(s.value, context=s.context)
+        for s in self.flattened_symbols
+    ]
+
+
 class ModuleBuilder:
   """Helpers for constructing an IREE input module."""
 
   def __init__(self, ic: Optional[ir_utils.ImportContext] = None):
     self.ic = ic if ic else ir_utils.ImportContext()
     self.ic.push_ip(ir.InsertionPoint(self.ic.module_body))
+    self.globals: Dict[str, ImportedGlobal] = dict()
+    self.global_groups: Dict[str, ImportedGlobalGroup] = dict()
 
   def __str__(self):
     return str(self.ic)
 
-  def import_function(
-      self,
-      module: Union[str, ir.Module],
-      main_symbol: str,
-      visibility: str = "private"
-  ) -> Tuple[Optional[str], Optional[ir.Operation]]:
+  def import_function(self,
+                      module: Union[str, ir.Module],
+                      main_symbol: str,
+                      visibility: str = "private") -> str:
     """Imports a named function from another module into this one.
 
     Returns (imported symbol name, operation) of the found function (if
@@ -73,28 +125,34 @@ class ModuleBuilder:
           found_function = source_operation
           found_function.attributes["sym_visibility"] = ir.StringAttr.get(
               visibility)
-    return found_name, found_function
+    assert found_name, f"Imported function {main_symbol} not found"
+    return found_name
 
   def load_module(self, module: Union[str, ir.Module]):
     if isinstance(module, ir.Module):
       if module.context is self.ic.context:
         return module
-      module = str(module)
+      # TODO: Fix upstream so that parse can accept bytes and then enable
+      # binary=True.
+      module = module.operation.get_asm(enable_debug_info=True)
     new_module = ir.Module.parse(module, context=self.ic.context)
     return new_module
 
   def import_global(self,
                     py_value: Any,
-                    symbol_prefix: str,
+                    identifier: str,
                     *,
                     visibility: str = "private",
                     mutable: bool = True,
-                    initialize: bool = False) -> Tuple[iree_input_d.GlobalOp]:
+                    initialize: bool = False) -> ImportedGlobal:
+    if identifier in self.globals:
+      raise ValueError(f"Attempt to define duplicate global {identifier}")
     ic = self.ic
     assert not initialize, "TODO: Global initializer NYI"
     imp_value = ic.hooks.import_python_value(py_value)
     ir_types = ic.hooks.map_value(ic, imp_value)
     ops: List[iree_input_d.GlobalOp] = []
+    symbols: List[ir.StringAttr] = []
 
     def emit(symbol: str, ir_type: ir.Type):
       with ic.loc, ic.ip:
@@ -108,32 +166,41 @@ class ModuleBuilder:
         )
         ops.append(op)
         ic.symbol_table.insert(op)
+        # Must get the symbol name after insert, since it may be renamed.
+        symbols.append(ir.StringAttr(op.attributes["sym_name"]))
 
     if len(ir_types) == 1:
-      symbol = symbol_prefix
+      symbol = identifier
       emit(symbol, ir_types[0])
     else:
       for it, ir_type in enumerate(ir_types):
-        symbol = f"{symbol_prefix}${it}"
+        symbol = f"{identifier}${it}"
         emit(symbol, ir_type)
-    return tuple(ops)
+    imported_global = ImportedGlobal(identifier, py_value, tuple(symbols),
+                                     tuple(ops))
+    self.globals[identifier] = imported_global
+    return imported_global
 
-  def import_globals(
-      self,
-      linear_py_values: Sequence[Any],
-      symbol_prefix: str,
-      *,
-      mutable: bool = True,
-      initialize: bool = False) -> Sequence[Tuple[iree_input_d.GlobalOp]]:
-    ops = []
+  def import_globals(self,
+                     linear_py_values: Sequence[Any],
+                     identifier: str,
+                     *,
+                     mutable: bool = True,
+                     initialize: bool = False) -> ImportedGlobalGroup:
+    if identifier in self.global_groups:
+      raise ValueError(f"Attempt to define duplicate global {identifier}")
+    globals: List[ImportedGlobal] = list()
     for it, py_value in enumerate(linear_py_values):
-      symbol = f"{symbol_prefix}${it}"
-      ops.append(
+      symbol = f"{identifier}${it}"
+      globals.append(
           self.import_global(py_value,
                              symbol,
                              mutable=mutable,
                              initialize=initialize))
-    return ops
+    global_group = ImportedGlobalGroup(identifier, tuple(linear_py_values),
+                                       tuple(globals))
+    self.global_groups[identifier] = global_group
+    return global_group
 
   def get_function_type(self, name: str) -> ir.FunctionType:
     """Gets the FunctionType for a defined function by name."""
@@ -182,6 +249,7 @@ class FunctionBuilder:
       ftype = self.func_op.type
       ftype = ir.FunctionType.get(ftype.inputs, value_types)
       self.func_op.attributes["type"] = ir.TypeAttr.get(ftype)
+      assert self.func_op.verify(), "Created function is invalid"
 
   def emit_call(self, name: str,
                 arguments: Sequence[ir.Value]) -> Sequence[ir.Value]:
@@ -190,20 +258,25 @@ class FunctionBuilder:
     with ic.loc, self.ip:
       return std_d.CallOp(target_ftype.results, name, arguments).results
 
-  def emit_group_global_store(self, global_group, flat_values: ir.Value):
+  def emit_global_group_store(self, global_group: ImportedGlobalGroup,
+                              flat_values: Sequence[ir.Value]):
+    flattened_symbol_refs = global_group.flattened_symbol_refs
+    if len(flattened_symbol_refs) != len(flat_values):
+      raise ValueError(f"Mismatched arity in emit_global_group_store: "
+                       f"global arity={len(flattened_symbol_refs)}, "
+                       f"store arity={len(flat_values)}")
     ic = self.ic
-    flat_value_len = len(flat_values)
-    flat_value_index = 0
     with ic.loc, self.ip:
-      for global_comp in global_group:
-        for global_op in global_comp:
-          if flat_value_index >= flat_value_len:
-            raise IndexError(
-                f"Mismatched group_global_store arity {flat_value_index}")
-          symbol = ir.StringAttr(global_op.attributes["sym_name"]).value
-          symbol_ref = ir.FlatSymbolRefAttr.get(symbol)
-          iree_input_d.GlobalStoreOp(value=flat_values[flat_value_index],
-                                     global_=symbol_ref)
-          flat_value_index += 1
-    if flat_value_index != flat_value_len:
-      raise IndexError(f"Mismatched group_global_store arity")
+      for symbol_ref, value in zip(flattened_symbol_refs, flat_values):
+        iree_input_d.GlobalStoreOp(value=value, global_=symbol_ref)
+
+  def emit_global_group_load(
+      self, global_group: ImportedGlobalGroup) -> Sequence[ir.Value]:
+    ic = self.ic
+    flattened_symbol_refs = global_group.flattened_symbol_refs
+    flattened_types = global_group.flattened_types
+    results = []
+    with ic.loc, self.ip:
+      for symbol_ref, ir_type in zip(flattened_symbol_refs, flattened_types):
+        results.append(iree_input_d.GlobalLoadOp(ir_type, symbol_ref).result)
+    return results
