@@ -51,9 +51,9 @@ def main(args):
   # TODO: Something is different with in process vs out of process: lots of
   # backend errors in the former. Maybe some pipelines drifted? It is the
   # exact same binaries...
-  #compile_inprocess(root_module, os.path.join(output_dir, "mnsit_train.vmfb"))
+  #compile_inprocess(root_module, os.path.join(output_dir, "mnist_train.vmfb"))
   compile_out_of_process(root_module,
-                         os.path.join(output_dir, "mnsit_train.vmfb"))
+                         os.path.join(output_dir, "mnist_train.vmfb"))
 
 
 def compile_out_of_process(root_module, output_path):
