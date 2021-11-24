@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import os
 import sys
 from iree import runtime as iree_rt
 
@@ -14,12 +15,24 @@ from examples import datasets
 
 def main(args):
   vmfb_file = args[0]
+  checkpoint_file = None
+  if len(args) > 1:
+    checkpoint_file = args[1]
   config = iree_rt.system_api.Config("dylib")
   trainer_module = iree_rt.system_api.load_vm_flatbuffer_file(vmfb_file,
                                                               driver="dylib")
   print(trainer_module)
-  print("Random initializing...")
-  trainer_module.initialize(np.asarray([34, 66], dtype=np.int32))
+
+  if checkpoint_file and os.path.exists(checkpoint_file):
+    print(f"Loading checkpoint {checkpoint_file}")
+    loaded_arrays = []
+    with np.load(checkpoint_file) as checkpoint:
+      for _, value in checkpoint.items():
+        loaded_arrays.append(value)
+    trainer_module.set_opt_state(*loaded_arrays)
+  else:
+    print("Random initializing...")
+    trainer_module.initialize(np.asarray([232, 843], dtype=np.int32))
 
   print("Stepping...")
   train_batch = get_examples()
@@ -28,7 +41,10 @@ def main(args):
     batch = next(train_batch)
     trainer_module.update(*batch)
     accuracy = compute_accuracy(batch, trainer_module)
-    print(f"Step {i} accuracy = {accuracy}")
+    if (i % 50) == 0:
+      print(f"Step {i} accuracy = {accuracy}")
+    if checkpoint_file:
+      np.savez(checkpoint_file, *trainer_module.get_opt_state())
 
 
 def compute_accuracy(batch, trainer_module):
