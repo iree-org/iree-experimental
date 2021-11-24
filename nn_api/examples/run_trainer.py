@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import os
+import shutil
 import sys
 from iree import runtime as iree_rt
 
@@ -41,10 +42,10 @@ def main(args):
     batch = next(train_batch)
     trainer_module.update(*batch)
     accuracy = compute_accuracy(batch, trainer_module)
-    if (i % 50) == 0:
+    if (i % 100) == 0:
       print(f"Step {i} accuracy = {accuracy}")
     if checkpoint_file:
-      np.savez(checkpoint_file, *trainer_module.get_opt_state())
+      save_checkpoint(checkpoint_file, *trainer_module.get_opt_state())
 
 
 def compute_accuracy(batch, trainer_module):
@@ -72,6 +73,13 @@ def get_examples():
 
   batches = data_stream()
   return batches
+
+
+def save_checkpoint(checkpoint_file, *arrays):
+  temp_file = os.path.join(os.path.dirname(checkpoint_file),
+                           "_tmp_" + os.path.basename(checkpoint_file))
+  np.savez(temp_file, *arrays)
+  shutil.move(temp_file, checkpoint_file)
 
 
 if __name__ == "__main__":
