@@ -3,13 +3,15 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
+# Usage:
+#   JAX_ENABLE_MLIR=1 python low_level_mnist_export.py ~/export_path
 import os
 import sys
 
 from iree.compiler import (
-  ir,
-  passmanager,
+    ir,
+    passmanager,
+    tools as iree_tools,
 )
 from iree.compiler.api import driver as iree_driver
 from iree.nn.jax_utils import (
@@ -31,32 +33,53 @@ from jax.tree_util import (tree_map, tree_flatten, tree_unflatten,
 
 
 def main(args):
-  output_path = args[0]
+  output_dir = args[0]
   example_batch = get_example_batch()
   imp = import_mnist_model(example_batch)
-  with open(os.path.join(output_path, "iree_input.mlir"), "wb") as f:
+  with open(os.path.join(output_dir, "mnist_train.mlir"), "wb") as f:
     imp.ic.module.print(f, binary=True)
 
   # Compiler it.
   # TODO: Make it possible to use Operations with pass manager API.
-  root_module = imp.ic._root_module
-  compiler_options = iree_driver.CompilerOptions()
-  # TODO: CPU broken:
-  # error: 'linalg.matmul' op expected op to be distributed along 2 dimensions
-  # compiler_options.add_target_backend("cpu")
-  # TODO: Vulkan broken:
-  # python: /home/stella/src/iree/iree/compiler/Codegen/SPIRV/KernelConfig.cpp:365: mlir::LogicalResult mlir::iree_compiler::setDefaultOpConfig(spirv::ResourceLimitsAttr, mlir::Operation *): Assertion `partitionedLoops.size() == tiledLoopInfo.size()' failed.
-  # compiler_options.add_target_backend("vulkan")
-  # TODO: CUDA broken:
-  # python: /home/stella/src/iree/third_party/llvm-project/llvm/include/llvm/ADT/SmallVector.h:277: llvm::SmallVectorTemplateCommon::reference llvm::SmallVectorTemplateCommon<llvm::StringMap<mlir::OpPassManager>>::operator[](llvm::SmallVectorTemplateCommon::size_type) [T = llvm::StringMap<mlir::OpPassManager>]: Assertion `idx < size()' failed.
-  # compiler_options.add_target_backend("cuda")
+  print("Compiling...")
   with imp.ic.context:
+    root_module = imp.ic._root_module
+    # TODO: Don't reparse (at least gets us mlir relative locs since the imported
+    # locs are bad/wrong).
+    root_module = ir.Module.parse(str(root_module))
+
+  # TODO: Something is different with in process vs out of process: lots of
+  # backend errors in the former. Maybe some pipelines drifted? It is the
+  # exact same binaries...
+  #compile_inprocess(root_module, os.path.join(output_dir, "mnsit_train.vmfb"))
+  compile_out_of_process(root_module,
+                         os.path.join(output_dir, "mnsit_train.vmfb"))
+
+
+def compile_out_of_process(root_module, output_path):
+  iree_tools.compile_str(str(root_module),
+                         target_backends=["cpu"],
+                         output_file=output_path)
+
+
+def compile_inprocess(root_module, output_path):
+  with root_module.context:
+    compiler_options = iree_driver.CompilerOptions()
+    # TODO: CPU broken:
+    # error: 'linalg.matmul' op expected op to be distributed along 2 dimensions
+    compiler_options.add_target_backend("cpu")
+    # TODO: Vulkan broken:
+    # python: /home/stella/src/iree/iree/compiler/Codegen/SPIRV/KernelConfig.cpp:365: mlir::LogicalResult mlir::iree_compiler::setDefaultOpConfig(spirv::ResourceLimitsAttr, mlir::Operation *): Assertion `partitionedLoops.size() == tiledLoopInfo.size()' failed.
+    # compiler_options.add_target_backend("vulkan")
+    # TODO: CUDA broken:
+    # python: /home/stella/src/iree/third_party/llvm-project/llvm/include/llvm/ADT/SmallVector.h:277: llvm::SmallVectorTemplateCommon::reference llvm::SmallVectorTemplateCommon<llvm::StringMap<mlir::OpPassManager>>::operator[](llvm::SmallVectorTemplateCommon::size_type) [T = llvm::StringMap<mlir::OpPassManager>]: Assertion `idx < size()' failed.
+    # compiler_options.add_target_backend("cuda")
     pm = passmanager.PassManager()
     iree_driver.build_iree_vm_pass_pipeline(compiler_options, pm)
     pm.run(root_module)
-  with open(os.path.join(output_path, "mnsit_train.vmfb"), "wb") as f:
-    iree_driver.translate_module_to_vm_bytecode(compiler_options,
-                                                root_module, f)
+    with open(output_path, "wb") as f:
+      iree_driver.translate_module_to_vm_bytecode(compiler_options, root_module,
+                                                  f)
 
 
 def get_example_batch():
