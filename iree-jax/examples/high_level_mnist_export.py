@@ -2,6 +2,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Usage: python high_level_mnist_export.py {dest dir}
+
 import os
 import sys
 
