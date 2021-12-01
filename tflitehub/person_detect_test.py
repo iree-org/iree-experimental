@@ -39,7 +39,8 @@ class PersonDetectTest(test_util.TFLiteModelTest):
     urllib.request.urlretrieve(img_path, local_path)
 
     shape = input_details[0]["shape"]
-    im = numpy.array(Image.open(local_path).resize((shape[1], shape[2])))
+    im = numpy.array(Image.open(local_path).resize(
+        (shape[1], shape[2]))).astype(input_details[0]["dtype"])
     args = [im.reshape(shape)]
     return args
 
