@@ -71,7 +71,11 @@ def get_examples():
       perm = rng.permutation(num_train)
       for i in range(num_batches):
         batch_idx = perm[i * batch_size:(i + 1) * batch_size]
-        yield train_images[batch_idx], train_labels[batch_idx]
+        batch = train_images[batch_idx], train_labels[batch_idx]
+        # Some batches may be short.
+        if batch[0].shape[0] != batch_size:
+          continue
+        yield batch
 
   batches = data_stream()
   return batches

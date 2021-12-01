@@ -16,7 +16,7 @@ from iree.compiler.dialects import (
 )
 
 
-def create_context(*, debug: bool = False) -> ir.Context:
+def create_context(*, debug: bool = True) -> ir.Context:
   context = ir.Context()
   if debug:
     context.enable_multithreading(False)

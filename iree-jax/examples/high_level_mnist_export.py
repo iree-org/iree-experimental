@@ -29,6 +29,7 @@ from iree.jax2.builtins import *
 
 
 def main(args):
+  jax.config.update("jax_enable_mlir", True)
   exp = exporter.ExportModule.create_empty()
   build_model(exp)
 
