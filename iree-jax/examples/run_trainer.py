@@ -40,7 +40,9 @@ def main(args):
   print("Stepping...")
   train_batch = get_examples()
   print(trainer_module.update)
-  for i in range(1000):
+  i = 0
+  while True:
+    i += 1
     batch = next(train_batch)
     trainer_module.update(*batch)
     accuracy = compute_accuracy(batch, trainer_module)
@@ -63,18 +65,15 @@ def get_examples():
   train_images, train_labels, test_images, test_labels = datasets.mnist()
   num_train = train_images.shape[0]
   num_complete_batches, leftover = divmod(num_train, batch_size)
-  num_batches = num_complete_batches + bool(leftover)
-
+  print(f"Number of batches in dataset: {num_complete_batches}")
   def data_stream():
     rng = npr.RandomState(0)
     while True:
       perm = rng.permutation(num_train)
-      for i in range(num_batches):
+      for i in range(num_complete_batches):
         batch_idx = perm[i * batch_size:(i + 1) * batch_size]
         batch = train_images[batch_idx], train_labels[batch_idx]
-        # Some batches may be short.
-        if batch[0].shape[0] != batch_size:
-          continue
+        assert batch[0].shape[0] == batch_size
         yield batch
 
   batches = data_stream()
