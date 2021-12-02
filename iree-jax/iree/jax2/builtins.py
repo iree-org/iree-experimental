@@ -66,11 +66,9 @@ class export_pure_func(tracing.CallableIntrinsic):
 
     # Now convert each IR result to an intrinsic.
     # TODO: Switch based on values not an array?
-    # TODO: Is there some internal API for getting the output avals instead
-    # of raising here? Also arity mismatches... a lot to fix.
-    flat_results_aval = map(
-        lambda x: jax_utils.convert_ir_type_to_aval(x.type),
-        flat_results_ir)
+    # TODO: Better way to get the lowering abstract values. See:
+    #   https://github.com/google/jax/issues/8745
+    flat_results_aval = lowered._lowering.compile_args[5]
     flat_results_py = map(
         lambda aval, ir_value: array_types.IrValueArray(aval, ir_value),
         flat_results_aval, flat_results_ir)

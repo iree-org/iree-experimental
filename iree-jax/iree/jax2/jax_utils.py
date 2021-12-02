@@ -124,28 +124,3 @@ def import_main_function(*,
             visibility)
   assert found_name, f"Imported function {main_symbol} not found"
   return found_name
-
-
-def convert_ir_type_to_aval(ir_type: ir.Type) -> jax.core.AbstractValue:
-  """Raises an IR type back to an AbstractValue.
-
-  TODO: This shouldn't be necessary and should be removed. It is far better to
-  avoid the raising and the various issues that can arise.
-  TODO: Only supports a very small subset of cases.
-  """
-  if ir.RankedTensorType.isinstance(ir_type):
-    tensor_type = ir.RankedTensorType(ir_type)
-    return jax.core.ShapedArray(
-        tuple(tensor_type.shape),
-        convert_ir_element_type_to_dtype(tensor_type.element_type))
-  raise TypeError(f"Cannot convert IR type {ir_type} to JAX abstract value")
-
-
-def convert_ir_element_type_to_dtype(ir_type: ir.Type):
-  if ir.F32Type.isinstance(ir_type):
-    return jnp.float32
-  if ir.F64Type.isinstance(ir_type):
-    return jnp.float64
-  if ir.F16Type.isinstance(ir_type):
-    return jnp.float16
-  raise TypeError(f"Cannot convert IR type {ir_type} to a JAX dtype")
