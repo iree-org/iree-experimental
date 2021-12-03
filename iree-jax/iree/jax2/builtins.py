@@ -27,11 +27,14 @@ class export_pure_func(tracing.CallableIntrinsic):
   """Decorator which makes a pure function callable from tracing.
 
   Internally, it will be JIT-ed and exported as needed.
+
+  TODO: This should really be an internal detail of the exporter, not part of
+  the user API. It is just here to facilite an initial prototype.
   """
 
-  def __init__(self, wrapped_f):
+  def __init__(self, wrapped_f, *, wrap_with_jit: bool = True):
     self.wrapped_f = wrapped_f
-    self.jit_f = jax.jit(self.wrapped_f)
+    self.jit_f = jax.jit(self.wrapped_f) if wrap_with_jit else self.wrapped_f
 
   def __repr__(self):
     return f"<Exportable Pure Func: {self.wrapped_f}>"

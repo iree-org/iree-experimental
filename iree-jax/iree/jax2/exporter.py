@@ -50,11 +50,17 @@ class ExportModule:
     self.exports = AttributeDict()
 
   @classmethod
-  def create_empty(cls, context: Optional[ir.Context] = None):
+  def create_empty(cls,
+                   *,
+                   context: Optional[ir.Context] = None,
+                   name: Optional[str] = None):
     if not context:
       context = ir_utils.create_context()
     loc = ir.Location.unknown(context=context)
     module = ir.Module.create(loc)
+    if name:
+      module.operation.attributes["sym_name"] = ir.StringAttr.get(
+          name, context=context)
     return cls(module=module)
 
   def def_global(self, symbol_name: str, value) -> jax.core.AbstractValue:
@@ -158,6 +164,9 @@ class ExportModule:
       else:
         return_ir_values = trace.materialize_py_values(return_py_value)
         trace.emit_return(*return_ir_values)
+
+  def __str__(self):
+    return str(self.module)
 
 
 class RefInfo:

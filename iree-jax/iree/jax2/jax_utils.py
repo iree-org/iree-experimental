@@ -79,6 +79,11 @@ def import_module(context: ir.Context, module: Union[str, ir.Module]):
     # TODO: Fix upstream so that parse can accept bytes and then enable
     # binary=True.
     module = module.operation.get_asm(enable_debug_info=True)
+
+  if not isinstance(module, str):
+    raise ValueError(
+        f"Attempted to import a non-module (did you enable MLIR in JAX?). "
+        f"Got {module}")
   new_module = ir.Module.parse(module, context=context)
   return new_module
 
