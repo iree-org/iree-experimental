@@ -61,19 +61,6 @@ def build_model():
     preds = predict(params, inputs)
     return -jnp.mean(jnp.sum(preds * targets, axis=1))
 
-  # NOTE: The export_pure_func annotation is unfortunate and we should be able
-  # to eliminate it. What it says is that this function should be jitted when
-  # exporting. Probably just using @jax.jit for this would be best, but I
-  # couldn't find a good way to detect whether that target of a call was the
-  # result of @jax.jit and that would be required.
-  @export_pure_func
-  def predict_target_class(params, inputs):
-    # TODO: An issue with argmax (https://github.com/google/iree/issues/7748).
-    #predicted_class = jnp.argmax(predict(params, inputs), axis=1)
-    #return predicted_class
-    prediction = predict(params, inputs)
-    return prediction
-
   rng = random.PRNGKey(0)
   _, init_params = init_random_params(rng, (-1, 28 * 28))
   opt_init, opt_update, opt_get_params = optimizers.momentum(0.001, mass=0.9)
@@ -104,6 +91,14 @@ def build_model():
       # does some special things to preserve dead arguments.
       return opt_update(None, grad(loss)(params, batch), opt_state)
 
+    @export_kernel
+    def _predict_target_class(mdl, params, inputs):
+      # TODO: An issue with argmax (https://github.com/google/iree/issues/7748).
+      #predicted_class = jnp.argmax(predict(params, inputs), axis=1)
+      #return predicted_class
+      prediction = predict(params, inputs)
+      return prediction
+
     @export_traced_proc
     def get_params(mdl):
       return mdl._params
@@ -127,7 +122,7 @@ def build_model():
 
     @export_traced_proc(signature=[example_batch[0]])
     def predict(mdl, inputs):
-      return predict_target_class(mdl._params, inputs)
+      return mdl._predict_target_class(mdl._params, inputs)
 
   return MnistModule
 
