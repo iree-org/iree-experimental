@@ -2,9 +2,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+from collections import namedtuple
 import logging
-
-logging.basicConfig(level=logging.DEBUG)
 
 from iree.jax2.staging_api import *
 from iree.jax2.builtins import *
@@ -17,12 +16,15 @@ jax.config.update("jax_enable_mlir", True)
 a = jnp.zeros((3, 4), jnp.float32)
 b = jnp.zeros((3, 4), jnp.float32)
 
-params = {"a": a, "b": b}
+Params = namedtuple("Params", "a,b")
+
+params = Params(a, b)
 
 
 class LineModule(StagedModule):
 
-  params = export_global(params)
+  # TODO: Add trivial initialization support.
+  _params = export_global(params)
 
   @export_kernel
   def linear(_, m, x, b):
@@ -30,12 +32,12 @@ class LineModule(StagedModule):
 
   @export_traced_proc(signature=[a])
   def run(mdl, multiplier):
-    result = mdl.linear(multiplier, mdl.params["a"], mdl.params["b"])
-    store_global(mdl.params["a"], result)
+    result = mdl.linear(multiplier, mdl._params.a, mdl._params.b)
+    store_global(mdl._params.a, result)
 
   @export_traced_proc
   def get_params(mdl):
-    return mdl.params
+    return mdl._params
 
 
 print(get_mlir_module(LineModule))
