@@ -60,6 +60,9 @@ def abstractify(x) -> jax.core.AbstractValue:
     x = x.val
   if isinstance(x, array_types.TracedArrayBase):
     return x.aval
+  # Note that a ConcreteArray is an AbstractValue so we handle that above.
+  if isinstance(x, jax.core.AbstractValue):
+    return x
   return jax_abstractify(x)
 
 

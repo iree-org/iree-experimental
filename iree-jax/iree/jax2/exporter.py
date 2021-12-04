@@ -9,6 +9,7 @@ be user manipulable in the course of interacting with the machinery).
 
 from collections import namedtuple
 import functools
+import logging
 from typing import Any, Dict, Optional, Sequence
 import weakref
 
@@ -29,6 +30,8 @@ from jax.tree_util import (tree_map, tree_flatten, tree_unflatten)
 __all__ = [
     "ExportModule",
 ]
+
+logger = logging.getLogger("iree_jax")
 
 # Opaque value to indicate something is empty. Used in cases where 'None'
 # may have a different meaning.
@@ -107,12 +110,25 @@ class ExportModule:
     """
     if symbol_name in self.exports:
       raise ValueError(f"Duplicate export definition: {symbol_name}")
+
     concrete_leaves, tree_def = tree_flatten(treeish)
-    tracked_leaves = [
-        self.def_global(f"{symbol_name}${i}", leaf)
-        for i, leaf in enumerate(concrete_leaves)
-    ]
-    result = tree_unflatten(tree_def, tracked_leaves)
+    imported_leaves = []
+    tracked_leaf_count = 0
+    for concrete_leaf in concrete_leaves:
+      # We fork between trackable things and static constants. Currently this
+      # is just array vs not, but this should match Jax's heuristic.
+      # TODO: Make sure this is the right way to detect array.
+      if hasattr(concrete_leaf, "__array__"):
+        leaf_symbol = f"{symbol_name}${tracked_leaf_count}"
+        logger.debug("def_global_tree: array %s=%r:%r", leaf_symbol,
+                    concrete_leaf.shape, concrete_leaf.dtype)
+        imported_leaves.append(self.def_global(leaf_symbol, concrete_leaf))
+        tracked_leaf_count += 1
+      else:
+        logger.debug("def_global_tree: literal=%r", type(concrete_leaf))
+        imported_leaves.append(concrete_leaf)
+    result = tree_unflatten(tree_def, imported_leaves)
+    logger.debug("def_global_tree: new tree=%r", result)
     self.exports[symbol_name] = result
     return result
 

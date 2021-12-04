@@ -16,6 +16,7 @@ from iree.compiler.dialects import (
 
 import jax.core
 from jax.tree_util import (tree_map, tree_flatten, tree_unflatten)
+from numpy import number
 
 _thread_state = threading.local()
 
@@ -119,6 +120,8 @@ class FunctionIrTrace(IrTrace):
     if isinstance(py_value, Intrinsic):
       with self.loc, self.ip:
         return py_value.resolve_ir_values(self)
+    if isinstance(py_value, number):
+      return py_value
 
     raise TypeError(
         f"While tracing, encountered an unsupported value: {py_value}")

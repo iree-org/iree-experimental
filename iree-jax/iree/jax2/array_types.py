@@ -39,7 +39,9 @@ class TracedArrayBase(numpy.lib.mixins.NDArrayOperatorsMixin):
     return _BASE_HANDLED_FUNCTIONS[func](*args, **kwargs)
 
   def __array__(self, dtype=None):
-    assert dtype is None
+    if dtype is not None:
+      assert dtype is self.aval.dtype, "Traced data type cast not yet implemented"
+    # assert dtype is None
     return self
 
 

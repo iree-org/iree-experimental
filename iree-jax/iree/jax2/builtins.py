@@ -2,6 +2,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import logging
+
 from . import array_types
 from . import ir_utils
 from . import jax_utils
@@ -11,12 +13,15 @@ from iree.compiler.dialects import (
     std as std_d,)
 
 import jax
+import jax.core
 from jax.tree_util import (tree_map, tree_flatten, tree_unflatten)
 
 __all__ = [
     "export_pure_func",
     "store_global",
 ]
+
+logger = logging.getLogger("iree_jax")
 
 
 def _instantiate(cls):
@@ -53,16 +58,37 @@ class export_pure_func(tracing.CallableIntrinsic):
         target_symbol_table=func_trace.module_symbol_table,
         source_module=lowered_asm)
 
-    # Flatten and convert args to IR values.
-    flat_py_args, _ = tree_flatten(args)
-    flat_ir_args = []
-    for py_arg in flat_py_args:
-      flat_ir_args.extend(func_trace.materialize_py_values(py_arg))
-
     # TODO: Signficiant verification could be done here in order to save
     # trouble down stream and emit errors at the point they are made.
     target_ftype = ir_utils.get_function_type(func_trace.module_symbol_table,
                                               imported_main_symbol_name)
+    logging.debug("Emitting call to kernel: %s", target_ftype)
+
+    # TODO: Another magic stashed argument (position 6). Make a real name for
+    # this.
+    kept_var_idx = lowered._lowering.compile_args[6]
+    assert len(kept_var_idx) == len(target_ftype.inputs), (
+        f"Mismatched arguments in Jax kept_var_idx vs func decl: "
+        f"{len(kept_var_idx)} vs {len(target_ftype.inputs)}")
+
+    # Flatten and convert args to IR values.
+    flat_py_args, _ = tree_flatten(args)
+    flat_ir_args = []
+    for idx, py_arg in enumerate(flat_py_args):
+      if idx not in kept_var_idx:
+        logger.debug("Skipping pruned argument %d=(of type %r)", idx,
+                    type(py_arg))
+        continue
+      logger.debug("Materializing call arg to IR: %r (%r)", py_arg,
+                  type(py_arg))
+      flat_ir_args.extend(func_trace.materialize_py_values(py_arg))
+
+    assert len(flat_ir_args) == len(target_ftype.inputs), (
+        f"Mismatched number of IR call args vs function decl: "
+        f"{len(flat_ir_args)} vs {len(target_ftype.inputs)}\n"
+        f"  For call to: {target_ftype}\n"
+        f"  From: {flat_py_args}\n")
+
     flat_results_ir = std_d.CallOp(target_ftype.results,
                                    imported_main_symbol_name,
                                    flat_ir_args).results

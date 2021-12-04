@@ -11,6 +11,7 @@ from iree.jax2.builtins import *
 import jax
 import jax.numpy as jnp
 
+logging.basicConfig(level=logging.DEBUG)
 jax.config.update("jax_enable_mlir", True)
 
 a = jnp.zeros((3, 4), jnp.float32)
