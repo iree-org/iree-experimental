@@ -92,14 +92,7 @@ def build_model(exp: exporter.ExportModule):
   @export_pure_func
   def update_step(batch, opt_state):
     params = opt_get_params(opt_state)
-    # TODO: It appears that since the iteration count isn't used in this
-    # computation, it gets elided from the function signature.
-    # Just setting the first arg to None for this demo.
-    # It seems likely that we want to store the iteration count as a global
-    # anyway and tie it.
-    # Note that this may be a bug in the MLIR lowerings: the XLA lowering
-    # does some special things to preserve dead arguments.
-    return opt_update(None, grad(loss)(params, batch), opt_state)
+    return opt_update(1, grad(loss)(params, batch), opt_state)
 
   @exp.def_func
   def get_params():
