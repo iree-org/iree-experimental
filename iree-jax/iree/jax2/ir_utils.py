@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from typing import Sequence, Tuple, Union
+from typing import Optional, Sequence, Tuple, Union
 from iree.compiler import (
     ir,)
 
@@ -31,14 +31,15 @@ def create_global(symbol_table: ir.SymbolTable,
                   ir_type: ir.Type,
                   *,
                   mutable: bool = True,
-                  visibility: str = "private") -> str:
+                  visibility: str = "private",
+                  initial_value: Optional[ir.Attribute] = None) -> str:
   op = iree_input_d.GlobalOp(
       sym_visibility=ir.StringAttr.get(visibility),
       sym_name=ir.StringAttr.get(symbol),
       type=ir.TypeAttr.get(ir_type),
       is_mutable=ir.UnitAttr.get() if mutable else None,
       initializer=None,
-      initial_value=None,
+      initial_value=initial_value,
   )
   symbol_table.insert(op)
   # Must get the symbol name after insert, since it may be renamed.
@@ -72,3 +73,9 @@ def get_function_type(symbol_table: ir.SymbolTable, symbol_name: str) -> ir.Func
   # TODO: Verify that it is a function, etc.
   return ir.FunctionType(func_op.type)
 
+
+def create_array_attribute(array, ir_types: Sequence[ir.Type]) -> ir.Attribute:
+  if len(ir_types) != 1:
+    raise ValueError("Only single-typed arrays are supported")
+  ranked_tensor_type = ir.RankedTensorType(ir_types[0])
+  return ir.DenseElementsAttr.get(array, type=ranked_tensor_type.element_type)

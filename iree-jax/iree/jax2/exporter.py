@@ -66,7 +66,12 @@ class ExportModule:
           name, context=context)
     return cls(module=module)
 
-  def def_global(self, symbol_name: str, value) -> jax.core.AbstractValue:
+  def def_global(self,
+                 symbol_name: str,
+                 value,
+                 *,
+                 initialize: bool = False,
+                 mutable: bool = True) -> jax.core.AbstractValue:
     if symbol_name in self.exports:
       raise ValueError(f"Duplicate export definition: {symbol_name}")
     # Abstractify.
@@ -90,8 +95,15 @@ class ExportModule:
       if len(ir_types) != 1:
         raise TypeError(f"Composite JAX types not yet supported: {ir_types}")
       with self.loc, self.ip:
+        initial_value = None
+        if initialize:
+          initial_value = ir_utils.create_array_attribute(
+              concrete_value, ir_types)
         actual_symbol_name = ir_utils.create_global(self._symbol_table,
-                                                    symbol_name, ir_types[0])
+                                                    symbol_name,
+                                                    ir_types[0],
+                                                    mutable=mutable,
+                                                    initial_value=initial_value)
       info.tracked_value = array_types.ExportedGlobalArray(
           value, actual_symbol_name, ir_types[0])
       result = jax.core.ConcreteArray(info.tracked_value)
@@ -101,7 +113,12 @@ class ExportModule:
     self.exports[symbol_name] = result
     return result
 
-  def def_global_tree(self, symbol_name: str, treeish: Any) -> Any:
+  def def_global_tree(self,
+                      symbol_name: str,
+                      treeish: Any,
+                      *,
+                      initialize: bool = False,
+                      mutable: bool = True) -> Any:
     """Defines a PyTree with a symbolic name.
 
     Note that the tree can either consist of concrete or abstract values.
@@ -121,8 +138,12 @@ class ExportModule:
       if hasattr(concrete_leaf, "__array__"):
         leaf_symbol = f"{symbol_name}${tracked_leaf_count}"
         logger.debug("def_global_tree: array %s=%r:%r", leaf_symbol,
-                    concrete_leaf.shape, concrete_leaf.dtype)
-        imported_leaves.append(self.def_global(leaf_symbol, concrete_leaf))
+                     concrete_leaf.shape, concrete_leaf.dtype)
+        imported_leaves.append(
+            self.def_global(leaf_symbol,
+                            concrete_leaf,
+                            initialize=initialize,
+                            mutable=mutable))
         tracked_leaf_count += 1
       else:
         logger.debug("def_global_tree: literal=%r", type(concrete_leaf))

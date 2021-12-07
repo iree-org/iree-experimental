@@ -96,7 +96,10 @@ class StagedModuleMeta(type):
     export_name = d.export_name if d.export_name is not None else attr_name
     d.export_name = export_name
     # TODO: Need to differentiate between single array and tree.
-    tracked = export_module.def_global_tree(export_name, d.captured_value)
+    tracked = export_module.def_global_tree(export_name,
+                                            d.captured_value,
+                                            initialize=d.initialize,
+                                            mutable=d.mutable)
     d.tracked_value = tracked
 
   def _bind_private_kernel(export_module: ExportModule, attr_name: str,
@@ -186,9 +189,16 @@ def get_compiled_binary(staged_module: StagedModule):
 ################################################################################
 
 
-def export_global(captured_value: Any, *, export_name: Optional[str] = None):
+def export_global(captured_value: Any,
+                  *,
+                  export_name: Optional[str] = None,
+                  initialize: bool = False,
+                  mutable: bool = True):
   # TODO: Should differentiate between single value and tree.
-  return ExportedGlobalDescriptor(captured_value, export_name)
+  return ExportedGlobalDescriptor(captured_value,
+                                  export_name=export_name,
+                                  initialize=initialize,
+                                  mutable=mutable)
 
 
 def export_traced_proc(f=None,
@@ -223,13 +233,18 @@ class ExportedGlobalDescriptor(BaseDescriptor):
   """A descriptor for an exported global."""
   __slots__ = [
       "captured_value",
+      "initialize",
+      "mutable",
       "export_name",
       "tracked_value",
   ]
 
-  def __init__(self, captured_value: Any, export_name: Optional[str] = None):
+  def __init__(self, captured_value: Any, *, export_name: Optional[str],
+               initialize: bool, mutable: bool):
     self.captured_value = captured_value
     self.export_name = export_name
+    self.initialize = initialize
+    self.mutable = mutable
     self.tracked_value = None
 
   def __get__(self, obj, objtype=None):
