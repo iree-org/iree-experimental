@@ -1,10 +1,11 @@
 # IREE Python API
+# Use nightly releases at the GitHub releases page instead of PyPi
 -f https://github.com/google/iree/releases
-iree-compiler-snapshot
-iree-runtime-snapshot
-iree-tools-tflite-snapshot
-iree-tools-xla-snapshot
-iree-tools-tf-snapshot
+iree-compiler
+iree-runtime
+iree-tools-tflite
+iree-tools-xla
+iree-tools-tf
 
 # TensorFlow and JAX.
 tensorflow
