@@ -129,7 +129,9 @@ def main_patch(args, module_info: iree_modules.ModuleInfo):
     print(
         f"Checking out remote patch branch {branch_name} in {module_info.path}."
     )
-    iree_utils.git_fetch(repository=PATCH_REMOTE_ALIAS, repo_dir=module_root)
+    iree_utils.git_fetch(repository=PATCH_REMOTE_ALIAS,
+                         ref=branch_name,
+                         repo_dir=module_root)
     if not iree_utils.git_branch_exists(branch_name, repo_dir=module_root):
         print(f"Setting up local branch {branch_name}")
         iree_utils.git_create_branch(branch_name,

@@ -78,10 +78,12 @@ def git_check_porcelain(*, repo_dir=None):
             f"Please stash changes:\n{output}")
 
 
-def git_fetch(*, repository=None, repo_dir=None):
+def git_fetch(*, repository=None, ref=None, repo_dir=None):
     args = ["fetch"]
     if repository:
         args.append(repository)
+    if ref is not None:
+        args.append(ref)
     git_exec(args, repo_dir=repo_dir)
 
 
