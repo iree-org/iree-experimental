@@ -36,8 +36,10 @@
 
 import argparse
 from datetime import date
+import os
 import sys
 
+import iree_modules
 import iree_utils
 
 
@@ -73,6 +75,13 @@ def main(args):
         "third_party/llvm-project",
         url="https://github.com/llvm/llvm-project.git",
         branch="--default")
+
+    # Remove the branch pin file, reverting us to pure upstream.
+    branch_pin_file = os.path.join(
+        iree_utils.get_repo_root(),
+        iree_modules.MODULE_INFOS["llvm-project"].branch_pin_file)
+    if os.path.exists(branch_pin_file):
+        os.remove(branch_pin_file)
 
     # Update the LLVM submodule.
     llvm_commit = args.llvm_commit
