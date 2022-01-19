@@ -13,7 +13,7 @@ class SsdSpaghettinetLargeUint8Test(test_util.TFLiteModelTest):
   def compare_results(self, iree_results, tflite_results, details):
     super(SsdSpaghettinetLargeUint8Test, self).compare_results(iree_results, tflite_results, details)
     for i in range(len(iree_results)):
-      self.assertTrue(numpy.isclose(iree_results[i], tflite_results[i], atol=1e-4).all())
+      self.assertTrue(numpy.isclose(iree_results[i], tflite_results[i], atol=1.0).all())
 
   def test_compile_tflite(self):
     self.compile_and_execute()
