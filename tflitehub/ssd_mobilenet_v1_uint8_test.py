@@ -1,9 +1,9 @@
 # RUN: %PYTHON %s
+# XFAIL: *
 
 import absl.testing
 import numpy
 import test_util
-import unittest
 
 model_path = "https://storage.googleapis.com/iree-model-artifacts/ssd_mobilenet_v1_320_1.0_uint8.tflite"
 
@@ -16,7 +16,6 @@ class SsdMobilenetV1Uint8Test(test_util.TFLiteModelTest):
     for i in range(len(iree_results)):
       self.assertTrue(numpy.isclose(iree_results[i], tflite_results[i], atol=1.0).all())
 
-  @unittest.expectedFailure
   def test_compile_tflite(self):
     self.compile_and_execute()
 
