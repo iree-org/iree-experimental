@@ -88,9 +88,9 @@ def main(args):
     print(f"Updating LLVM submodule to {llvm_commit}")
     llvm_root = iree_utils.get_submodule_root("llvm-project")
     iree_utils.git_fetch(repository="origin",
-        ref="refs/heads/mainline", repo_dir=llvm_root)
+        ref="refs/heads/main", repo_dir=llvm_root)
     if llvm_commit == "HEAD":
-        llvm_commit = "origin/mainline"
+        llvm_commit = "origin/main"
     iree_utils.git_reset(llvm_commit, repo_dir=llvm_root)
     llvm_commit, llvm_summary = iree_utils.git_current_commit(
         repo_dir=llvm_root)
