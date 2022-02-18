@@ -1,7 +1,8 @@
 # RUN: %PYTHON %s
 
 import absl.testing
-import numpy
+import numpy as np
+import squad_test_data
 import test_util
 
 model_path = "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-float.tflite"
@@ -15,16 +16,19 @@ class MobileBertTest(test_util.TFLiteModelTest):
     for input in input_details:
       absl.logging.info("\t%s, %s", str(input["shape"]), input["dtype"].__name__)
 
-    args = []
-    args.append(numpy.random.randint(low=0, high=256, size=input_details[0]["shape"], dtype=input_details[0]["dtype"]))
-    args.append(numpy.ones(shape=input_details[1]["shape"], dtype=input_details[1]["dtype"]))
-    args.append(numpy.zeros(shape=input_details[2]["shape"], dtype=input_details[2]["dtype"]))
-    return args
+    input_0 = np.asarray(squad_test_data._INPUT_WORD_ID, dtype=input_details[0]["dtype"])
+    input_1 = np.asarray(squad_test_data._INPUT_TYPE_ID, dtype=input_details[1]["dtype"])
+    input_2 = np.asarray(squad_test_data._INPUT_MASK, dtype=input_details[2]["dtype"])
+    return [
+        input_0.reshape(input_details[0]["shape"]),
+        input_1.reshape(input_details[1]["shape"]),
+        input_2.reshape(input_details[2]["shape"])
+    ]
 
   def compare_results(self, iree_results, tflite_results, details):
     super(MobileBertTest, self).compare_results(iree_results, tflite_results, details)
-    self.assertTrue(numpy.isclose(iree_results[0], tflite_results[0], atol=1e-4).all())
-    self.assertTrue(numpy.isclose(iree_results[1], tflite_results[1], atol=1e-4).all())
+    self.assertTrue(np.isclose(iree_results[0], tflite_results[0], atol=1e-4).all())
+    self.assertTrue(np.isclose(iree_results[1], tflite_results[1], atol=1e-4).all())
 
   def test_compile_tflite(self):
     self.compile_and_execute()
