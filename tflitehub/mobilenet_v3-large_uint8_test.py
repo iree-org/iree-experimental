@@ -1,7 +1,7 @@
 # RUN: %PYTHON %s
-# XFAIL: *
 
 import absl.testing
+import imagenet_test_data
 import numpy
 import test_util
 
@@ -13,7 +13,15 @@ class MobilenetV3LargeUint8Test(test_util.TFLiteModelTest):
 
   def compare_results(self, iree_results, tflite_results, details):
     super(MobilenetV3LargeUint8Test, self).compare_results(iree_results, tflite_results, details)
-    self.assertTrue(numpy.isclose(iree_results[0], tflite_results[0], atol=1.0).all())
+    # Dequantize outputs.
+    zero_point = details[0]['quantization_parameters']['zero_points'][0]
+    scale = details[0]['quantization_parameters']['scales'][0]
+    dequantized_iree_results = (iree_results - zero_point) * scale
+    dequantized_tflite_results = (tflite_results - zero_point) * scale
+    self.assertTrue(numpy.isclose(dequantized_iree_results, dequantized_tflite_results, atol=5e-3).all())
+
+  def generate_inputs(self, input_details):
+    return [imagenet_test_data.generate_input(self.workdir, input_details)]
 
   def test_compile_tflite(self):
     self.compile_and_execute()
