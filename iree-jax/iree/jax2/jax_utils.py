@@ -12,8 +12,8 @@ from iree.compiler import (
     ir,
     passmanager,
 )
-from iree.compiler.api import (
-    driver,)
+from iree.compiler.transforms import (
+    ireec,)
 
 import jax.core
 import jax.interpreters.mlir
@@ -47,7 +47,7 @@ def aval_to_ir_types(context: ir.Context,
 def cleanup_mhlo_module(module: ir.Module):
   with module.context:
     pm = passmanager.PassManager()
-    driver.build_xla_cleanup_pass_pipeline(pm)
+    ireec.build_xla_cleanup_pass_pipeline(pm)
     # TODO: Don't lower it all the way here - but need to land bug fixes
     # first.
     #driver.build_mhlo_import_pass_pipeline(pm)
