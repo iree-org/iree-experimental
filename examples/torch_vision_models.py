@@ -15,6 +15,7 @@ class VisionModule(torch.nn.Module):
     def forward(self, input):
         return self.model.forward(input)
 
+
 input = torch.randn(1, 3, 224, 224)
 
 ## The vision models present here: https://pytorch.org/vision/stable/models.html
@@ -36,11 +37,11 @@ vision_models_list = [
     models.regnet_x_400mf(pretrained=True),
 ]
 
-for i,vision_model in enumerate(vision_models_list):
+for i, vision_model in enumerate(vision_models_list):
     results = shark_inference(
         VisionModule(vision_model),
         input,
         device="cpu",
         dynamic=False,
-        trace_module=False,
+        jit_trace=False,
     )

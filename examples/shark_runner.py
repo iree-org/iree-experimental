@@ -60,7 +60,7 @@ def get_serialized_test(model):
 
 # shark_inference takes torch.nn.module, input, and device, extracts torchscript,
 # runs the torch-mlir linalg on tensors backend and finally runs via iree stack.
-def shark_inference(module, input, device="cpu", dynamic=False, trace_module=False):
+def shark_inference(module, input, device="cpu", dynamic=False, jit_trace=False):
 
     if trace_module:
         module = getTracedRecursiveScriptModule(module, input, dynamic)

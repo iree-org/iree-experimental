@@ -66,7 +66,7 @@ labels = load_labels()
 
 ## The device should be "cpu", "gpu" or "vulkan".
 results = shark_inference(
-    Resnet50Module(), img, device="cpu", dynamic=False, trace_module=False
+    Resnet50Module(), img, device="cpu", dynamic=False, jit_trace=False
 )
 
 print("The top 3 results obtained via torch-mlir via iree-backend is:")
