@@ -22,10 +22,12 @@ config.test_source_root = os.path.dirname(__file__)
 
 #config.use_default_substitutions()
 config.excludes = [
+  'imagenet_test_data.py',
   'lit.cfg.py',
   'lit.site.cfg.py',
-  'test_util.py',
   'manual_test.py',
+  'squad_test_data.py',
+  'test_util.py',
 ]
 
 config.substitutions.extend([
