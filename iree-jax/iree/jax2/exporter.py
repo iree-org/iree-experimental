@@ -106,7 +106,7 @@ class ExportModule:
                                                     initial_value=initial_value)
       info.tracked_value = array_types.ExportedGlobalArray(
           value, actual_symbol_name, ir_types[0])
-      result = jax.core.ConcreteArray(info.tracked_value)
+      result = jax.core.ConcreteArray(value.dtype, info.tracked_value)
     else:
       raise TypeError(f"Export not implemented for JAX abstract value: {value}")
 

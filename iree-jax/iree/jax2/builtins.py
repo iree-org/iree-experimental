@@ -52,7 +52,7 @@ class export_pure_func(tracing.CallableIntrinsic):
     # recursive calls to functions that may be traced happen as if outside.
     lowered = self.jit_f.lower(*abstract_args)
     result_tree_def = lowered.out_tree
-    lowered_asm = lowered._xla_computation()
+    lowered_asm = str(lowered.compiler_ir())
     imported_main_symbol_name = jax_utils.import_main_function(
         target_module=func_trace.module,
         target_symbol_table=func_trace.module_symbol_table,
@@ -66,7 +66,7 @@ class export_pure_func(tracing.CallableIntrinsic):
 
     # TODO: Another magic stashed argument (position 6). Make a real name for
     # this.
-    kept_var_idx = lowered._lowering.compile_args[6]
+    kept_var_idx = lowered._lowering.compile_args["kept_var_idx"]
     assert len(kept_var_idx) == len(target_ftype.inputs), (
         f"Mismatched arguments in Jax kept_var_idx vs func decl: "
         f"{len(kept_var_idx)} vs {len(target_ftype.inputs)}")
@@ -97,7 +97,7 @@ class export_pure_func(tracing.CallableIntrinsic):
     # TODO: Switch based on values not an array?
     # TODO: Better way to get the lowering abstract values. See:
     #   https://github.com/google/jax/issues/8745
-    flat_results_aval = lowered._lowering.compile_args[5]
+    flat_results_aval = lowered._lowering.compile_args["out_avals"]
     flat_results_py = map(
         lambda aval, ir_value: array_types.IrValueArray(aval, ir_value),
         flat_results_aval, flat_results_ir)
