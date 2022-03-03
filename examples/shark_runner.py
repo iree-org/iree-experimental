@@ -103,4 +103,6 @@ def shark_inference(module, input, device="cpu", dynamic=False, jit_trace=False)
     ctx.add_vm_module(vm_module)
     ModuleCompiled = ctx.modules.module["forward"]
     result = ModuleCompiled(input.numpy())
-    return np.asarray(result, dtype=np.float32)
+    result_numpy = np.asarray(result, dtype=np.float32)
+    result_copy = np.copy(result_numpy)
+    return result_copy
