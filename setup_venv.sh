@@ -21,9 +21,10 @@ function die() {
 $PYTHON -m venv "$VENV_DIR" || die "Could not create venv."
 source "$VENV_DIR/bin/activate" || die "Could not activate venv"
 
-# Upgrade pip.
-$PYTHON -m pip install --upgrade pip || die "Could not upgrade pip"
-$PYTHON -m pip install --upgrade -r "$TD/requirements.txt"
+# Upgrade pip and install requirements. 'python' is used here in order to
+# reference to the python executable from the venv.
+python -m pip install --upgrade pip || die "Could not upgrade pip"
+python -m pip install --upgrade -r "$TD/requirements.txt"
 
 echo "Activate venv with:"
 echo "  source $VENV_DIR/bin/activate"
