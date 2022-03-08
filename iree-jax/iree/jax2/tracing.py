@@ -11,7 +11,7 @@ from iree.compiler import (
 from iree.compiler.dialects import (
     builtin as builtin_d,
     iree_input as iree_input_d,
-    std as std_d,
+    func as func_d,
 )
 
 import jax.core
@@ -128,7 +128,7 @@ class FunctionIrTrace(IrTrace):
 
   def emit_return(self, *ir_values: Sequence[ir.Value]):
     with self.loc, self.ip:
-      std_d.ReturnOp(ir_values)
+      func_d.ReturnOp(ir_values)
       # Check or rewrite the function return type.
       value_types = [v.type for v in ir_values]
       if self.return_types:

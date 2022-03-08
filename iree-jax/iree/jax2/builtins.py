@@ -10,7 +10,7 @@ from . import jax_utils
 from . import tracing
 
 from iree.compiler.dialects import (
-    std as std_d,)
+    func as func_d,)
 
 import jax
 import jax.core
@@ -89,7 +89,7 @@ class export_pure_func(tracing.CallableIntrinsic):
         f"  For call to: {target_ftype}\n"
         f"  From: {flat_py_args}\n")
 
-    flat_results_ir = std_d.CallOp(target_ftype.results,
+    flat_results_ir = func_d.CallOp(target_ftype.results,
                                    imported_main_symbol_name,
                                    flat_ir_args).results
 
