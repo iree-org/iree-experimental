@@ -8,7 +8,9 @@ iree-tools-xla
 iree-tools-tf
 
 # TensorFlow and JAX.
+gin-config
 tensorflow
+transformers
 jax[cpu]
 
 
