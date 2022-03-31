@@ -22,6 +22,7 @@ config.test_source_root = os.path.dirname(__file__)
 
 #config.use_default_substitutions()
 config.excludes = [
+  'coco_test_data.py',
   'imagenet_test_data.py',
   'lit.cfg.py',
   'lit.site.cfg.py',
