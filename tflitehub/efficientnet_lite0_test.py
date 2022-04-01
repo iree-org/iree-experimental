@@ -5,15 +5,15 @@ import imagenet_test_data
 import numpy
 import test_util
 
-# Source https://tfhub.dev/tensorflow/lite-model/inception_v4/1/default/1
-model_path = "https://storage.googleapis.com/iree-model-artifacts/inception_v4_299_fp32.tflite"
+# Source https://tfhub.dev/tensorflow/lite-model/efficientnet/lite0/fp32/2
+model_path = "https://storage.googleapis.com/iree-model-artifacts/efficientnet_lite0_fp32_2.tflite"
 
-class InceptionV4Test(test_util.TFLiteModelTest):
+class EfficientnetLite0Test(test_util.TFLiteModelTest):
   def __init__(self, *args, **kwargs):
-    super(InceptionV4Test, self).__init__(model_path, *args, **kwargs)
+    super(EfficientnetLite0Test, self).__init__(model_path, *args, **kwargs)
 
   def compare_results(self, iree_results, tflite_results, details):
-    super(InceptionV4Test, self).compare_results(iree_results, tflite_results, details)
+    super(EfficientnetLite0Test, self).compare_results(iree_results, tflite_results, details)
     self.assertTrue(numpy.isclose(iree_results, tflite_results, atol=1e-4).all())
 
   def generate_inputs(self, input_details):
@@ -27,7 +27,3 @@ class InceptionV4Test(test_util.TFLiteModelTest):
 
 if __name__ == '__main__':
   absl.testing.absltest.main()
-
-
-
-
