@@ -1,4 +1,5 @@
 # RUN: %PYTHON %s
+# XFAIL: *
 
 import absl.testing
 import imagenet_test_data
