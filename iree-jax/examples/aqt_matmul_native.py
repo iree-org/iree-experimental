@@ -7,15 +7,12 @@
 from collections import namedtuple
 import logging
 
-from iree.jax2.staging_api import *
-from iree.jax2.builtins import *
+from iree.jax import Program, kernel, like
 
 import jax
 import jax.numpy as jnp
 
 logging.basicConfig(level=logging.DEBUG)
-jax.config.update("jax_enable_mlir", True)
-
 
 activation_example = jnp.arange(30, dtype=jnp.float32).reshape(5, 6) / 10.4
 
@@ -25,12 +22,12 @@ params = Params(
   activation_scale=jnp.array(5.0),
 )
 
-class AqtMatmulModule(StagedModule):
+class AqtMatmulModule(Program):
 
-  _params = export_global(params, initialize=True, mutable=False)
+  _params = params
 
-  @export_kernel
-  def aqt_matmul_native(mdl, params, activation):
+  @kernel
+  def aqt_matmul_native(params, activation):
     precision = 8
     lower_bound = -2**(precision - 1) + 1
     upper_bound = 2**(precision - 1) - 1
@@ -49,9 +46,8 @@ class AqtMatmulModule(StagedModule):
         activation_as_int, weight_as_int, preferred_element_type=jnp.int32)
     return scaled_result / (params.activation_scale * weight_scale)
 
-  @export_traced_proc(signature=(activation_example,))
-  def compute_native(mdl, activation):
+  def compute_native(mdl, activation=like(activation_example)):
     return mdl.aqt_matmul_native(mdl._params, activation)
 
 
-print(get_mlir_module(AqtMatmulModule))
+print(Program.get_mlir_module(AqtMatmulModule))
