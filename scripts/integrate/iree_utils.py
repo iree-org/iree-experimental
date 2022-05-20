@@ -31,7 +31,7 @@ def get_submodule_root(submodule) -> str:
 
 def _validate_repo_root():
     # Look for something we know is there.
-    known_dir = os.path.join(_repo_root, "iree/compiler")
+    known_dir = os.path.join(_repo_root, "compiler")
     if not os.path.isdir(known_dir):
         raise SystemExit(f"ERROR: Must run from the iree repository root. "
                          f"Actually in: {_repo_root}")
