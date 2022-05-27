@@ -53,7 +53,7 @@ class AqtDenseModule(Program):
   _params = params
 
   @kernel
-  def _model( params, activation):
+  def _model(params, activation):
     activation = dense(params[0], activation)
     activation = dense(params[1], activation)
     return activation
