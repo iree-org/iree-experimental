@@ -13,7 +13,7 @@ from official.nlp.modeling import layers
 from official.nlp.modeling import networks
 from official.nlp.modeling.models import bert_classifier
 
-vocab_size = 10000
+vocab_size = 100
 NUM_CLASSES = 5
 SEQUENCE_LENGTH = 512
 BATCH_SIZE = 1
@@ -27,7 +27,7 @@ class BertModule(tf.Module):
         super(BertModule, self).__init__()
         dict_outputs = False
         test_network = networks.BertEncoder(
-            vocab_size=vocab_size, num_layers=96, hidden_size=2048, num_attention_heads=16, dict_outputs=dict_outputs)
+            vocab_size=vocab_size, num_layers=24, hidden_size=1024, num_attention_heads=16, dict_outputs=dict_outputs)
 
         # Create a BERT trainer with the created network.
         bert_trainer_model = bert_classifier.BertClassifier(
