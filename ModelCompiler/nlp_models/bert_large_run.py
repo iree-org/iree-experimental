@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     # Compile the model using IREE
     backend = "dylib-llvm-aot"
-    args = ["--iree-llvm-target-cpu-features=host", "--iree-mhlo-demote-i64-to-i32=false", "--iree-flow-demote-i64-to-i32"]
+    args = ["--iree-llvm-target-cpu-features=host", "--iree-mhlo-demote-i64-to-i32=false", "--iree-stream-resource-index-bits=64", "--iree-vm-target-index-bits=64"]
     backend_config = "dylib"
     #backend = "cuda"
     #backend_config = "cuda"
