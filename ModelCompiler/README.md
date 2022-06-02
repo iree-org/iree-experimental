@@ -9,10 +9,6 @@ We have three different types of python scripts:
 - python scripts that are meant to RUN with regular tf will be prefixed by \<model\_name\>\_**tf**.py
 
 ### Getting ModelCompiler tf_models
-```bash
-git submodule update --init --recursive 
-```
-
 ## Initial/First Time Setups
 ### VirtualEnv Setup
 ```bash
@@ -22,8 +18,6 @@ git submodule update --init --recursive
 ## Generating IREE Model (After the first time, this is all you need)
 ```bash
 source iree-samples.venv/bin/activate
-cd ModelCompiler
-export PYTHONPATH=$PYTHONPATH:$PWD/tf_models
-cd nlp_models # cd into subdir where category of model live
-python bert_small_gen.py # Basically any <model_name>_gen.py should generate it to /tmp/model.mlir
+cd ModelCompiler/nlp_models
+python bert_small_gen.py # Basically any <model_name>_gen.py should generate it to model.mlir
 ```
