@@ -2,7 +2,7 @@ name: Daily regression tests
 
 on:
   schedule:
-    - cron: '0 4,16 * * *'
+    - cron: '0 4,15 * * *'
   workflow_dispatch:
 
 jobs:
