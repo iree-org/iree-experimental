@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// This sample uses iree/tools/utils/image_util to load a hand-written image
-// as an iree_hal_buffer_view_t then passes it to the bytecode module built
-// from mnist.mlir on the dylib-llvm-aot backend.
+// This sample uses image_util to load a hand-written image as an
+// iree_hal_buffer_view_t then passes it to the bytecode module built from
+// mnist.mlir on the CPU backend with the local-task driver.
 
 #include <float.h>
 
