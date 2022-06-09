@@ -21,9 +21,9 @@ def main(args):
   checkpoint_file = None
   if len(args) > 1:
     checkpoint_file = args[1]
-  config = iree_rt.system_api.Config("dylib")
+  config = iree_rt.system_api.Config("local-task")
   trainer_module = iree_rt.system_api.load_vm_flatbuffer_file(vmfb_file,
-                                                              driver="dylib")
+                                                              driver="local-task")
   print(trainer_module)
 
   if checkpoint_file and os.path.exists(checkpoint_file):

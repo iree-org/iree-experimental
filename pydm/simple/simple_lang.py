@@ -248,5 +248,5 @@ _cached_global_config: Optional[iree_runtime.system_api.Config] = None
 def _get_global_config() -> iree_runtime.system_api.Config:
   global _cached_global_config
   if not _cached_global_config:
-    _cached_global_config = iree_runtime.system_api.Config("dylib")
+    _cached_global_config = iree_runtime.system_api.Config("local-task")
   return _cached_global_config

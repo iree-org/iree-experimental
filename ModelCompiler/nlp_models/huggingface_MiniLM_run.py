@@ -48,7 +48,7 @@ if __name__ == "__main__":
     # Compile the model using IREE
     backend = "dylib-llvm-aot"
     args = ["--iree-llvm-target-cpu-features=host", "--iree-mhlo-demote-i64-to-i32=false", "--iree-flow-demote-i64-to-i32"]
-    backend_config = "dylib"
+    backend_config = "local-task"
     #backend = "cuda"
     #backend_config = "cuda"
     #args = ["--iree-cuda-llvm-target-arch=sm_80", "--iree-hal-cuda-disable-loop-nounroll-wa", "--iree-enable-fusion-with-reduction-ops"]

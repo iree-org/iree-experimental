@@ -19,16 +19,16 @@ import time
 import urllib.request
 
 targets = {
-  'dylib' : 'dylib-llvm-aot',
+  'local-task' : 'dylib-llvm-aot',
   'vulkan' : 'vulkan-spirv',
 }
 
 configs = {
-  'dylib' : 'dylib',
+  'local-task' : 'local-task',
   'vulkan' : 'vulkan',
 }
 
-absl.flags.DEFINE_string('config', 'dylib', 'model path to execute')
+absl.flags.DEFINE_string('config', 'local-task', 'model path to execute')
 
 class TFLiteModelTest(testing.absltest.TestCase):
   def __init__(self, model_path, *args, **kwargs):

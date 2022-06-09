@@ -46,7 +46,7 @@ class IREELinalgOnTensorsBackend(LinalgOnTensorsBackend):
     def load(self, flatbuffer) -> IREEInvoker:
         """Loads a compiled artifact into the runtime."""
         vm_module = ireert.VmModule.from_flatbuffer(flatbuffer)
-        config = ireert.Config(driver_name="dylib")
+        config = ireert.Config(driver_name="local-task")
         ctx = ireert.SystemContext(config=config)
         ctx.add_vm_module(vm_module)
         return IREEInvoker(ctx.modules.module)
