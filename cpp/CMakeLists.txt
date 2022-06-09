@@ -20,16 +20,19 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 #-------------------------------------------------------------------------------
 
 message(STATUS "Fetching core IREE repo (this may take a few minutes)...")
+# Note: for log output, set -DFETCHCONTENT_QUIET=OFF,
+# see https://gitlab.kitware.com/cmake/cmake/-/issues/18238#note_440475
 
 include(FetchContent)
 
 FetchContent_Declare(
   iree
   GIT_REPOSITORY https://github.com/google/iree.git
-  GIT_TAG d9f6498ca22a03ede66bc82e20d733faaa768be4 # 2022-06-06
+  GIT_TAG 7ca0f46fc38c7d5ccb7ee275db59ed7d992436ef # 2022-06-09
   GIT_SUBMODULES_RECURSE OFF
   GIT_SHALLOW ON
   GIT_PROGRESS ON
+  USES_TERMINAL_DOWNLOAD ON
 )
 
 # Extend module path to find MLIR CMake modules.
@@ -40,10 +43,11 @@ set(IREE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(IREE_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(iree)
-FetchContent_GetProperties(iree SOURCE_DIR IREE_SOURCE)
+FetchContent_GetProperties(iree SOURCE_DIR IREE_SOURCE_DIR)
 
 #-------------------------------------------------------------------------------
 # Individual samples
 #-------------------------------------------------------------------------------
 
+add_subdirectory(vision_inference)
 add_subdirectory(vulkan_gui)

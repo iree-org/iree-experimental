@@ -15,30 +15,29 @@ endif()
 # https://vulkan.lunarg.com/.
 include(FindVulkan)
 if(NOT Vulkan_FOUND)
-  message(STATUS "Could not find Vulkan, disabling Vulkan GUI programs")
+  message(STATUS "Could not find Vulkan, skipping vulkan_gui sample")
   return()
 endif()
 
 # vcpkg install imgui[vulkan-binding,sdl2-binding]
 #   tested with versions 1.83 - 1.87#1
-find_package(imgui CONFIG QUIET)
+find_package(imgui)
 if(NOT imgui_FOUND)
-  message(STATUS "Could not find Dear ImGui, disabling Vulkan GUI programs")
+  message(STATUS "Could not find Dear ImGui, skipping vulkan_gui sample")
   return()
 endif()
 
 # vcpkg install sdl2[vulkan]
 #   tested with versions 2.0.14#4 - 2.0.22#1
-find_package(SDL2 CONFIG QUIET)
+find_package(SDL2)
 if(NOT SDL2_FOUND)
-  message(STATUS "Could not find SDL2, disabling Vulkan GUI programs")
+  message(STATUS "Could not find SDL2, skipping vulkan_gui sample")
   return()
 endif()
 
 # Compile simple_mul.mlir to simple_mul.vmfb.
 set(_COMPILE_TOOL_EXECUTABLE $<TARGET_FILE:iree-compile>)
 set(_COMPILE_ARGS)
-list(APPEND _COMPILE_ARGS "--iree-mlir-to-vm-bytecode-module")
 list(APPEND _COMPILE_ARGS "--iree-hal-target-backends=vulkan-spirv")
 list(APPEND _COMPILE_ARGS "${CMAKE_CURRENT_SOURCE_DIR}/simple_mul.mlir")
 list(APPEND _COMPILE_ARGS "-o")
@@ -103,3 +102,5 @@ target_link_options(${_NAME}
   PRIVATE
     ${_GUI_LINKOPTS}
 )
+
+message(STATUS "Configured vulkan_gui sample successfully")
