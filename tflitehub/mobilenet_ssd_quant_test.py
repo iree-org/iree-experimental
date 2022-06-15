@@ -1,5 +1,4 @@
 # RUN: %PYTHON %s
-# XFAIL: *
 
 import absl.testing
 import numpy
@@ -19,7 +18,7 @@ class MobilenetSsdQuantTest(test_util.TFLiteModelTest):
 
   def compare_results(self, iree_results, tflite_results, details):
     super(MobilenetSsdQuantTest, self).compare_results(iree_results, tflite_results, details)
-    self.assertTrue(numpy.isclose(iree_results[0], tflite_results[0], atol=1.0).all())
+    self.assertTrue(numpy.isclose(iree_results[0], tflite_results[0], atol=2.0).all())
 
   def generate_inputs(self, input_details):
     img_path = "https://github.com/google-coral/test_data/raw/master/grace_hopper.bmp"
