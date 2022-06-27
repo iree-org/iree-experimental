@@ -73,7 +73,7 @@ def main(args):
     # and you will find out.
     iree_utils.git_submodule_set_origin(
         "third_party/llvm-project",
-        url="https://github.com/google/iree-llvm-fork.git",
+        url="https://github.com/iree-org/iree-llvm-fork.git",
         branch="--default")
 
     # Remove the branch pin file, reverting us to pure upstream.
@@ -115,7 +115,7 @@ def parse_arguments(argv):
                         default="UPSTREAM_AUTOMATION")
     parser.add_argument("--upstream-repository",
                         help="Upstream repository URL",
-                        default="git@github.com:google/iree.git")
+                        default="git@github.com:iree-org/iree.git")
     parser.add_argument("--disable-setup-remote",
                         help="Disable remote setup",
                         action="store_true",

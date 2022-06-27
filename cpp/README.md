@@ -2,7 +2,7 @@
 
 These C/C++ samples can be built using CMake. The samples depend on the main
 IREE project's C/C++ sources, including both the runtime and the compiler. See
-https://google.github.io/iree/building-from-source/getting-started/ for general
+https://iree-org.github.io/iree/building-from-source/getting-started/ for general
 information about build system installation and options, then from this project
 run
 

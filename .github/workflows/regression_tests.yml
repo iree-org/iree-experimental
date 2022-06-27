@@ -10,7 +10,7 @@ jobs:
     name: "Regression test TF hub models"
     runs-on: ubuntu-18.04
     # Don't run this in everyone's forks.
-    if: github.repository == 'google/iree-samples'
+    if: github.repository == 'iree-org/iree-samples'
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
@@ -28,7 +28,7 @@ jobs:
 
       - name: Installed IREE & TF versions
         shell: bash
-        run: |          
+        run: |
           pip freeze | egrep 'iree|tensorflow'
 
       - name: Run Tests
