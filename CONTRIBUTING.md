@@ -29,29 +29,12 @@ and clang-tidy handle that for us). The compiler portion of the project follows
 Improvements to code structure and clarity are welcome but please file issues to
 track such work first.
 
-## AUTHORS file
-
-If you would like to receive additional recognition for your contribution, you
-may add yourself (or your organization) to the AUTHORS file. This keeps track of
-those who have made significant contributions to the project. Please add the
-entity who owns the copyright for your contribution. The source control history
-remains the most accurate source for individual contributions.
-
 ## Code reviews
 
 All submissions, including submissions by project members, require review. We
 use GitHub pull requests (PRs) for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
-
-## Presubmits
-
-Several of our presubmit builds will only run automatically if you are a project
-collaborator. Otherwise a collaborator must label the PR with "kokoro:run". If
-you are sending code changes to the project, please ask to be added as a
-collaborator, so that these can run automatically. It is generally expected that
-PRs will only be merged when all presubmit checks are passing. In some cases,
-pre-existing failures may be ignored.
 
 ## Merging
 
@@ -62,14 +45,6 @@ would a helpful commit message. Please also keep PRs small (focused on a single
 issue) to streamline review and ease later culprit-finding. It is assumed that
 the PR author will merge their change unless they ask someone else to merge it
 for them (e.g. because they don't have write access).
-
-## Peculiarities
-
-Our documentation on
-[repository management](https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/repository_management.md)
-has more information on some of the oddities in our repository setup and
-workflows. For the most part, these should be transparent to normal developer
-workflows.
 
 ## Community Guidelines
 
