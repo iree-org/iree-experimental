@@ -91,7 +91,7 @@ def build_model():
 
     @kernel
     def _predict_target_class(params, inputs):
-      # TODO: An issue with argmax (https://github.com/google/iree/issues/7748).
+      # TODO: An issue with argmax (https://github.com/iree-org/iree/issues/7748).
       #predicted_class = jnp.argmax(predict(params, inputs), axis=1)
       #return predicted_class
       prediction = predict(params, inputs)

@@ -25,9 +25,9 @@ MODULE_INFOS = {
         name="llvm-project",
         path="third_party/llvm-project",
         branch_pin_file="third_party/llvm-project.branch-pin",
-        default_repository_url="https://github.com/google/iree-llvm-fork.git",
-        fork_repository_push="git@github.com:google/iree-llvm-fork.git",
-        fork_repository_pull="https://github.com/google/iree-llvm-fork.git",
+        default_repository_url="https://github.com/iree-org/iree-llvm-fork.git",
+        fork_repository_push="git@github.com:iree-org/iree-llvm-fork.git",
+        fork_repository_pull="https://github.com/iree-org/iree-llvm-fork.git",
         branch_prefix="patched-llvm-project-",
     ),
     "mlir-hlo":
@@ -35,9 +35,9 @@ MODULE_INFOS = {
         name="mlir-hlo",
         path="third_party/mlir-hlo",
         branch_pin_file="third_party/mlir-hlo.branch-pin",
-        default_repository_url="https://github.com/google/iree-mhlo-fork.git",
-        fork_repository_push="git@github.com:google/iree-mhlo-fork.git",
-        fork_repository_pull="https://github.com/google/iree-mhlo-fork.git",
+        default_repository_url="https://github.com/iree-org/iree-mhlo-fork.git",
+        fork_repository_push="git@github.com:iree-org/iree-mhlo-fork.git",
+        fork_repository_pull="https://github.com/iree-org/iree-mhlo-fork.git",
         branch_prefix="patched-mlir-hlo-",
     )
 }

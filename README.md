@@ -1,8 +1,8 @@
 # IREE Samples Repository
 
-This repository contains various samples and prototypes associated with the [IREE](https://github.com/google/iree) project.
+This repository contains various samples and prototypes associated with the [IREE](https://github.com/iree-org/iree) project.
 
-Contact the [IREE Team](https://github.com/google/iree#communication-channels) for questions about this repository.
+Contact the [IREE Team](https://github.com/iree-org/iree#communication-channels) for questions about this repository.
 
 ## Setting up a venv
 

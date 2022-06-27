@@ -1,6 +1,6 @@
 # IREE Python API
 # Use nightly releases at the GitHub releases page instead of PyPi
--f https://github.com/google/iree/releases
+-f https://github.com/iree-org/iree/releases
 iree-compiler
 iree-runtime
 iree-tools-tflite
