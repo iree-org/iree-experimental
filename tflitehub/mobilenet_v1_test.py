@@ -5,6 +5,7 @@ import imagenet_test_data
 import numpy
 import test_util
 
+# Mirrored of https://tfhub.dev/iree/lite-model/mobilenet_v1_100_224/fp32/1
 model_path = "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v1_224_1.0_float.tflite"
 
 class MobilenetV1Test(test_util.TFLiteModelTest):
