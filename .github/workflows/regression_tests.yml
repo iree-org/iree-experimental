@@ -29,7 +29,7 @@ jobs:
       - name: Installed IREE & TF versions
         shell: bash
         run: |
-          pip freeze | egrep 'iree|tensorflow'
+          pip freeze | egrep 'iree|tensorflow|tf-'
 
       - name: Run Tests
         shell: bash
