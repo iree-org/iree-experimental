@@ -9,7 +9,7 @@ iree-tools-tf
 
 # TensorFlow and JAX.
 gin-config
-tensorflow
+tf-nightly
 tf-models-nightly
 tensorflow-text-nightly
 transformers
