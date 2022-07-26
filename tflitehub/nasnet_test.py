@@ -1,6 +1,5 @@
 # RUN: %PYTHON %s
 # REQUIRES: hugetest
-# XFAIL: *
 
 import absl.testing
 import numpy
