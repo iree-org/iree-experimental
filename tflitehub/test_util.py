@@ -19,7 +19,7 @@ import time
 import urllib.request
 
 targets = {
-  'local-task' : 'dylib-llvm-aot',
+  'local-task' : 'llvm-cpu',
   'vulkan' : 'vulkan-spirv',
 }
 

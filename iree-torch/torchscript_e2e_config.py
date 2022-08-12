@@ -41,7 +41,7 @@ class IREELinalgOnTensorsBackend(LinalgOnTensorsBackend):
           passed to `load`.
         """
         return ireec.compile_str(str(imported_module),
-                                 target_backends=["dylib-llvm-aot"])
+                                 target_backends=["llvm-cpu"])
 
     def load(self, flatbuffer) -> IREEInvoker:
         """Loads a compiled artifact into the runtime."""

@@ -67,14 +67,14 @@ if __name__ == "__main__":
     compiler_module = tfc.compile_module(BertModule(), exported_names = ["learn"], import_only=True)
 
     # Compile the model using IREE
-    backend = "dylib-llvm-aot"
+    backend = "llvm-cpu"
     args = ["--iree-llvm-target-cpu-features=host", "--iree-mhlo-demote-i64-to-i32=false", "--iree-flow-demote-i64-to-i32"]
     backend_config = "local-task"
     #backend = "cuda"
     #backend_config = "cuda"
     #args = ["--iree-cuda-llvm-target-arch=sm_80", "--iree-hal-cuda-disable-loop-nounroll-wa", "--iree-enable-fusion-with-reduction-ops"]
     flatbuffer_blob = compile_str(compiler_module, target_backends=[backend], extra_args=args, input_type="mhlo")
-    #flatbuffer_blob = compile_str(compiler_module, target_backends=["dylib-llvm-aot"])
+    #flatbuffer_blob = compile_str(compiler_module, target_backends=["llvm-cpu"])
 
     # Save module as MLIR file in a directory
     vm_module = ireert.VmModule.from_flatbuffer(flatbuffer_blob)
