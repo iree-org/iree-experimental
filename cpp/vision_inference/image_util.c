@@ -140,13 +140,13 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
         iree_hal_element_dense_byte_count(element_type);
     // SINT_8 and UINT_8 perform direct buffer wrap.
     result = iree_hal_buffer_view_allocate_buffer(
-        allocator, shape, shape_rank, element_type,
+        allocator, shape_rank, shape, element_type,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
             .access = IREE_HAL_MEMORY_ACCESS_READ,
-            .usage =
-                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+            .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                     IREE_HAL_BUFFER_USAGE_TRANSFER,
         },
         iree_make_const_byte_span(pixel_data, element_byte * buffer_length),
         out_buffer_view);
@@ -207,11 +207,11 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
       .input_range_length = input_range_length,
   };
   iree_status_t status = iree_hal_buffer_view_generate_buffer(
-      allocator, shape, shape_rank, element_type, encoding_type,
+      allocator, shape_rank, shape, element_type, encoding_type,
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
                   IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-          .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+          .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING,
       },

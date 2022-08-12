@@ -20,8 +20,8 @@
 // IREE's C API:
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/vulkan/api.h"
-#include "iree/hal/vulkan/registration/driver_module.h"
+#include "iree/hal/drivers/vulkan/api.h"
+#include "iree/hal/drivers/vulkan/registration/driver_module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -29,7 +29,6 @@
 
 // Other dependencies (helpers, etc.)
 #include "iree/base/internal/main.h"
-#include "iree/base/logging.h"
 
 // Compiled module embedded here to avoid file IO:
 #include "simple_mul_bytecode_module_c.h"
@@ -51,7 +50,8 @@ static int g_SwapChainResizeHeight = 0;
 
 static void check_vk_result(VkResult err) {
   if (err == 0) return;
-  IREE_LOG(FATAL) << "VkResult: " << err;
+  fprintf(stderr, "VkResult: %d\n", err);
+  abort();
 }
 
 // Returns the names of the Vulkan layers used for the given IREE
@@ -61,12 +61,12 @@ std::vector<const char*> GetIreeLayers(
     iree_hal_vulkan_features_t features) {
   iree_host_size_t required_count;
   iree_hal_vulkan_query_extensibility_set(
-      features, extensibility_set, /*string_capacity=*/0,
-      /*out_string_values=*/NULL, &required_count);
+      features, extensibility_set, /*string_capacity=*/0, &required_count,
+      /*out_string_values=*/NULL);
   std::vector<const char*> layers(required_count);
   iree_hal_vulkan_query_extensibility_set(features, extensibility_set,
-                                          layers.size(), layers.data(),
-                                          &required_count);
+                                          layers.size(), &required_count,
+                                          layers.data());
   return layers;
 }
 
@@ -77,12 +77,12 @@ std::vector<const char*> GetIreeExtensions(
     iree_hal_vulkan_features_t features) {
   iree_host_size_t required_count;
   iree_hal_vulkan_query_extensibility_set(
-      features, extensibility_set, /*string_capacity=*/0,
-      /*out_string_values=*/NULL, &required_count);
+      features, extensibility_set, /*string_capacity=*/0, &required_count,
+      /*out_string_values=*/NULL);
   std::vector<const char*> extensions(required_count);
   iree_hal_vulkan_query_extensibility_set(features, extensibility_set,
-                                          extensions.size(), extensions.data(),
-                                          &required_count);
+                                          extensions.size(), &required_count,
+                                          extensions.data());
   return extensions;
 }
 
@@ -152,7 +152,8 @@ std::vector<const char*> GetInstanceLayers(
       }
     }
     if (!found) {
-      IREE_LOG(FATAL) << "Required layer " << layer_name << " not available";
+      fprintf(stderr, "Required layer %s not available\n", layer_name);
+      abort();
     }
   }
   for (const char* layer_name : optional_layers) {
@@ -233,7 +234,7 @@ void SetupVulkan(iree_hal_vulkan_features_t vulkan_features,
 
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(*physical_device, &properties);
-    IREE_LOG(INFO) << "Selected Vulkan device: " << properties.deviceName;
+    fprintf(stdout, "Selected Vulkan device: '%s'\n", properties.deviceName);
     free(gpus);
   }
 
@@ -472,7 +473,8 @@ extern "C" int iree_main(int argc, char** argv) {
   // --------------------------------------------------------------------------
   // Create a window.
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
-    IREE_LOG(FATAL) << "Failed to initialize SDL";
+    fprintf(stderr, "Failed to initialize SDL\n");
+    abort();
     return 1;
   }
 
@@ -581,23 +583,24 @@ extern "C" int iree_main(int argc, char** argv) {
   iree_status_t status =
       iree_api_version_check(IREE_API_VERSION_LATEST, &actual_version);
   if (iree_status_is_ok(status)) {
-    IREE_LOG(INFO) << "IREE runtime API version " << actual_version;
+    fprintf(stdout, "IREE runtime API version: %d\n", actual_version);
   } else {
-    IREE_LOG(FATAL) << "Unsupported runtime API version " << actual_version;
+    fprintf(stderr, "Unsupported runtime API version: %d\n", actual_version);
+    abort();
   }
-
-  // Register HAL drivers and VM module types.
-  IREE_CHECK_OK(iree_hal_vulkan_driver_module_register(
-      iree_hal_driver_registry_default()));
-  IREE_CHECK_OK(iree_hal_module_register_types());
 
   // Create a runtime Instance.
   iree_vm_instance_t* iree_instance = nullptr;
   IREE_CHECK_OK(
       iree_vm_instance_create(iree_allocator_system(), &iree_instance));
 
+  // Register HAL drivers and VM module types.
+  IREE_CHECK_OK(iree_hal_vulkan_driver_module_register(
+      iree_hal_driver_registry_default()));
+  IREE_CHECK_OK(iree_hal_module_register_all_types(iree_instance));
+
   // Create IREE Vulkan Driver and Device, sharing our VkInstance/VkDevice.
-  IREE_LOG(INFO) << "Creating Vulkan driver/device";
+  fprintf(stdout, "Creating Vulkan driver/device\n");
   // Load symbols from our static `vkGetInstanceProcAddr` for IREE to use.
   iree_hal_vulkan_syms_t* iree_vk_syms = nullptr;
   IREE_CHECK_OK(iree_hal_vulkan_syms_create(
@@ -629,15 +632,17 @@ extern "C" int iree_main(int argc, char** argv) {
       &transfer_queue_set, iree_allocator_system(), &iree_vk_device));
   // Create a HAL module using the HAL device.
   iree_vm_module_t* hal_module = nullptr;
-  IREE_CHECK_OK(iree_hal_module_create(iree_vk_device, iree_allocator_system(),
-                                       &hal_module));
+  IREE_CHECK_OK(iree_hal_module_create(iree_instance, iree_vk_device,
+                                       IREE_HAL_MODULE_FLAG_NONE,
+                                       iree_allocator_system(), &hal_module));
 
   // Load bytecode module from embedded data.
-  IREE_LOG(INFO) << "Loading simple_mul.mlir...";
+  fprintf(stdout, "Loading simple_mul.mlir...\n");
   const struct iree_file_toc_t* module_file_toc =
       iree_samples_vulkan_gui_simple_mul_bytecode_module_create();
   iree_vm_module_t* bytecode_module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
+      iree_instance,
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
@@ -645,30 +650,28 @@ extern "C" int iree_main(int argc, char** argv) {
   // Query for details about what is in the loaded module.
   iree_vm_module_signature_t bytecode_module_signature =
       iree_vm_module_signature(bytecode_module);
-  IREE_LOG(INFO) << "Module loaded, have <"
-                 << bytecode_module_signature.export_function_count
-                 << "> exported functions:";
+  fprintf(stdout, "Module loaded, have <%" PRIhsz "> exported functions:\n",
+          bytecode_module_signature.export_function_count);
   for (int i = 0; i < bytecode_module_signature.export_function_count; ++i) {
     iree_vm_function_t function;
     IREE_CHECK_OK(iree_vm_module_lookup_function_by_ordinal(
         bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function));
     auto function_name = iree_vm_function_name(&function);
     auto function_signature = iree_vm_function_signature(&function);
-    IREE_LOG(INFO) << "  " << i << ": '"
-                   << std::string(function_name.data, function_name.size)
-                   << "' with calling convention '"
-                   << std::string(function_signature.calling_convention.data,
-                                  function_signature.calling_convention.size)
-                   << "'";
+
+    fprintf(stdout, "  %d: '%.*s' with calling convention '%.*s'\n", i,
+            (int)function_name.size, function_name.data,
+            (int)function_signature.calling_convention.size,
+            function_signature.calling_convention.data);
   }
 
   // Allocate a context that will hold the module state across invocations.
   iree_vm_context_t* iree_context = nullptr;
   std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
   IREE_CHECK_OK(iree_vm_context_create_with_modules(
-      iree_instance, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+      iree_instance, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
       iree_allocator_system(), &iree_context));
-  IREE_LOG(INFO) << "Context with modules is ready for use";
+  fprintf(stdout, "Context with modules is ready for use\n");
 
   // Lookup the entry point function.
   iree_vm_function_t main_function;
@@ -678,10 +681,8 @@ extern "C" int iree_main(int argc, char** argv) {
       iree_string_view_t{kMainFunctionName, sizeof(kMainFunctionName) - 1},
       &main_function));
   iree_string_view_t main_function_name = iree_vm_function_name(&main_function);
-  IREE_LOG(INFO) << "Resolved main function named '"
-                 << std::string(main_function_name.data,
-                                main_function_name.size)
-                 << "'";
+  fprintf(stdout, "Resolved main function named '%.*s'\n",
+          (int)main_function_name.size, main_function_name.data);
   // --------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------
@@ -757,7 +758,6 @@ extern "C" int iree_main(int argc, char** argv) {
         // This is synchronous and doesn't reuse buffers for now.
 
         // Write inputs into mappable buffers.
-        IREE_DLOG(INFO) << "Creating I/O buffers...";
         constexpr iree_hal_dim_t kElementCount = 4;
         iree_hal_allocator_t* allocator =
             iree_hal_device_allocator(iree_vk_device);
@@ -766,10 +766,7 @@ extern "C" int iree_main(int argc, char** argv) {
                 IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
                 IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE);
         iree_hal_buffer_usage_t input_buffer_usage =
-            static_cast<iree_hal_buffer_usage_t>(
-                IREE_HAL_BUFFER_USAGE_DISPATCH |
-                IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING |
-                IREE_HAL_BUFFER_USAGE_CONSTANT);
+            static_cast<iree_hal_buffer_usage_t>(IREE_HAL_BUFFER_USAGE_DEFAULT);
         iree_hal_buffer_params_t buffer_params;
         buffer_params.type = input_memory_type;
         buffer_params.usage = input_buffer_usage;
@@ -778,14 +775,14 @@ extern "C" int iree_main(int argc, char** argv) {
         iree_hal_buffer_view_t* input1_buffer_view = nullptr;
         IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer(
             allocator,
-            /*shape=*/&kElementCount, /*shape_rank=*/1,
+            /*shape_rank=*/1, /*shape=*/&kElementCount,
             IREE_HAL_ELEMENT_TYPE_FLOAT_32,
             IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
             iree_make_const_byte_span(&input_x, sizeof(input_x)),
             &input0_buffer_view));
         IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer(
             allocator,
-            /*shape=*/&kElementCount, /*shape_rank=*/1,
+            /*shape_rank=*/1, /*shape=*/&kElementCount,
             IREE_HAL_ELEMENT_TYPE_FLOAT_32,
             IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
             iree_make_const_byte_span(&input_y, sizeof(input_y)),
@@ -817,7 +814,6 @@ extern "C" int iree_main(int argc, char** argv) {
                                      outputs.get(), iree_allocator_system()));
 
         // Read back the results.
-        IREE_DLOG(INFO) << "Reading back results...";
         auto* output_buffer_view = reinterpret_cast<iree_hal_buffer_view_t*>(
             iree_vm_list_get_ref_deref(outputs.get(), 0,
                                        iree_hal_buffer_view_get_descriptor()));
