@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(NOT IREE_TARGET_BACKEND_DYLIB_LLVM_AOT OR
+if(NOT IREE_TARGET_BACKEND_LLVM_CPU OR
    NOT IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
   message(STATUS "Missing LLVM backend and/or embeddded elf loader, skipping vision_inference sample")
   return()
@@ -22,7 +22,7 @@ endif()
 set(_COMPILE_TOOL_EXECUTABLE $<TARGET_FILE:iree-compile>)
 set(_COMPILE_ARGS)
 list(APPEND _COMPILE_ARGS "--iree-input-type=mhlo")
-list(APPEND _COMPILE_ARGS "--iree-hal-target-backends=llvm")
+list(APPEND _COMPILE_ARGS "--iree-hal-target-backends=llvm-cpu")
 list(APPEND _COMPILE_ARGS "${IREE_SOURCE_DIR}/samples/models/mnist.mlir")
 list(APPEND _COMPILE_ARGS "-o")
 list(APPEND _COMPILE_ARGS "mnist.vmfb")

@@ -12,7 +12,7 @@ cmake_minimum_required(VERSION 3.21...3.23)
 
 project(iree-samples C CXX)
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 #-------------------------------------------------------------------------------
@@ -28,9 +28,9 @@ include(FetchContent)
 FetchContent_Declare(
   iree
   GIT_REPOSITORY https://github.com/iree-org/iree.git
-  GIT_TAG 7ca0f46fc38c7d5ccb7ee275db59ed7d992436ef # 2022-06-09
+  GIT_TAG c4624870a8de85224c3f02f4ea8e26837cd99e2f # 2022-08-12
   GIT_SUBMODULES_RECURSE OFF
-  GIT_SHALLOW ON
+  GIT_SHALLOW OFF
   GIT_PROGRESS ON
   USES_TERMINAL_DOWNLOAD ON
 )
