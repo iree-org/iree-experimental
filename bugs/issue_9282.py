@@ -24,10 +24,11 @@ ir = str(iree.jax.Program.get_mlir_module(BugTest()))
 print(ir)
 
 
+instance = iree.runtime.VmInstance()
 iree_config = iree.runtime.system_api.Config("local-task")
 iree_binary = iree.compiler.compile_str(
-    ir, target_backends=["cpu"], input_type="mhlo")
-vm_module = iree.runtime.VmModule.from_flatbuffer(iree_binary)
+    ir, target_backends=["llvm-cpu"], input_type="mhlo")
+vm_module = iree.runtime.VmModule.from_flatbuffer(instance, iree_binary)
 module_object = iree.runtime.load_vm_module(vm_module, iree_config)
 out = module_object["main"](arg0, arg1)
 assert out.to_host().dtype == jnp.uint8
