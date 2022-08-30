@@ -30,4 +30,3 @@ iree_binary = iree.compiler.compile_str(
 vm_module = iree.runtime.VmModule.from_flatbuffer(instance, iree_binary)
 module_object = iree.runtime.load_vm_module(vm_module, iree_config)
 out = module_object["main"](arg0, arg1)
-assert out.to_host().dtype == jnp.float64
