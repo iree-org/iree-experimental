@@ -28,7 +28,7 @@ include(FetchContent)
 FetchContent_Declare(
   iree
   GIT_REPOSITORY https://github.com/iree-org/iree.git
-  GIT_TAG c4624870a8de85224c3f02f4ea8e26837cd99e2f # 2022-08-12
+  GIT_TAG 7a435f0e45b2dbc3988c1a751e6810cd80c2dd83 # 2022-09-12
   GIT_SUBMODULES_RECURSE OFF
   GIT_SHALLOW OFF
   GIT_PROGRESS ON
