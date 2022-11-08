@@ -578,17 +578,6 @@ extern "C" int iree_main(int argc, char** argv) {
   // --------------------------------------------------------------------------
   // Setup IREE.
 
-  // Check API version.
-  iree_api_version_t actual_version;
-  iree_status_t status =
-      iree_api_version_check(IREE_API_VERSION_LATEST, &actual_version);
-  if (iree_status_is_ok(status)) {
-    fprintf(stdout, "IREE runtime API version: %d\n", actual_version);
-  } else {
-    fprintf(stderr, "Unsupported runtime API version: %d\n", actual_version);
-    abort();
-  }
-
   // Create a runtime Instance.
   iree_vm_instance_t* iree_instance = nullptr;
   IREE_CHECK_OK(
@@ -609,7 +598,7 @@ extern "C" int iree_main(int argc, char** argv) {
   // Create the driver sharing our VkInstance.
   iree_hal_driver_t* iree_vk_driver = nullptr;
   iree_string_view_t driver_identifier = iree_make_cstring_view("vulkan");
-  iree_hal_vulkan_driver_options_t driver_options;
+  iree_hal_vulkan_driver_options_t driver_options = {};
   driver_options.api_version = VK_API_VERSION_1_0;
   driver_options.requested_features = static_cast<iree_hal_vulkan_features_t>(
       IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS);
@@ -767,7 +756,7 @@ extern "C" int iree_main(int argc, char** argv) {
                 IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE);
         iree_hal_buffer_usage_t input_buffer_usage =
             static_cast<iree_hal_buffer_usage_t>(IREE_HAL_BUFFER_USAGE_DEFAULT);
-        iree_hal_buffer_params_t buffer_params;
+        iree_hal_buffer_params_t buffer_params = {};
         buffer_params.type = input_memory_type;
         buffer_params.usage = input_buffer_usage;
         // Wrap input buffers in buffer views.
