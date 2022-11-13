@@ -1,0 +1,15 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Stuff needed to be able to load the tensorflow workspace.
+build --experimental_repo_remote_exec
+
+# C++17
+build --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+
+# Build the whole thing with hidden visibility. We are creating a limited
+# export library.
+build --copt=-fvisibility=hidden
