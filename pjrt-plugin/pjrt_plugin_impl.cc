@@ -12,11 +12,14 @@
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 
+namespace iree::pjrt {
 namespace {
 
 struct ApiInstance {
-  ApiInstance(iree_hal_driver_t* driver, std::string lib_dir)
-      : driver_(driver), lib_dir_(std::move(lib_dir)) {}
+  ApiInstance(iree_hal_driver_t* driver, Logger& logger, ConfigVars config_vars)
+      : driver_(driver),
+        logger_(logger),
+        config_vars_(std::move(config_vars)) {}
   ~ApiInstance() { iree_hal_driver_release(driver_); }
 
   static ApiInstance* Unwrap(PJRT_Api* api) {
@@ -24,22 +27,45 @@ struct ApiInstance {
   }
 
   iree_hal_driver_t* driver_;
-  std::string lib_dir_;
+  Logger logger_;
+  ConfigVars config_vars_;
 };
 
 // ---------------------------------- Errors -----------------------------------
 
 // Since PJRT errors can have their message queried, and it is assumed owned
 // by the error, we always have to allocate/wrap :(
-struct ErrorInstance {
-  ErrorInstance(iree_status_t status) : status(status) {}
-  ~ErrorInstance() { iree_status_ignore(status); }
+class ErrorInstance {
+ public:
+  ErrorInstance(iree_status_t status) : status_(status) {}
+  ~ErrorInstance() { iree_status_ignore(status_); }
   static const ErrorInstance* FromError(const PJRT_Error* error) {
     return reinterpret_cast<const ErrorInstance*>(error);
   }
 
-  iree_status_t status;
-  mutable std::string cached_message;
+  iree_status_t status() const { return status_; }
+  const std::string& message() const {
+    if (cached_message_.empty()) {
+      std::string buffer;
+      iree_host_size_t actual_len;
+      buffer.resize(128);
+      if (!iree_status_format(status_, buffer.size(), buffer.data(),
+                              &actual_len)) {
+        buffer.resize(actual_len);
+        if (!iree_status_format(status_, buffer.size(), buffer.data(),
+                                &actual_len)) {
+          actual_len = 0;
+        }
+      }
+      buffer.resize(actual_len);
+      cached_message_ = std::move(buffer);
+    }
+    return cached_message_;
+  }
+
+ private:
+  iree_status_t status_;
+  mutable std::string cached_message_;
 };
 
 PJRT_Error* MakeError(iree_status_t status) {
@@ -63,29 +89,14 @@ void Error_Message_Impl(PJRT_Error_Message_Args* args) {
     return;
   }
 
-  if (error->cached_message.empty()) {
-    std::string buffer;
-    iree_host_size_t actual_len;
-    buffer.resize(128);
-    if (!iree_status_format(error->status, buffer.size(), buffer.data(),
-                            &actual_len)) {
-      buffer.resize(actual_len);
-      if (!iree_status_format(error->status, buffer.size(), buffer.data(),
-                              &actual_len)) {
-        actual_len = 0;
-      }
-    }
-    buffer.resize(actual_len);
-    error->cached_message = std::move(buffer);
-  }
-
-  args->message = error->cached_message.data();
-  args->message_size = error->cached_message.size();
+  const std::string& message = error->message();
+  args->message = message.data();
+  args->message_size = message.size();
 }
 
 PJRT_Error* Error_GetCode_Impl(PJRT_Error_GetCode_Args* args) {
   auto* error = ErrorInstance::FromError(args->error);
-  iree_status_code_t status_code = iree_status_code(error->status);
+  iree_status_code_t status_code = iree_status_code(error->status());
   switch (status_code) {
     case IREE_STATUS_CANCELLED:
       args->code = PJRT_Error_Code_CANCELLED;
@@ -154,8 +165,13 @@ PJRT_Error* Client_Destroy_Impl(PJRT_Client_Destroy_Args* args) {
 
 }  // namespace
 
-bool iree::pjrt::Initialize(PJRT_Api* api, std::string_view driver_name,
-                            std::string_view lib_dir) {
+bool ConfigVars::Parse(Logger& logger, const char** config_vars,
+                       size_t config_var_size) {
+  // TODO
+  return true;
+}
+
+bool Initialize(PJRT_Api* api, Logger& logger, ConfigVars config_vars) {
   api->struct_size = PJRT_Api_STRUCT_SIZE;
 
   // Populate functions.
@@ -170,22 +186,27 @@ bool iree::pjrt::Initialize(PJRT_Api* api, std::string_view driver_name,
   iree_hal_driver_t* driver;
   iree_status_t status = iree_hal_driver_registry_try_create(
       iree_hal_driver_registry_default(),
-      iree_make_string_view(driver_name.data(), driver_name.size()),
+      iree_make_string_view(config_vars.driver_name.data(),
+                            config_vars.driver_name.size()),
       iree_allocator_system(), &driver);
   if (!iree_status_is_ok(status)) {
-    // TODO: Can't fail in initialize.
-    iree_status_fprint(stderr, status);
-    iree_status_ignore(status);
+    // Can't return an error in API initialization. Just log.
+    ErrorInstance error(status);
+    std::string message("Could not initialize IREE driver '");
+    message.append(config_vars.driver_name);
+    message.append("': ");
+    message.append(error.message());
+    logger.error(message);
     return false;
   }
 
   // Cannot fail after this: transfer ownership.
   auto api_instance =
-      std::make_unique<ApiInstance>(driver, std::string(lib_dir));
+      std::make_unique<ApiInstance>(driver, logger, std::move(config_vars));
   api->priv = api_instance.release();
   return true;
 }
 
-void iree::pjrt::Deinitialize(PJRT_Api* api) {
-  delete ApiInstance::Unwrap(api);
-}
+void Deinitialize(PJRT_Api* api) { delete ApiInstance::Unwrap(api); }
+
+}  // namespace iree::pjrt

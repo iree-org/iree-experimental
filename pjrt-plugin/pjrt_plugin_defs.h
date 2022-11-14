@@ -49,25 +49,45 @@
 extern "C" {
 #endif
 
+// Logging is done via a level and callbacks to determine if enabled and sink
+// a message.
+typedef enum {
+  PJRT_VERBOSE = -1,
+  PJRT_INFO = 0,
+  PJRT_WARNING = 1,
+  PJRT_ERROR = 2,
+  PJRT_FATAL = 3,
+} PJRT_LogLevel;
+
+typedef bool PJRT_LogEnabled_FN(void* context, PJRT_LogLevel level);
+typedef void PJRT_LogSink_FN(void* context, PJRT_LogLevel level,
+                             const char* message, size_t message_size);
+
+typedef struct {
+  void* context;
+  PJRT_LogEnabled_FN* enabled;
+  PJRT_LogSink_FN* sink;
+} PJRT_LogCallbacks;
+
 // Gets the version of the plugin API. This is incremented on breaking changes
 // to the exported plugin API.
-PJRT_PLUGIN_EXPORTED unsigned PJRT_Plugin_ApiVersion();
+// Exported as: PJRT_Plugin_ApiVersion
 typedef unsigned PJRT_Plugin_ApiVersion_FN();
 
-// Primary entry-point for the plugin, retrieving a concrete API struct.
-// Since this is always a dynamic symbol loaded from a shared library (i.e.
-// if static linking, a different mechanism would be used), we require the
-// caller to inform us the path they used to load the library. This allows
-// plugin libraries to exist as part of a relocatable directory tree that
-// consists of additional files which must be peers in some defined way.
-// If the plugin cannot be initialized, it must return nullptr.
-PJRT_PLUGIN_EXPORTED PJRT_Api* PJRT_Plugin_Create(const char* plugin_path);
-typedef PJRT_Api* PJRT_Plugin_Create_FN(const char* plugin_path);
+// Primary entry point for creating a specific PJRT API instance, configuring
+// it with logging callbacks and configuration variables. Configuration
+// variables are represented as "VAR=VALUE" simular to environment variables.
+// It is recommended (and up to the implementation) to also have correspondance
+// with environment variables.
+// Exported as: PJRT_Plugin_Create
+typedef PJRT_Api* PJRT_Plugin_Create_FN(PJRT_LogCallbacks log_callbacks,
+                                        const char** config_vars,
+                                        size_t config_var_size);
 
 // Destroys an API pointer previously obtained via PJRT_Plugin_Initialize.
 // This may perform heavy-weight shutdown activities, depending on the
 // implementation.
-PJRT_PLUGIN_EXPORTED void PJRT_Plugin_Destroy(PJRT_Api* api);
+// Exported as PJRT_Plugin_Destroy
 typedef void PJRT_Plugin_Destroy_FN(PJRT_Api* api);
 
 #ifdef __cplusplus

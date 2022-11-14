@@ -10,7 +10,6 @@ cc_binary(
     linkstatic = 1,
     srcs = [
         "entry_point.cc",
-        "pjrt_plugin_exports.h",
     ],
     deps = [
         ":impl",
@@ -31,6 +30,7 @@ cc_library(
         "pjrt_plugin_impl.cc",
     ],
     hdrs = [
+        "pjrt_plugin_defs.h",
         "pjrt_plugin_impl.h",
     ],
     deps = [
