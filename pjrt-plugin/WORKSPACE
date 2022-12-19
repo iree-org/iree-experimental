@@ -37,4 +37,8 @@ tf_workspace0()
 # Setup IREE dependencies.
 load("@iree//build_tools/bazel:workspace.bzl", "configure_iree_submodule_deps")
 
-configure_iree_submodule_deps()
+# TODO: Path hard-coding is... not great. Oh bazel.
+configure_iree_submodule_deps(
+    iree_repo_alias = "@iree",
+    iree_path = "../../iree",
+)
