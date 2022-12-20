@@ -23,6 +23,7 @@ class ClientInstance;
 class ConfigVars;
 class DeviceInstance;
 class ErrorInstance;
+class EventInstance;
 class Globals;
 class Logger;
 
@@ -106,15 +107,21 @@ inline PJRT_Error* MakeError(iree_status_t status) {
 
 class BufferInstance {
  public:
-  BufferInstance(ClientInstance& client) : client_(client) {}
+  BufferInstance(DeviceInstance& device, iree_hal_buffer_view_t* buffer_view)
+      : device_(device), buffer_view_(buffer_view) {}
+  ~BufferInstance();
   operator PJRT_Buffer*() { return reinterpret_cast<PJRT_Buffer*>(this); }
   static BufferInstance* Unwrap(PJRT_Buffer* buffer) {
     return reinterpret_cast<BufferInstance*>(buffer);
   }
   static void BindApi(PJRT_Api* api);
 
+  iree_hal_buffer_view_t* buffer_view() { return buffer_view_; }
+  DeviceInstance& device() { return device_; }
+
  private:
-  ClientInstance& client_;
+  DeviceInstance& device_;
+  iree_hal_buffer_view_t* buffer_view_;  // Owned.
 };
 
 //===----------------------------------------------------------------------===//
@@ -124,8 +131,9 @@ class BufferInstance {
 class DeviceInstance {
  public:
   DeviceInstance(int client_id, ClientInstance& client,
-                 iree_hal_device_info_t* info)
-      : client_id_(client_id), client_(client), info_(info) {}
+                 iree_hal_driver_t* driver, iree_hal_device_info_t* info)
+      : client_id_(client_id), client_(client), driver_(driver), info_(info) {}
+  ~DeviceInstance();
   operator PJRT_Device*() { return reinterpret_cast<PJRT_Device*>(this); }
   static void BindApi(PJRT_Api* api);
   static DeviceInstance* Unwrap(PJRT_Device* device) {
@@ -144,9 +152,21 @@ class DeviceInstance {
   bool is_addressable() { return true; }
   int process_index() { return 0; }
 
+  // Copies a host buffer to the device.
+  // See PJRT_Client_BufferFromHostBuffer
+  iree_status_t HostBufferToDevice(
+      const void* data, PJRT_Buffer_Type type, const int64_t* dims,
+      size_t num_dims, const int64_t* byte_strides, size_t num_byte_strides,
+      PJRT_HostBufferSemantics host_buffer_semantics,
+      EventInstance** out_done_with_host_buffer_event,
+      BufferInstance** out_buffer);
+
  private:
+  iree_status_t OpenDevice();
   int client_id_;
   ClientInstance& client_;
+  iree_hal_driver_t* driver_;  // Owned by client.
+  iree_hal_device_t* device_ = nullptr;
   iree_hal_device_info_t* info_;
 };
 
@@ -156,12 +176,20 @@ class DeviceInstance {
 
 class EventInstance {
  public:
+  // Default construction is always signalled.
   EventInstance() = default;
   operator PJRT_Event*() { return reinterpret_cast<PJRT_Event*>(this); }
   static void BindApi(PJRT_Api* api);
   static EventInstance* Unwrap(PJRT_Event* exe) {
     return reinterpret_cast<EventInstance*>(exe);
   }
+
+  iree_status_t OnReady(PJRT_Event_OnReadyCallback callback, void* user_arg);
+  ErrorInstance* error() { return error_; }
+  bool is_ready() { return is_ready_; }
+private:
+  ErrorInstance* error_ = nullptr;
+  bool is_ready_ = true;
 };
 
 //===----------------------------------------------------------------------===//
@@ -220,7 +248,7 @@ struct ClientInstance {
 
   Globals& globals() { return globals_; }
   Logger& logger() { return globals_.logger(); }
-
+  iree_allocator_t host_allocator() { return host_allocator_; }
   const std::vector<DeviceInstance*>& devices() { return devices_; }
   const std::vector<DeviceInstance*>& addressable_devices() {
     return addressable_devices_;
