@@ -7,14 +7,23 @@
 #ifndef IREE_PJRT_PLUGIN_PJRT_COMMON_API_IMPL_H_
 #define IREE_PJRT_PLUGIN_PJRT_COMMON_API_IMPL_H_
 
+#include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "tensorflow/compiler/xla/pjrt/c/pjrt_c_api.h"
 
 namespace iree::pjrt {
+
+class ClientInstance;
+class ConfigVars;
+class DeviceInstance;
+class ErrorInstance;
+class Globals;
+class Logger;
 
 //===----------------------------------------------------------------------===//
 // Logger
@@ -91,6 +100,39 @@ inline PJRT_Error* MakeError(iree_status_t status) {
 }
 
 //===----------------------------------------------------------------------===//
+// DeviceInstance
+//===----------------------------------------------------------------------===//
+
+class DeviceInstance {
+ public:
+  DeviceInstance(int client_id, ClientInstance& client,
+                 iree_hal_device_info_t* info)
+      : client_id_(client_id), client_(client), info_(info) {}
+  operator PJRT_Device*() { return reinterpret_cast<PJRT_Device*>(this); }
+  static void BindApi(PJRT_Api* api);
+  static DeviceInstance* Unwrap(PJRT_Device* device) {
+    return reinterpret_cast<DeviceInstance*>(device);
+  }
+
+  // Since the PJRT device id is a simple int and the IREE device_id is
+  // a pointer-sized value, we just assign a synthetic id. Currently, this
+  // is the offset into the devices() array on the client. Will need to be
+  // revisited if ever supporting re-scanning (but many things would seem to
+  // need updates then).
+  int client_id() { return client_id_; }
+  iree_hal_device_info_t* info() { return info_; }
+
+  // Not yet implemented but plumbed through.
+  bool is_addressable() { return true; }
+  int process_index() { return 0; }
+
+ private:
+  int client_id_;
+  ClientInstance& client_;
+  iree_hal_device_info_t* info_;
+};
+
+//===----------------------------------------------------------------------===//
 // ClientInstance
 // The root of the runtime hierarchy, these map to an IREE driver and are
 // created against an API.
@@ -98,7 +140,7 @@ inline PJRT_Error* MakeError(iree_status_t status) {
 
 struct ClientInstance {
  public:
-  ClientInstance(Globals& globals) : globals_(globals) {}
+  ClientInstance(Globals& globals);
   virtual ~ClientInstance();
 
   // Binds monomorphic entry-points for the client.
@@ -112,15 +154,37 @@ struct ClientInstance {
   PJRT_Error* Initialize();
 
   // Must be defined by concrete subclasses.
-  virtual PJRT_Error* CreateDriver(iree_hal_driver_t** out_driver) = 0;
+  virtual iree_status_t CreateDriver(iree_hal_driver_t** out_driver) = 0;
 
   Globals& globals() { return globals_; }
   Logger& logger() { return globals_.logger(); }
 
+  std::vector<DeviceInstance*>& devices() { return devices_; }
+  const std::string& cached_platform_name() { return cached_platform_name_; }
+  const std::string& cached_platform_version() {
+    return cached_platform_version_;
+  }
+
+ protected:
+  iree_allocator_t host_allocator_;
+  std::string cached_platform_name_;
+  std::string cached_platform_version_;
+
  private:
+  iree_status_t PopulateDevices();
+
+  // Populated during initialization.
   iree_hal_driver_t* driver_ = nullptr;
+  iree_hal_device_info_t* device_infos_ = nullptr;
+  iree_host_size_t device_info_count_ = 0;
+  std::vector<DeviceInstance*> devices_;
+
   Globals& globals_;
 };
+
+//===----------------------------------------------------------------------===//
+// API binding
+//===----------------------------------------------------------------------===//
 
 // Binds all monomorphic API members and top-level API struct setup.
 void BindMonomorphicApi(PJRT_Api* api, Globals& globals);

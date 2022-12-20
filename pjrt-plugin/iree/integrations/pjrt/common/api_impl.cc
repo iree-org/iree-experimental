@@ -109,25 +109,142 @@ const std::string& ErrorInstance::message() const {
 }
 
 //===----------------------------------------------------------------------===//
+// DeviceInstance
+//===----------------------------------------------------------------------===//
+
+void DeviceInstance::BindApi(PJRT_Api* api) {
+  api->PJRT_Device_Id = +[](PJRT_Device_Id_Args* args) -> PJRT_Error* {
+    args->id = DeviceInstance::Unwrap(args->device)->client_id();
+    return nullptr;
+  };
+  api->PJRT_Device_ProcessIndex =
+      +[](PJRT_Device_ProcessIndex_Args* args) -> PJRT_Error* {
+    args->process_index = DeviceInstance::Unwrap(args->device)->process_index();
+    return nullptr;
+  };
+  api->PJRT_Device_IsAddressable =
+      +[](PJRT_Device_IsAddressable_Args* args) -> PJRT_Error* {
+    args->is_addressable =
+        DeviceInstance::Unwrap(args->device)->is_addressable();
+    return nullptr;
+  };
+
+  api->PJRT_Device_Attributes =
+      +[](PJRT_Device_Attributes_Args* args) -> PJRT_Error* {
+    // TODO: Implement something.
+    args->num_attributes = 0;
+    args->attributes = nullptr;
+    return nullptr;
+  };
+  api->PJRT_Device_Kind = nullptr;
+  api->PJRT_Device_LocalHardwareId = nullptr;
+  api->PJRT_Device_DebugString = nullptr;
+  api->PJRT_Device_ToString = nullptr;
+}
+
+//===----------------------------------------------------------------------===//
 // ClientInstance
 //===----------------------------------------------------------------------===//
 
-ClientInstance::~ClientInstance() = default;
+ClientInstance::ClientInstance(Globals& globals) : globals_(globals) {
+  host_allocator_ = iree_allocator_system();
+  cached_platform_version_ = "git";  // TODO: Plumb through version info.
+}
+
+ClientInstance::~ClientInstance() {
+  for (auto* device : devices_) {
+    delete device;
+  }
+  if (device_infos_) {
+    iree_allocator_free(host_allocator_, device_infos_);
+  }
+}
 
 void ClientInstance::BindApi(PJRT_Api* api) {
+  // PJRT_Client_Create is polymorphic
   api->PJRT_Client_Destroy =
       +[](PJRT_Client_Destroy_Args* args) -> PJRT_Error* {
     delete ClientInstance::Unwrap(args->client);
     return nullptr;
   };
+  api->PJRT_Client_PlatformName =
+      +[](PJRT_Client_PlatformName_Args* args) -> PJRT_Error* {
+    auto* client = ClientInstance::Unwrap(args->client);
+    args->platform_name = client->cached_platform_name().data();
+    args->platform_name_size = client->cached_platform_name().size();
+    return nullptr;
+  };
+  api->PJRT_Client_ProcessIndex =
+      +[](PJRT_Client_ProcessIndex_Args* args) -> PJRT_Error* {
+    args->process_index = 0;
+    return nullptr;
+  };
+  api->PJRT_Client_PlatformVersion =
+      +[](PJRT_Client_PlatformVersion_Args* args) -> PJRT_Error* {
+    auto* client = ClientInstance::Unwrap(args->client);
+    args->platform_version = client->cached_platform_version().data();
+    args->platform_version_size = client->cached_platform_version().size();
+    return nullptr;
+  };
+  api->PJRT_Client_Devices =
+      +[](PJRT_Client_Devices_Args* args) -> PJRT_Error* {
+    auto& devices = ClientInstance::Unwrap(args->client)->devices();
+    args->devices = reinterpret_cast<PJRT_Device**>(devices.data());
+    args->num_devices = devices.size();
+    return nullptr;
+  };
+  api->PJRT_Client_AddressableDevices =
+      +[](PJRT_Client_AddressableDevices_Args* args) -> PJRT_Error* {
+    auto& devices = ClientInstance::Unwrap(args->client)->devices();
+    args->addressable_devices = reinterpret_cast<PJRT_Device**>(devices.data());
+    args->num_addressable_devices = devices.size();
+    return nullptr;
+  };
+  api->PJRT_Client_LookupDevice =
+      +[](PJRT_Client_LookupDevice_Args* args) -> PJRT_Error* {
+    auto& devices = ClientInstance::Unwrap(args->client)->devices();
+    size_t id_as_size = args->id;
+    if (id_as_size >= devices.size()) {
+      return MakeError(
+          iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                           "because device id %d is invalid (%d devices known)",
+                           (int)id_as_size, (int)devices.size()));
+    }
+    args->device = *devices[id_as_size];
+    return nullptr;
+  };
+  api->PJRT_Client_Compile = nullptr;
+  api->PJRT_Client_DefaultDeviceAssignment =
+      +[](PJRT_Client_DefaultDeviceAssignment_Args* args) -> PJRT_Error* {
+    // TODO: Something sensible.
+    for (size_t i = 0; i < args->default_assignment_size; ++i) {
+      args->default_assignment[i] = 0;
+    }
+    return nullptr;
+  };
+  api->PJRT_Client_BufferFromHostBuffer = nullptr;
 }
 
 PJRT_Error* ClientInstance::Initialize() {
-  auto* error = CreateDriver(&driver_);
-  if (error) return error;
+  auto status = CreateDriver(&driver_);
+  if (!iree_status_is_ok(status)) return MakeError(status);
+
+  status = PopulateDevices();
+  if (!iree_status_is_ok(status)) return MakeError(status);
 
   // More initialization.
   return nullptr;
+}
+
+iree_status_t ClientInstance::PopulateDevices() {
+  IREE_RETURN_IF_ERROR(iree_hal_driver_query_available_devices(
+      driver_, host_allocator_, &device_info_count_, &device_infos_));
+  devices_.resize(device_info_count_);
+  for (iree_host_size_t i = 0; i < device_info_count_; ++i) {
+    devices_[i] = new DeviceInstance(i, *this, &device_infos_[i]);
+  }
+
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -140,6 +257,7 @@ void BindMonomorphicApi(PJRT_Api* api, Globals& globals) {
 
   // Bind by object types.
   ClientInstance::BindApi(api);
+  DeviceInstance::BindApi(api);
   ErrorInstance::BindApi(api);
 }
 

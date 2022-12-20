@@ -16,7 +16,7 @@ class CPUClientInstance final : public ClientInstance {
  public:
   CPUClientInstance(Globals& globals);
   ~CPUClientInstance();
-  PJRT_Error* CreateDriver(iree_hal_driver_t** out_driver) override;
+  iree_status_t CreateDriver(iree_hal_driver_t** out_driver) override;
 
  private:
   iree_status_t InitializeDeps();
@@ -27,7 +27,6 @@ class CPUClientInstance final : public ClientInstance {
   iree_task_topology_t task_topology_options_;
 
   // Deps.
-  iree_allocator_t host_allocator_;
   iree_hal_executable_loader_t* loaders_[8] = {nullptr};
   iree_host_size_t loader_count_ = 0;
   iree_task_executor_t* executor_ = nullptr;

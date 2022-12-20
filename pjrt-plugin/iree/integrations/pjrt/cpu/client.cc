@@ -14,11 +14,14 @@ namespace iree::pjrt::cpu {
 
 CPUClientInstance::CPUClientInstance(Globals& globals)
     : ClientInstance(globals) {
+  // Seems that it must match how registered. Action at a distance not
+  // great.
+  // TODO: Get this when constructing the client so it is guaranteed to
+  // match.
+  cached_platform_name_ = "iree_cpu";
   iree_hal_task_device_params_initialize(&device_params_);
   iree_task_executor_options_initialize(&task_executor_options_);
   iree_task_topology_initialize(&task_topology_options_);
-
-  host_allocator_ = iree_allocator_system();
 }
 
 CPUClientInstance::~CPUClientInstance() {
@@ -56,22 +59,20 @@ iree_status_t CPUClientInstance::InitializeDeps() {
   return iree_ok_status();
 }
 
-PJRT_Error* CPUClientInstance::CreateDriver(iree_hal_driver_t** out_driver) {
+iree_status_t CPUClientInstance::CreateDriver(iree_hal_driver_t** out_driver) {
   // TODO: There is substantial configuration available.
   // We choose to use explicit instantiation (vs registration) because
   // it is assumed that for server-library oriented cases, we are going to
   // want non-default control.
-  auto status = InitializeDeps();
-  if (!iree_status_is_ok(status)) return MakeError(status);
+  IREE_RETURN_IF_ERROR(InitializeDeps());
 
   // driver
-  status = iree_hal_task_driver_create(
+  IREE_RETURN_IF_ERROR(iree_hal_task_driver_create(
       IREE_SV("local-task"), &device_params_, /*queue_count=*/1, &executor_,
-      loader_count_, loaders_, device_allocator_, host_allocator_, out_driver);
-  if (!iree_status_is_ok(status)) return MakeError(status);
+      loader_count_, loaders_, device_allocator_, host_allocator_, out_driver));
 
   logger().debug("CPU driver created");
-  return nullptr;
+  return iree_ok_status();
 }
 
 }  // namespace iree::pjrt::cpu
