@@ -213,7 +213,22 @@ void ClientInstance::BindApi(PJRT_Api* api) {
     args->device = *devices[id_as_size];
     return nullptr;
   };
-  api->PJRT_Client_Compile = nullptr;
+  api->PJRT_Client_Compile =
+      +[](PJRT_Client_Compile_Args* args) -> PJRT_Error* {
+    // TODO: It is not great that we only get a client here vs a list of
+    // devices to consider (or something). The issue is that systems often
+    // have unrelated devices that will not actually be scheduled and those
+    // will very naturally have different tuning flags. We therefore have to
+    // guess... which is an accident waiting to happen.
+    // Looks like what I need is buried in the compile options... need to
+    // work on that.
+    auto* client = ClientInstance::Unwrap(args->client);
+    ExecutableInstance* executable;
+    auto* error = client->Compile(args->program, &executable);
+    if (error) return error;
+    args->executable = *executable;
+    return nullptr;
+  };
   api->PJRT_Client_DefaultDeviceAssignment =
       +[](PJRT_Client_DefaultDeviceAssignment_Args* args) -> PJRT_Error* {
     // TODO: Something sensible.
@@ -232,8 +247,26 @@ PJRT_Error* ClientInstance::Initialize() {
   status = PopulateDevices();
   if (!iree_status_is_ok(status)) return MakeError(status);
 
+  status = InitializeCompiler();
+  if (!iree_status_is_ok(status)) return MakeError(status);
+
   // More initialization.
   return nullptr;
+}
+
+iree_status_t ClientInstance::InitializeCompiler() {
+  // TODO: This needs an overhaul obviously. Should be backed by a Platform
+  // factory that can be more customized for different deployment scenarios
+  // (i.e. static linking, etc).
+  compiler_ = InprocessStubCompiler::Initialize(
+      "/home/stella/src/iree-build/lib/libIREECompiler.so");
+  if (!compiler_) {
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "because the compiler shared library could not be loaded");
+  }
+
+  return iree_ok_status();
 }
 
 iree_status_t ClientInstance::PopulateDevices() {
@@ -245,6 +278,48 @@ iree_status_t ClientInstance::PopulateDevices() {
   }
 
   return iree_ok_status();
+}
+
+PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
+                                    ExecutableInstance** executable) {
+  std::string_view format(program->format, program->format_size);
+  std::string_view code(program->code, program->code_size);
+  if (format != "mlir") {
+    // See: https://github.com/google/jax/issues/13722
+    return MakeError(iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "because IREE only supports MLIR input but got something else"));
+  }
+
+  std::unique_ptr<CompilerJob> job = compiler_->StartJob();
+  auto MakeCompilerError = [&]() {
+    std::string message = job->GetErrorMessage();
+    return MakeError(iree_make_status(IREE_STATUS_INVALID_ARGUMENT, ": %s",
+                                      message.c_str()));
+  };
+
+  // Set flags.
+  // TODO: This should be done as part of session setup from a named pool.
+  // TODO: The HAL backends and other flags should come from the assigned
+  // devices.
+  if (!job->SetFlag("--iree-input-type=mhlo") ||
+      !job->SetFlag("--iree-hal-target-backends=llvm-cpu")) {
+    return MakeCompilerError();
+  }
+
+  // Parse the source.
+  if (!job->ParseSourceBuffer(code.data(), code.size())) {
+    return MakeCompilerError();
+  }
+
+  // Perform main compilation.
+  auto output = job->CompileStandardPipeline();
+  if (!output) {
+    return MakeCompilerError();
+  }
+
+  return MakeError(
+      iree_make_status(IREE_STATUS_UNIMPLEMENTED, "because I forgot"));
 }
 
 //===----------------------------------------------------------------------===//

@@ -14,6 +14,7 @@
 
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
+#include "iree/integrations/pjrt/common/compiler.h"
 #include "tensorflow/compiler/xla/pjrt/c/pjrt_c_api.h"
 
 namespace iree::pjrt {
@@ -133,6 +134,21 @@ class DeviceInstance {
 };
 
 //===----------------------------------------------------------------------===//
+// ExecutableInstance
+//===----------------------------------------------------------------------===//
+
+class ExecutableInstance {
+ public:
+  ExecutableInstance(ClientInstance& client) : client_(client) {}
+  operator PJRT_Executable*() {
+    return reinterpret_cast<PJRT_Executable*>(this);
+  }
+
+ private:
+  ClientInstance& client_;
+};
+
+//===----------------------------------------------------------------------===//
 // ClientInstance
 // The root of the runtime hierarchy, these map to an IREE driver and are
 // created against an API.
@@ -165,15 +181,21 @@ struct ClientInstance {
     return cached_platform_version_;
   }
 
+  // Compiles.
+  // See TODOs in PJRT_Client_Compile.
+  PJRT_Error* Compile(PJRT_Program* program, ExecutableInstance** executable);
+
  protected:
   iree_allocator_t host_allocator_;
   std::string cached_platform_name_;
   std::string cached_platform_version_;
 
  private:
+  iree_status_t InitializeCompiler();
   iree_status_t PopulateDevices();
 
   // Populated during initialization.
+  std::shared_ptr<AbstractCompiler> compiler_;
   iree_hal_driver_t* driver_ = nullptr;
   iree_hal_device_info_t* device_infos_ = nullptr;
   iree_host_size_t device_info_count_ = 0;

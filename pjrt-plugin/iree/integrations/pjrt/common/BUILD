@@ -14,17 +14,29 @@ cc_library(
     name = "impl",
     srcs = [
         "api_impl.cc",
-        #"pjrt_plugin_impl.cc",
     ],
     hdrs = [
         "api_impl.h",
         "dylib_entry_point.cc.inc",
-        # "pjrt_plugin_defs.h",
-        # "pjrt_plugin_impl.h",
     ],
     deps = [
+        ":compiler",
         "@iree//runtime/src/iree/vm",
         "@iree//runtime/src/iree/hal",
         "@org_tensorflow//tensorflow/compiler/xla/pjrt/c:pjrt_c_api_hdrs",
+    ],
+)
+
+cc_library(
+    name = "compiler",
+    srcs = [
+        "compiler.cc",
+    ],
+    hdrs = [
+        "compiler.h",
+    ],
+    deps = [
+        "@iree//compiler/src/iree/compiler/API2:EmbedHeaders",
+        "@iree//compiler/src/iree/compiler/API2/Stub",
     ],
 )
