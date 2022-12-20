@@ -101,6 +101,23 @@ inline PJRT_Error* MakeError(iree_status_t status) {
 }
 
 //===----------------------------------------------------------------------===//
+// BufferInstance
+//===----------------------------------------------------------------------===//
+
+class BufferInstance {
+ public:
+  BufferInstance(ClientInstance& client) : client_(client) {}
+  operator PJRT_Buffer*() { return reinterpret_cast<PJRT_Buffer*>(this); }
+  static BufferInstance* Unwrap(PJRT_Buffer* buffer) {
+    return reinterpret_cast<BufferInstance*>(buffer);
+  }
+  static void BindApi(PJRT_Api* api);
+
+ private:
+  ClientInstance& client_;
+};
+
+//===----------------------------------------------------------------------===//
 // DeviceInstance
 //===----------------------------------------------------------------------===//
 
@@ -134,18 +151,47 @@ class DeviceInstance {
 };
 
 //===----------------------------------------------------------------------===//
+// EventInstance
+//===----------------------------------------------------------------------===//
+
+class EventInstance {
+ public:
+  EventInstance() = default;
+  operator PJRT_Event*() { return reinterpret_cast<PJRT_Event*>(this); }
+  static void BindApi(PJRT_Api* api);
+  static EventInstance* Unwrap(PJRT_Event* exe) {
+    return reinterpret_cast<EventInstance*>(exe);
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // ExecutableInstance
 //===----------------------------------------------------------------------===//
 
 class ExecutableInstance {
  public:
-  ExecutableInstance(ClientInstance& client) : client_(client) {}
+  ExecutableInstance(ClientInstance& client,
+                     std::unique_ptr<CompilerOutput> binary,
+                     const std::vector<DeviceInstance*>& addressable_devices)
+      : client_(client),
+        binary_(std::move(binary)),
+        addressable_devices_(addressable_devices) {}
   operator PJRT_Executable*() {
     return reinterpret_cast<PJRT_Executable*>(this);
+  }
+  static void BindApi(PJRT_Api* api);
+  static ExecutableInstance* Unwrap(PJRT_Executable* exe) {
+    return reinterpret_cast<ExecutableInstance*>(exe);
+  }
+
+  const std::vector<DeviceInstance*>& addressable_devices() {
+    return addressable_devices_;
   }
 
  private:
   ClientInstance& client_;
+  std::unique_ptr<CompilerOutput> binary_;
+  std::vector<DeviceInstance*> addressable_devices_;
 };
 
 //===----------------------------------------------------------------------===//
@@ -175,7 +221,10 @@ struct ClientInstance {
   Globals& globals() { return globals_; }
   Logger& logger() { return globals_.logger(); }
 
-  std::vector<DeviceInstance*>& devices() { return devices_; }
+  const std::vector<DeviceInstance*>& devices() { return devices_; }
+  const std::vector<DeviceInstance*>& addressable_devices() {
+    return addressable_devices_;
+  }
   const std::string& cached_platform_name() { return cached_platform_name_; }
   const std::string& cached_platform_version() {
     return cached_platform_version_;
@@ -200,7 +249,7 @@ struct ClientInstance {
   iree_hal_device_info_t* device_infos_ = nullptr;
   iree_host_size_t device_info_count_ = 0;
   std::vector<DeviceInstance*> devices_;
-
+  std::vector<DeviceInstance*> addressable_devices_;
   Globals& globals_;
 };
 

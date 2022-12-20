@@ -109,6 +109,66 @@ const std::string& ErrorInstance::message() const {
 }
 
 //===----------------------------------------------------------------------===//
+// BufferInstance
+//===----------------------------------------------------------------------===//
+
+void BufferInstance::BindApi(PJRT_Api* api) {
+  api->PJRT_Buffer_Destroy =
+      +[](PJRT_Buffer_Destroy_Args* args) -> PJRT_Error* {
+    delete BufferInstance::Unwrap(args->buffer);
+    return nullptr;
+  };
+  api->PJRT_Buffer_OnDeviceTrimmedShape =
+      +[](PJRT_Buffer_OnDeviceTrimmedShape_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Buffer_OnDeviceTrimmedShape"));
+  };
+  api->PJRT_Buffer_ToHostBuffer =
+      +[](PJRT_Buffer_ToHostBuffer_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Buffer_ToHostBuffer"));
+  };
+  api->PJRT_Buffer_OnDeviceSizeInBytes =
+      +[](PJRT_Buffer_OnDeviceSizeInBytes_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Buffer_OnDeviceSizeInBytes"));
+  };
+  api->PJRT_Buffer_Delete = +[](PJRT_Buffer_Delete_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_Delete"));
+  };
+  api->PJRT_Buffer_IsDeleted =
+      +[](PJRT_Buffer_IsDeleted_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_IsDeleted"));
+  };
+  api->PJRT_Buffer_CopyToDevice =
+      +[](PJRT_Buffer_CopyToDevice_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Buffer_CopyToDevice"));
+  };
+  api->PJRT_Buffer_IsOnCpu =
+      +[](PJRT_Buffer_IsOnCpu_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_IsOnCpu"));
+  };
+  api->PJRT_Buffer_Device = +[](PJRT_Buffer_Device_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_Device"));
+  };
+  api->PJRT_Buffer_ReadyEvent =
+      +[](PJRT_Buffer_ReadyEvent_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_ReadyEvent"));
+  };
+  api->PJRT_Buffer_UnsafePointer =
+      +[](PJRT_Buffer_UnsafePointer_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Buffer_UnsafePointer"));
+  };
+}
+
+//===----------------------------------------------------------------------===//
 // DeviceInstance
 //===----------------------------------------------------------------------===//
 
@@ -189,14 +249,16 @@ void ClientInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Client_Devices =
       +[](PJRT_Client_Devices_Args* args) -> PJRT_Error* {
     auto& devices = ClientInstance::Unwrap(args->client)->devices();
-    args->devices = reinterpret_cast<PJRT_Device**>(devices.data());
+    args->devices = const_cast<PJRT_Device**>(
+        reinterpret_cast<PJRT_Device* const*>(devices.data()));
     args->num_devices = devices.size();
     return nullptr;
   };
   api->PJRT_Client_AddressableDevices =
       +[](PJRT_Client_AddressableDevices_Args* args) -> PJRT_Error* {
-    auto& devices = ClientInstance::Unwrap(args->client)->devices();
-    args->addressable_devices = reinterpret_cast<PJRT_Device**>(devices.data());
+    auto& devices = ClientInstance::Unwrap(args->client)->addressable_devices();
+    args->addressable_devices = const_cast<PJRT_Device**>(
+        reinterpret_cast<PJRT_Device* const*>(devices.data()));
     args->num_addressable_devices = devices.size();
     return nullptr;
   };
@@ -237,7 +299,11 @@ void ClientInstance::BindApi(PJRT_Api* api) {
     }
     return nullptr;
   };
-  api->PJRT_Client_BufferFromHostBuffer = nullptr;
+  api->PJRT_Client_BufferFromHostBuffer =
+      +[](PJRT_Client_BufferFromHostBuffer_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Client_BufferFromHostBuffer"));
+  };
 }
 
 PJRT_Error* ClientInstance::Initialize() {
@@ -277,6 +343,11 @@ iree_status_t ClientInstance::PopulateDevices() {
     devices_[i] = new DeviceInstance(i, *this, &device_infos_[i]);
   }
 
+  // For now, just make all devices addressable.
+  addressable_devices_.reserve(devices_.size());
+  for (auto* device : devices_) {
+    addressable_devices_.push_back(device);
+  }
   return iree_ok_status();
 }
 
@@ -313,13 +384,120 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
   }
 
   // Perform main compilation.
-  auto output = job->CompileStandardPipeline();
+  std::unique_ptr<CompilerOutput> output = job->CompileStandardPipeline();
   if (!output) {
     return MakeCompilerError();
   }
 
-  return MakeError(
-      iree_make_status(IREE_STATUS_UNIMPLEMENTED, "because I forgot"));
+  *executable =
+      new ExecutableInstance(*this, std::move(output), addressable_devices_);
+  return nullptr;
+}
+
+//===----------------------------------------------------------------------===//
+// EventInstance
+//===----------------------------------------------------------------------===//
+
+void EventInstance::BindApi(PJRT_Api* api) {
+  api->PJRT_Event_Destroy = +[](PJRT_Event_Destroy_Args* args) -> PJRT_Error* {
+    delete EventInstance::Unwrap(args->event);
+    return nullptr;
+  };
+  api->PJRT_Event_IsReady = +[](PJRT_Event_IsReady_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Event_IsReady"));
+  };
+  api->PJRT_Event_IsReady = +[](PJRT_Event_IsReady_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Event_IsReady"));
+  };
+  api->PJRT_Event_Error = +[](PJRT_Event_Error_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Event_Error"));
+  };
+  api->PJRT_Event_Await = +[](PJRT_Event_Await_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Event_Await"));
+  };
+  api->PJRT_Event_OnReady = +[](PJRT_Event_OnReady_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Event_OnReady"));
+  };
+}
+
+//===----------------------------------------------------------------------===//
+// ExecutableInstance
+//===----------------------------------------------------------------------===//
+
+void ExecutableInstance::BindApi(PJRT_Api* api) {
+  api->PJRT_Executable_Destroy =
+      +[](PJRT_Executable_Destroy_Args* args) -> PJRT_Error* {
+    delete ExecutableInstance::Unwrap(args->executable);
+    return nullptr;
+  };
+  api->PJRT_Executable_Name =
+      +[](PJRT_Executable_Name_Args* args) -> PJRT_Error* {
+    const char* dummy_name = "iree_vmfb";
+    args->executable_name = dummy_name;
+    args->executable_name_size = strlen(dummy_name);
+    return nullptr;
+  };
+  api->PJRT_Executable_AddressableDevices =
+      +[](PJRT_Executable_AddressableDevices_Args* args) -> PJRT_Error* {
+    auto& devices =
+        ExecutableInstance::Unwrap(args->executable)->addressable_devices();
+    args->addressable_devices = const_cast<PJRT_Device**>(
+        reinterpret_cast<PJRT_Device* const*>(devices.data()));
+    args->num_addressable_devices = devices.size();
+    return nullptr;
+  };
+  api->PJRT_Executable_OptimizedProgram =
+      +[](PJRT_Executable_OptimizedProgram_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Executable_OptimizedProgram"));
+  };
+  api->PJRT_Executable_Delete =
+      +[](PJRT_Executable_Delete_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Executable_Delete"));
+  };
+  api->PJRT_Executable_IsDeleted =
+      +[](PJRT_Executable_IsDeleted_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Executable_IsDeleted"));
+  };
+  api->PJRT_Executable_Execute =
+      +[](PJRT_Executable_Execute_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Executable_Execute"));
+  };
+  api->PJRT_Executable_NumOutputs =
+      +[](PJRT_Executable_NumOutputs_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Executable_NumOutputs"));
+  };
+  api->PJRT_Executable_SizeOfGeneratedCodeInBytes =
+      +[](PJRT_Executable_SizeOfGeneratedCodeInBytes_Args* args)
+      -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                         "PJRT_Executable_SizeOfGeneratedCodeInBytes_Args"));
+  };
+  api->PJRT_Executable_GetCostAnalysis =
+      +[](PJRT_Executable_GetCostAnalysis_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Executable_GetCostAnalysis"));
+  };
+  api->PJRT_Executable_Serialize =
+      +[](PJRT_Executable_Serialize_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Executable_Serialize"));
+  };
+  api->PJRT_Executable_Deserialize =
+      +[](PJRT_Executable_Deserialize_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Executable_Deserialize"));
+  };
 }
 
 //===----------------------------------------------------------------------===//
@@ -331,9 +509,12 @@ void BindMonomorphicApi(PJRT_Api* api, Globals& globals) {
   api->priv = &globals;
 
   // Bind by object types.
+  BufferInstance::BindApi(api);
   ClientInstance::BindApi(api);
   DeviceInstance::BindApi(api);
   ErrorInstance::BindApi(api);
+  EventInstance::BindApi(api);
+  ExecutableInstance::BindApi(api);
 }
 
 }  // namespace iree::pjrt
