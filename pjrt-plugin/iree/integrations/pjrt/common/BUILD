@@ -22,7 +22,9 @@ cc_library(
     deps = [
         ":compiler",
         "@iree//runtime/src/iree/vm",
+        "@iree//runtime/src/iree/vm:bytecode_module",
         "@iree//runtime/src/iree/hal",
+        "@iree//runtime/src/iree/modules/hal",
         "@org_tensorflow//tensorflow/compiler/xla/pjrt/c:pjrt_c_api_hdrs",
     ],
 )

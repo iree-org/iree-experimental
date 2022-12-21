@@ -306,6 +306,7 @@ void BufferInstance::BindApi(PJRT_Api* api) {
       // TODO: This function is terrible and not exposed properly to C.
       // It is slated to be deleted...
       // See Google bug b/238999986
+      // Filed https://github.com/google/jax/issues/13740
       auto* bv = BufferInstance::Unwrap(args->buffer)->buffer_view();
       iree_hal_element_type_t hal_element_type =
           iree_hal_buffer_view_element_type(bv);
@@ -511,6 +512,12 @@ iree_status_t DeviceInstance::HostBufferToDevice(
   return iree_ok_status();
 }
 
+iree_status_t DeviceInstance::GetHalDevice(iree_hal_device_t** out_device) {
+  IREE_RETURN_IF_ERROR(OpenDevice());
+  *out_device = device_;
+  return iree_ok_status();
+}
+
 //===----------------------------------------------------------------------===//
 // ClientInstance
 //===----------------------------------------------------------------------===//
@@ -626,6 +633,9 @@ PJRT_Error* ClientInstance::Initialize() {
   auto status = CreateDriver(&driver_);
   if (!iree_status_is_ok(status)) return MakeError(status);
 
+  status = InitializeVM();
+  if (!iree_status_is_ok(status)) return MakeError(status);
+
   status = PopulateDevices();
   if (!iree_status_is_ok(status)) return MakeError(status);
 
@@ -651,6 +661,12 @@ iree_status_t ClientInstance::InitializeCompiler() {
   return iree_ok_status();
 }
 
+iree_status_t ClientInstance::InitializeVM() {
+  IREE_RETURN_IF_ERROR(iree_vm_instance_create(host_allocator_, &vm_instance_));
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(vm_instance_.get()));
+  return iree_ok_status();
+}
+
 iree_status_t ClientInstance::PopulateDevices() {
   IREE_RETURN_IF_ERROR(iree_hal_driver_query_available_devices(
       driver_, host_allocator_, &device_info_count_, &device_infos_));
@@ -671,7 +687,8 @@ iree_status_t ClientInstance::PopulateDevices() {
 }
 
 PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
-                                    ExecutableInstance** executable) {
+                                    ExecutableInstance** out_executable) {
+  iree_status_t status;
   std::string_view format(program->format, program->format_size);
   std::string_view code(program->code, program->code_size);
   if (format != "mlir") {
@@ -708,9 +725,29 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
     return MakeCompilerError();
   }
 
-  *executable =
-      new ExecutableInstance(*this, std::move(output), addressable_devices_);
+  auto executable = std::make_unique<ExecutableInstance>(
+      *this, std::move(output), addressable_devices_);
+  status = executable->LoadAll();
+  if (!iree_status_is_ok(status)) {
+    return MakeError(status);
+  }
+
+  *out_executable = executable.release();
   return nullptr;
+}
+
+iree_status_t ClientInstance::PopulateVMModules(
+    std::vector<iree::vm::ref<iree_vm_module_t>> modules,
+    iree_hal_device_t* hal_device, iree_vm_module_t* main_module) {
+  // HAL module.
+  modules.push_back({});
+  IREE_RETURN_IF_ERROR(iree_hal_module_create(
+      vm_instance(), hal_device, IREE_HAL_MODULE_FLAG_NONE, host_allocator(),
+      &modules.back()));
+
+  // Main module.
+  modules.push_back(main_module);
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -739,7 +776,8 @@ void EventInstance::BindApi(PJRT_Api* api) {
   };
 }
 
-iree_status_t EventInstance::OnReady(PJRT_Event_OnReadyCallback callback, void* user_arg) {
+iree_status_t EventInstance::OnReady(PJRT_Event_OnReadyCallback callback,
+                                     void* user_arg) {
   // TODO: Detect if not ready.
   callback((PJRT_Error*)error_, user_arg);
   return iree_ok_status();
@@ -793,8 +831,12 @@ void ExecutableInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Executable_NumOutputs =
       +[](PJRT_Executable_NumOutputs_Args* args) -> PJRT_Error* {
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Executable_NumOutputs"));
+    auto* exec = ExecutableInstance::Unwrap(args->executable);
+    iree_host_size_t arg_count;
+    iree_host_size_t result_count;
+    auto status = exec->GetArgResultCount(&arg_count, &result_count);
+    args->num_outputs = result_count;
+    return MakeError(status);
   };
   api->PJRT_Executable_SizeOfGeneratedCodeInBytes =
       +[](PJRT_Executable_SizeOfGeneratedCodeInBytes_Args* args)
@@ -818,6 +860,69 @@ void ExecutableInstance::BindApi(PJRT_Api* api) {
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                       "PJRT_Executable_Deserialize"));
   };
+}
+
+iree_status_t ExecutableInstance::LoadAll() {
+  std::vector<LoadedExecutable> new_list;
+  for (DeviceInstance* device_instance : addressable_devices_) {
+    iree_hal_device_t* hal_device;
+    IREE_RETURN_IF_ERROR(device_instance->GetHalDevice(&hal_device));
+    new_list.push_back({});
+    LoadedExecutable& loaded = new_list.back();
+
+    IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
+        client_.vm_instance(),
+        iree_make_const_byte_span(binary_->GetData(), binary_->GetDataSize()),
+        /*archive_allocator=*/iree_allocator_null(), client_.host_allocator(),
+        &loaded.main_module));
+
+    // Defer to the client to populate the stack of modules.
+    std::vector<iree::vm::ref<iree_vm_module_t>> modules;
+    IREE_RETURN_IF_ERROR(client_.PopulateVMModules(modules, hal_device,
+                                                   loaded.main_module.get()));
+    std::vector<iree_vm_module_t*> module_ptrs;
+    module_ptrs.resize(modules.size());
+    for (size_t i = 0; i < modules.size(); ++i) {
+      module_ptrs[i] = modules[i].get();
+    }
+
+    IREE_CHECK_OK(iree_vm_context_create_with_modules(
+        client_.vm_instance(), IREE_VM_CONTEXT_FLAG_NONE, module_ptrs.size(),
+        module_ptrs.data(), iree_allocator_system(), &loaded.vm_context));
+  }
+
+  new_list.swap(loaded_executables_);
+  return iree_ok_status();
+}
+
+iree_status_t ExecutableInstance::GetDefaultLoadedExecutable(
+    LoadedExecutable** out_loaded) {
+  if (loaded_executables_.empty()) {
+    IREE_RETURN_IF_ERROR(LoadAll());
+  }
+  if (loaded_executables_.empty()) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "no executables could be loaded");
+  }
+  *out_loaded = &loaded_executables_.front();
+  return iree_ok_status();
+}
+
+iree_status_t ExecutableInstance::GetArgResultCount(
+    iree_host_size_t* out_arg_count, iree_host_size_t* out_result_count) {
+  LoadedExecutable* loaded;
+  IREE_RETURN_IF_ERROR(GetDefaultLoadedExecutable(&loaded));
+
+  // Lookup main function.
+  iree_vm_function_t function;
+  const char kNameMain[] = "main";
+  IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
+      loaded->main_module.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT,
+      iree_string_view_t{kNameMain, sizeof(kNameMain) - 1}, &function));
+
+  iree_vm_function_signature_t sig = iree_vm_function_signature(&function);
+  return iree_vm_function_call_count_arguments_and_results(&sig, out_arg_count,
+                                                           out_result_count);
 }
 
 //===----------------------------------------------------------------------===//

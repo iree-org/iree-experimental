@@ -15,6 +15,9 @@
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/integrations/pjrt/common/compiler.h"
+#include "iree/modules/hal/module.h"
+#include "iree/vm/api.h"
+#include "iree/vm/bytecode_module.h"
 #include "tensorflow/compiler/xla/pjrt/c/pjrt_c_api.h"
 
 namespace iree::pjrt {
@@ -161,6 +164,8 @@ class DeviceInstance {
       EventInstance** out_done_with_host_buffer_event,
       BufferInstance** out_buffer);
 
+  iree_status_t GetHalDevice(iree_hal_device_t** out_device);
+
  private:
   iree_status_t OpenDevice();
   int client_id_;
@@ -187,7 +192,8 @@ class EventInstance {
   iree_status_t OnReady(PJRT_Event_OnReadyCallback callback, void* user_arg);
   ErrorInstance* error() { return error_; }
   bool is_ready() { return is_ready_; }
-private:
+
+ private:
   ErrorInstance* error_ = nullptr;
   bool is_ready_ = true;
 };
@@ -195,6 +201,13 @@ private:
 //===----------------------------------------------------------------------===//
 // ExecutableInstance
 //===----------------------------------------------------------------------===//
+
+// An executable loaded on all available devices.
+struct LoadedExecutable {
+  iree::vm::ref<iree_hal_device_t> device;
+  iree::vm::ref<iree_vm_context_t> vm_context;
+  iree::vm::ref<iree_vm_module_t> main_module;
+};
 
 class ExecutableInstance {
  public:
@@ -216,10 +229,22 @@ class ExecutableInstance {
     return addressable_devices_;
   }
 
+  // Loads all executables to addressable devices.
+  iree_status_t LoadAll();
+
+  // Gets one loaded executable that can be used for querying metadata
+  // and such.
+  iree_status_t GetDefaultLoadedExecutable(LoadedExecutable** out_loaded);
+
+  // Gets the number of outputs.
+  iree_status_t GetArgResultCount(iree_host_size_t* out_arg_count,
+                                  iree_host_size_t* out_result_count);
+
  private:
   ClientInstance& client_;
   std::unique_ptr<CompilerOutput> binary_;
   std::vector<DeviceInstance*> addressable_devices_;
+  std::vector<LoadedExecutable> loaded_executables_;
 };
 
 //===----------------------------------------------------------------------===//
@@ -258,9 +283,19 @@ struct ClientInstance {
     return cached_platform_version_;
   }
 
+  iree_vm_instance_t* vm_instance() { return vm_instance_.get(); }
+
   // Compiles.
   // See TODOs in PJRT_Client_Compile.
   PJRT_Error* Compile(PJRT_Program* program, ExecutableInstance** executable);
+
+  // Populates the list of modules to load into a context for an executable
+  // on a device. This can be customized by subclasses. The default
+  // implementation constructs a hal module and appends:
+  //   {hal_module, main_module}.
+  virtual iree_status_t PopulateVMModules(
+      std::vector<iree::vm::ref<iree_vm_module_t>> modules,
+      iree_hal_device_t* hal_device, iree_vm_module_t* main_module);
 
  protected:
   iree_allocator_t host_allocator_;
@@ -269,16 +304,23 @@ struct ClientInstance {
 
  private:
   iree_status_t InitializeCompiler();
+  iree_status_t InitializeVM();
   iree_status_t PopulateDevices();
+
+  Globals& globals_;
 
   // Populated during initialization.
   std::shared_ptr<AbstractCompiler> compiler_;
+
+  // HAL.
   iree_hal_driver_t* driver_ = nullptr;
   iree_hal_device_info_t* device_infos_ = nullptr;
   iree_host_size_t device_info_count_ = 0;
   std::vector<DeviceInstance*> devices_;
   std::vector<DeviceInstance*> addressable_devices_;
-  Globals& globals_;
+
+  // VM.
+  iree::vm::ref<iree_vm_instance_t> vm_instance_;
 };
 
 //===----------------------------------------------------------------------===//
