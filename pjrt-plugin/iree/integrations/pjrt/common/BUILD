@@ -26,6 +26,7 @@ cc_library(
         "@iree//runtime/src/iree/hal",
         "@iree//runtime/src/iree/modules/hal",
         "@org_tensorflow//tensorflow/compiler/xla/pjrt/c:pjrt_c_api_hdrs",
+        "@org_tensorflow//tensorflow/compiler/xla:shape_util",
     ],
 )
 

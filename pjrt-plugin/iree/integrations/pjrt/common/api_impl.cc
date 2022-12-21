@@ -7,57 +7,140 @@
 #include "iree/integrations/pjrt/common/api_impl.h"
 
 #include <iostream>
+#include <optional>
 
 #include "iree/hal/buffer_view.h"
 
 namespace iree::pjrt {
 
+// Chopped down utilities from various TPU support libraries. Basically all for
+// populating Trimmed device shapes. Since that is supposed to go away at
+// some point, just copy-pasta here.
+namespace ApiConverter {
+// Helper functions for copying data to possibly-inlined C arrays.
+
+// 'Src' and 'Dst' are allowed to be different types to make this usable with
+// memory-identical types, e.g. int64_t and int64_t. This should not be used
+// with types that require a static_cast.
+template <typename Src, typename Dst, typename DstList>
+static void CreateVectorBase(const absl::Span<Src> src, DstList* dst) {
+  dst->size = src.size();
+  if (dst->size > TPU_C_API_MAX_INLINED) {
+    dst->heap = new Dst[dst->size];
+    std::copy(src.begin(), src.end(), dst->heap);
+  } else {
+    std::copy(src.begin(), src.end(), dst->inlined);
+  }
+}
+
+void CreateVector(const absl::Span<const int64_t> src, Int64List* dst) {
+  return CreateVectorBase<const int64_t, int64_t, Int64List>(src, dst);
+}
+
+void CreateVector(const absl::Span<const bool> src, BoolList* dst) {
+  return CreateVectorBase<const bool, bool, BoolList>(src, dst);
+}
+
+static void CreateVector(const absl::Span<const bool> src, IntList* dst) {
+  CreateVectorBase<const bool, int, IntList>(src, dst);
+}
+
+static void CreateVector(const absl::Span<const xla::DimLevelType> src,
+                         IntList* dst) {
+  CreateVectorBase<const xla::DimLevelType, int, IntList>(src, dst);
+}
+
+void ToC(const xla::Tile& tile, XLA_Tile* c_tile) {
+  CreateVector(tile.dimensions(), &c_tile->dimensions);
+}
+
+static void CreateVector(const absl::Span<const xla::Tile> src, TileList* dst) {
+  dst->size = src.size();
+  XLA_Tile* c_tiles;
+  if (dst->size > TPU_C_API_MAX_INLINED) {
+    dst->heap = new XLA_Tile[dst->size];
+    c_tiles = dst->heap;
+  } else {
+    c_tiles = dst->inlined;
+  }
+  for (int i = 0; i < dst->size; ++i) {
+    ToC(src[i], &c_tiles[i]);
+  }
+}
+
+void ToC(const xla::Layout& layout, XLA_Layout* c_layout) {
+  CreateVector(layout.minor_to_major(), &c_layout->minor_to_major);
+  CreateVector(layout.dim_level_types(), &c_layout->dim_level_types);
+  CreateVector(layout.dim_unique(), &c_layout->dim_unique);
+  CreateVector(layout.dim_ordered(), &c_layout->dim_ordered);
+  c_layout->index_primitive_type = layout.index_primitive_type();
+  c_layout->pointer_primitive_type = layout.pointer_primitive_type();
+  c_layout->memory_space = layout.memory_space();
+  CreateVector(layout.tiles(), &c_layout->tiles);
+}
+
+}  // namespace ApiConverter
+
 namespace {
 
-iree_status_t MapElementTypeToBufferType(iree_hal_element_type_t element_type,
-                                         PJRT_Buffer_Type* buffer_type) {
+iree_status_t MapElementTypeToXlaElementType(
+    iree_hal_element_type_t element_type, xla::PrimitiveType* xla_primitive) {
+  // TODO: Cascade on bit-field sub-types to avoid large linear scan.
   switch (element_type) {
+    // TODO: How do I interpret signless?
+    case IREE_HAL_ELEMENT_TYPE_INT_8:
+      *xla_primitive = xla::PrimitiveType::U8;
+      return iree_ok_status();
+    case IREE_HAL_ELEMENT_TYPE_INT_16:
+      *xla_primitive = xla::PrimitiveType::U16;
+      return iree_ok_status();
+    case IREE_HAL_ELEMENT_TYPE_INT_32:
+      *xla_primitive = xla::PrimitiveType::U32;
+      return iree_ok_status();
+    case IREE_HAL_ELEMENT_TYPE_INT_64:
+      *xla_primitive = xla::PrimitiveType::U64;
+      return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      *buffer_type = PJRT_Buffer_Type_S8;
+      *xla_primitive = xla::PrimitiveType::S8;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
-      *buffer_type = PJRT_Buffer_Type_S16;
+      *xla_primitive = xla::PrimitiveType::S16;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      *buffer_type = PJRT_Buffer_Type_S32;
+      *xla_primitive = xla::PrimitiveType::S32;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      *buffer_type = PJRT_Buffer_Type_S64;
+      *xla_primitive = xla::PrimitiveType::S64;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
-      *buffer_type = PJRT_Buffer_Type_U8;
+      *xla_primitive = xla::PrimitiveType::U8;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
-      *buffer_type = PJRT_Buffer_Type_U16;
+      *xla_primitive = xla::PrimitiveType::U16;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      *buffer_type = PJRT_Buffer_Type_U32;
+      *xla_primitive = xla::PrimitiveType::U32;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      *buffer_type = PJRT_Buffer_Type_U64;
+      *xla_primitive = xla::PrimitiveType::U64;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      *buffer_type = PJRT_Buffer_Type_F16;
+      *xla_primitive = xla::PrimitiveType::F16;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      *buffer_type = PJRT_Buffer_Type_F32;
+      *xla_primitive = xla::PrimitiveType::U32;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      *buffer_type = PJRT_Buffer_Type_F64;
+      *xla_primitive = xla::PrimitiveType::F64;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
-      *buffer_type = PJRT_Buffer_Type_BF16;
+      *xla_primitive = xla::PrimitiveType::BF16;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64:
-      *buffer_type = PJRT_Buffer_Type_C64;
+      *xla_primitive = xla::PrimitiveType::C64;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128:
-      *buffer_type = PJRT_Buffer_Type_C128;
+      *xla_primitive = xla::PrimitiveType::C128;
       return iree_ok_status();
     default:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -117,67 +200,6 @@ iree_status_t MapBufferTypeToElementType(
       return iree_ok_status();
     case PJRT_Buffer_Type_C128:
       *element_type = IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128;
-      return iree_ok_status();
-    default:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "conversion from unknown buffer type %d",
-                              (int)buffer_type);
-  }
-}
-
-iree_status_t MapBufferTypeToXlaElementType(PJRT_Buffer_Type buffer_type,
-                                            int* xla_element_type) {
-  // See xla_data.proto:PrimitiveType.
-  // This should go away once the bug is fixed and exposed properly
-  // through the C API.
-  switch (buffer_type) {
-    case PJRT_Buffer_Type_INVALID:
-      *xla_element_type = 0;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_PRED:
-      *xla_element_type = 1;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_S8:
-      *xla_element_type = 2;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_S16:
-      *xla_element_type = 3;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_S32:
-      *xla_element_type = 4;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_S64:
-      *xla_element_type = 5;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_U8:
-      *xla_element_type = 6;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_U16:
-      *xla_element_type = 7;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_U32:
-      *xla_element_type = 8;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_U64:
-      *xla_element_type = 9;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_F16:
-      *xla_element_type = 10;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_F32:
-      *xla_element_type = 11;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_F64:
-      *xla_element_type = 12;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_BF16:
-      *xla_element_type = 16;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_C64:
-      *xla_element_type = 15;
-      return iree_ok_status();
-    case PJRT_Buffer_Type_C128:
-      *xla_element_type = 18;
       return iree_ok_status();
     default:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -294,6 +316,36 @@ BufferInstance::~BufferInstance() {
   iree_hal_buffer_view_release(buffer_view_);
 }
 
+iree_status_t BufferInstance::GetXlaShape(xla::Shape** out_shape) {
+  if (cached_shape_) {
+    *out_shape = &(*cached_shape_);
+    return iree_ok_status();
+  }
+
+  iree_hal_element_type_t hal_element_type =
+      iree_hal_buffer_view_element_type(buffer_view_);
+  xla::PrimitiveType xla_element_type;
+  IREE_RETURN_IF_ERROR(
+      MapElementTypeToXlaElementType(hal_element_type, &xla_element_type));
+
+  size_t rank = iree_hal_buffer_view_shape_rank(buffer_view_);
+  const iree_hal_dim_t* dims = iree_hal_buffer_view_shape_dims(buffer_view_);
+  std::array<int64_t, 9> xla_dims;
+  if (rank > xla_dims.size()) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "rank > 9 not supported");
+  }
+  for (size_t i = 0; i < rank; ++i) {
+    xla_dims[i] = dims[i];
+  }
+
+  cached_shape_ = xla::ShapeUtil::MakeShape(
+      xla_element_type,
+      absl::MakeSpan(xla_dims.begin(), xla_dims.begin() + rank));
+  *out_shape = &(*cached_shape_);
+  return iree_ok_status();
+}
+
 void BufferInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Buffer_Destroy =
       +[](PJRT_Buffer_Destroy_Args* args) -> PJRT_Error* {
@@ -306,43 +358,37 @@ void BufferInstance::BindApi(PJRT_Api* api) {
       // TODO: This function is terrible and not exposed properly to C.
       // It is slated to be deleted...
       // See Google bug b/238999986
-      // Filed https://github.com/google/jax/issues/13740
-      auto* bv = BufferInstance::Unwrap(args->buffer)->buffer_view();
-      iree_hal_element_type_t hal_element_type =
-          iree_hal_buffer_view_element_type(bv);
-      PJRT_Buffer_Type pjrt_buffer_type;
-      IREE_RETURN_IF_ERROR(
-          MapElementTypeToBufferType(hal_element_type, &pjrt_buffer_type));
-      IREE_RETURN_IF_ERROR(
-          MapBufferTypeToXlaElementType(pjrt_buffer_type, &args->element_type));
+      BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
+      xla::Shape* shape;
+      IREE_RETURN_IF_ERROR(buffer->GetXlaShape(&shape));
 
-      args->has_layout = false;
+      args->element_type = shape->element_type();
+      ApiConverter::CreateVector(shape->dimensions(), &args->dimensions);
+      ApiConverter::CreateVector(shape->dynamic_dimensions(),
+                                 &args->dynamic_dimensions);
 
-      auto rank = iree_hal_buffer_view_shape_rank(bv);
-      const iree_hal_dim_t* dims = iree_hal_buffer_view_shape_dims(bv);
-
-      int64_t* dim_list = args->dimensions.inlined;
-      bool* dyn_list = args->dynamic_dimensions.inlined;
-      if (rank > TPU_C_API_MAX_INLINED) {
-        dim_list = args->dimensions.heap =
-            (int64_t*)malloc(sizeof(int64_t) * rank);
-        dyn_list = args->dynamic_dimensions.heap =
-            (bool*)malloc(sizeof(int64_t) * rank);
+      if (shape->has_layout()) {
+        args->has_layout = true;
+        ApiConverter::ToC(shape->layout(), &args->layout);
+      } else {
+        args->has_layout = false;
       }
-      for (size_t i = 0; i < rank; ++i) {
-        dim_list[i] = dims[i];
-        dyn_list[i] = false;
-      }
-      args->dimensions.size = rank;
-      args->dynamic_dimensions.size = rank;
       return iree_ok_status();
     };
     return MakeError(impl());
   };
   api->PJRT_Buffer_ToHostBuffer =
       +[](PJRT_Buffer_ToHostBuffer_Args* args) -> PJRT_Error* {
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Buffer_ToHostBuffer"));
+    BufferInstance* buffer = BufferInstance::Unwrap(args->src);
+    if (!args->dst) {
+      // Size query.
+      return MakeError(buffer->GetHostSizeInBytes(&args->dst_size));
+    } else {
+      // Initiate transfer.
+      return MakeError(
+          buffer->CopyToHost(args->dst, args->dst_size,
+                             reinterpret_cast<EventInstance**>(&args->event)));
+    }
   };
   api->PJRT_Buffer_OnDeviceSizeInBytes =
       +[](PJRT_Buffer_OnDeviceSizeInBytes_Args* args) -> PJRT_Error* {
@@ -355,8 +401,8 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Buffer_IsDeleted =
       +[](PJRT_Buffer_IsDeleted_Args* args) -> PJRT_Error* {
-    return MakeError(
-        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_IsDeleted"));
+    args->is_deleted = BufferInstance::Unwrap(args->buffer)->is_deleted();
+    return nullptr;
   };
   api->PJRT_Buffer_CopyToDevice =
       +[](PJRT_Buffer_CopyToDevice_Args* args) -> PJRT_Error* {
@@ -365,8 +411,8 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Buffer_IsOnCpu =
       +[](PJRT_Buffer_IsOnCpu_Args* args) -> PJRT_Error* {
-    return MakeError(
-        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_IsOnCpu"));
+    args->is_on_cpu = BufferInstance::Unwrap(args->buffer)->is_on_cpu();
+    return nullptr;
   };
   api->PJRT_Buffer_Device = +[](PJRT_Buffer_Device_Args* args) -> PJRT_Error* {
     args->device = BufferInstance::Unwrap(args->buffer)->device();
@@ -382,6 +428,24 @@ void BufferInstance::BindApi(PJRT_Api* api) {
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                       "PJRT_Buffer_UnsafePointer"));
   };
+}
+
+iree_status_t BufferInstance::GetHostSizeInBytes(iree_host_size_t* host_size) {
+  *host_size = iree_hal_buffer_view_byte_length(buffer_view_);
+  return iree_ok_status();
+}
+
+iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
+                                         EventInstance** done_event) {
+  // TODO: Do an async transfer on a transfer queue like a grown up.
+  iree_hal_device_t* hal_device;
+  IREE_RETURN_IF_ERROR(device_.GetHalDevice(&hal_device));
+  IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
+      hal_device, iree_hal_buffer_view_buffer(buffer_view_), 0, dst, dst_size,
+      IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+
+  *done_event = new EventInstance();
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -737,8 +801,9 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
 }
 
 iree_status_t ClientInstance::PopulateVMModules(
-    std::vector<iree::vm::ref<iree_vm_module_t>> modules,
-    iree_hal_device_t* hal_device, iree_vm_module_t* main_module) {
+    std::vector<iree::vm::ref<iree_vm_module_t>>& modules,
+    iree_hal_device_t* hal_device,
+    iree::vm::ref<iree_vm_module_t>& main_module) {
   // HAL module.
   modules.push_back({});
   IREE_RETURN_IF_ERROR(iree_hal_module_create(
@@ -827,7 +892,7 @@ void ExecutableInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Executable_Execute =
       +[](PJRT_Executable_Execute_Args* args) -> PJRT_Error* {
     return MakeError(
-        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Executable_Execute"));
+        ExecutableInstance::Unwrap(args->executable)->BatchExecute(args));
   };
   api->PJRT_Executable_NumOutputs =
       +[](PJRT_Executable_NumOutputs_Args* args) -> PJRT_Error* {
@@ -863,12 +928,15 @@ void ExecutableInstance::BindApi(PJRT_Api* api) {
 }
 
 iree_status_t ExecutableInstance::LoadAll() {
+  if (!loaded_executables_.empty()) return iree_ok_status();
+
   std::vector<LoadedExecutable> new_list;
   for (DeviceInstance* device_instance : addressable_devices_) {
     iree_hal_device_t* hal_device;
     IREE_RETURN_IF_ERROR(device_instance->GetHalDevice(&hal_device));
     new_list.push_back({});
     LoadedExecutable& loaded = new_list.back();
+    loaded.device_instance = device_instance;
 
     IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
         client_.vm_instance(),
@@ -876,10 +944,23 @@ iree_status_t ExecutableInstance::LoadAll() {
         /*archive_allocator=*/iree_allocator_null(), client_.host_allocator(),
         &loaded.main_module));
 
+    // Lookup main function.
+    const char kNameMain[] = "main";
+    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
+        loaded.main_module.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT,
+        iree_string_view_t{kNameMain, sizeof(kNameMain) - 1},
+        &loaded.main_function));
+
+    // Record number of args/results.
+    iree_vm_function_signature_t sig =
+        iree_vm_function_signature(&loaded.main_function);
+    IREE_RETURN_IF_ERROR(iree_vm_function_call_count_arguments_and_results(
+        &sig, &loaded.arg_count, &loaded.result_count));
+
     // Defer to the client to populate the stack of modules.
     std::vector<iree::vm::ref<iree_vm_module_t>> modules;
-    IREE_RETURN_IF_ERROR(client_.PopulateVMModules(modules, hal_device,
-                                                   loaded.main_module.get()));
+    IREE_RETURN_IF_ERROR(
+        client_.PopulateVMModules(modules, hal_device, loaded.main_module));
     std::vector<iree_vm_module_t*> module_ptrs;
     module_ptrs.resize(modules.size());
     for (size_t i = 0; i < modules.size(); ++i) {
@@ -897,9 +978,7 @@ iree_status_t ExecutableInstance::LoadAll() {
 
 iree_status_t ExecutableInstance::GetDefaultLoadedExecutable(
     LoadedExecutable** out_loaded) {
-  if (loaded_executables_.empty()) {
-    IREE_RETURN_IF_ERROR(LoadAll());
-  }
+  IREE_RETURN_IF_ERROR(LoadAll());
   if (loaded_executables_.empty()) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "no executables could be loaded");
@@ -912,17 +991,93 @@ iree_status_t ExecutableInstance::GetArgResultCount(
     iree_host_size_t* out_arg_count, iree_host_size_t* out_result_count) {
   LoadedExecutable* loaded;
   IREE_RETURN_IF_ERROR(GetDefaultLoadedExecutable(&loaded));
+  *out_arg_count = loaded->arg_count;
+  *out_result_count = loaded->result_count;
+  return iree_ok_status();
+}
 
-  // Lookup main function.
-  iree_vm_function_t function;
-  const char kNameMain[] = "main";
-  IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
-      loaded->main_module.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT,
-      iree_string_view_t{kNameMain, sizeof(kNameMain) - 1}, &function));
+iree_status_t ExecutableInstance::BatchExecute(
+    PJRT_Executable_Execute_Args* args) {
+  // Early exit for unsupported features and illegal input.
+  if (args->execute_device) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "executing with a specific device not supported");
+  }
+  if (args->num_devices != addressable_devices_.size()) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "incorrect number of devices to execute on (%d vs %d)",
+        (int)args->num_devices, (int)addressable_devices_.size());
+  }
 
-  iree_vm_function_signature_t sig = iree_vm_function_signature(&function);
-  return iree_vm_function_call_count_arguments_and_results(&sig, out_arg_count,
-                                                           out_result_count);
+  // Make sure loaded.
+  IREE_RETURN_IF_ERROR(LoadAll());
+
+  // Initialize invocations.
+  auto allocator = client_.host_allocator();
+  auto& loaded_execs = loaded_executables_;
+  struct Invocation {
+    LoadedExecutable* dev_exe;
+    iree::vm::ref<iree_vm_list_t> inputs;
+    iree::vm::ref<iree_vm_list_t> outputs;
+  };
+  std::vector<Invocation> invs;
+  invs.resize(args->num_devices);
+  for (size_t dev_index = 0; dev_index < args->num_devices; ++dev_index) {
+    auto& inv = invs[dev_index];
+    inv.dev_exe = &loaded_execs[dev_index];
+    IREE_RETURN_IF_ERROR(iree_vm_list_create(
+        /*element_type=*/nullptr, args->num_args, allocator, &inv.inputs));
+    IREE_RETURN_IF_ERROR(iree_vm_list_create(
+        /*element_type=*/nullptr, inv.dev_exe->result_count, allocator,
+        &inv.outputs));
+
+    // Populate inputs.
+    for (size_t i = 0; i < args->num_args; ++i) {
+      auto* buffer = BufferInstance::Unwrap(args->argument_lists[dev_index][i]);
+      iree_vm_ref_t bv_ref =
+          iree_hal_buffer_view_retain_ref(buffer->buffer_view());
+      IREE_RETURN_IF_ERROR(
+          iree_vm_list_push_ref_move(inv.inputs.get(), &bv_ref));
+    }
+  }
+
+  // Issue invocations.
+  // TODO: Switch to using the async API. I've tried to structure this
+  // so that we can move to that. Obviously important before we have more
+  // than one device.
+  iree_status_t status = iree_ok_status();
+  for (size_t dev_index = 0; dev_index < args->num_devices; ++dev_index) {
+    auto& inv = invs[dev_index];
+    status = iree_vm_invoke(
+        inv.dev_exe->vm_context.get(), inv.dev_exe->main_function,
+        IREE_VM_INVOCATION_FLAG_NONE,
+        /*policy=*/nullptr, inv.inputs.get(), inv.outputs.get(), allocator);
+    if (!iree_status_is_ok(status)) break;
+  }
+
+  // Process results.
+  // Early exit before committing things to the client if anything failed.
+  if (!iree_status_is_ok(status)) return status;
+  for (size_t dev_index = 0; dev_index < args->num_devices; ++dev_index) {
+    auto& inv = invs[dev_index];
+    for (size_t i = 0; i < inv.dev_exe->result_count; ++i) {
+      iree_hal_buffer_view_t* ret_buffer_view =
+          (iree_hal_buffer_view_t*)iree_vm_list_get_ref_deref(
+              inv.outputs.get(), i, iree_hal_buffer_view_get_descriptor());
+      // This should not be possible so just hard-assert.
+      IREE_ASSERT_ARGUMENT(ret_buffer_view);
+      iree_hal_buffer_view_retain(ret_buffer_view);
+      args->output_lists[dev_index][i] =
+          *(new BufferInstance(*inv.dev_exe->device_instance, ret_buffer_view));
+    }
+
+    if (args->device_complete_events) {
+      args->device_complete_events[dev_index] = *(new EventInstance());
+    }
+  }
+
+  return status;
 }
 
 //===----------------------------------------------------------------------===//

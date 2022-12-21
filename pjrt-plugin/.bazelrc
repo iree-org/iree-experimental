@@ -13,3 +13,6 @@ build --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 # Build the whole thing with hidden visibility. We are creating a limited
 # export library.
 build --copt=-fvisibility=hidden
+
+# TensorFlow... TODO: Use IREE's bazelrc
+build --copt=-Wno-sign-compare

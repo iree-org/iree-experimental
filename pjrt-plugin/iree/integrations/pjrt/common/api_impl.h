@@ -19,6 +19,7 @@
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "tensorflow/compiler/xla/pjrt/c/pjrt_c_api.h"
+#include "tensorflow/compiler/xla/shape_util.h"
 
 namespace iree::pjrt {
 
@@ -121,10 +122,25 @@ class BufferInstance {
 
   iree_hal_buffer_view_t* buffer_view() { return buffer_view_; }
   DeviceInstance& device() { return device_; }
+  bool is_deleted() { return false; }
+  bool is_on_cpu() {
+    // TODO: Plumb through an indication if running on CPU and then implement
+    // the hook to get an unsafe pointer (avoids a copy).
+    return false;
+  }
+  iree_status_t GetXlaShape(xla::Shape** out_shape);
+
+  // Gets the required host size in bytes to copy to host.
+  iree_status_t GetHostSizeInBytes(iree_host_size_t* host_size);
+  iree_status_t CopyToHost(void* dst, iree_host_size_t dst_size,
+                           EventInstance** done_event);
 
  private:
   DeviceInstance& device_;
   iree_hal_buffer_view_t* buffer_view_;  // Owned.
+  // Various things require XLA's idea of shapes, layouts, etc.
+  // We keep one around for such cases.
+  std::optional<xla::Shape> cached_shape_;
 };
 
 //===----------------------------------------------------------------------===//
@@ -204,9 +220,12 @@ class EventInstance {
 
 // An executable loaded on all available devices.
 struct LoadedExecutable {
-  iree::vm::ref<iree_hal_device_t> device;
+  DeviceInstance* device_instance;
   iree::vm::ref<iree_vm_context_t> vm_context;
   iree::vm::ref<iree_vm_module_t> main_module;
+  iree_vm_function_t main_function;
+  iree_host_size_t arg_count;
+  iree_host_size_t result_count;
 };
 
 class ExecutableInstance {
@@ -239,6 +258,10 @@ class ExecutableInstance {
   // Gets the number of outputs.
   iree_status_t GetArgResultCount(iree_host_size_t* out_arg_count,
                                   iree_host_size_t* out_result_count);
+
+  // Executes on a batch of devices. Since this is a complicated call,
+  // we just give it the raw C argument struct vs breaking it down.
+  iree_status_t BatchExecute(PJRT_Executable_Execute_Args* args);
 
  private:
   ClientInstance& client_;
@@ -294,8 +317,9 @@ struct ClientInstance {
   // implementation constructs a hal module and appends:
   //   {hal_module, main_module}.
   virtual iree_status_t PopulateVMModules(
-      std::vector<iree::vm::ref<iree_vm_module_t>> modules,
-      iree_hal_device_t* hal_device, iree_vm_module_t* main_module);
+      std::vector<iree::vm::ref<iree_vm_module_t>>& modules,
+      iree_hal_device_t* hal_device,
+      iree::vm::ref<iree_vm_module_t>& main_module);
 
  protected:
   iree_allocator_t host_allocator_;
