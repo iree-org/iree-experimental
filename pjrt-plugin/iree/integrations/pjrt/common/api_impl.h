@@ -77,7 +77,7 @@ class BufferInstance {
   }
   static void BindApi(PJRT_Api* api);
 
-  iree_hal_buffer_view_t* buffer_view() { return buffer_view_; }
+  iree_hal_buffer_view_t* buffer_view() { return buffer_view_.get(); }
   DeviceInstance& device() { return device_; }
   bool is_deleted() { return false; }
   bool is_on_cpu() {
@@ -94,7 +94,7 @@ class BufferInstance {
 
  private:
   DeviceInstance& device_;
-  iree_hal_buffer_view_t* buffer_view_;  // Owned.
+  iree::vm::ref<iree_hal_buffer_view_t> buffer_view_;  // Owned.
   // Various things require XLA's idea of shapes, layouts, etc.
   // We keep one around for such cases.
   std::optional<xla::Shape> cached_shape_;
@@ -144,7 +144,7 @@ class DeviceInstance {
   int client_id_;
   ClientInstance& client_;
   iree_hal_driver_t* driver_;  // Owned by client.
-  iree_hal_device_t* device_ = nullptr;
+  iree::vm::ref<iree_hal_device_t> device_;
   iree_hal_device_info_t* info_;
 };
 

@@ -300,9 +300,7 @@ const std::string& ErrorInstance::message() const {
 // BufferInstance
 //===----------------------------------------------------------------------===//
 
-BufferInstance::~BufferInstance() {
-  iree_hal_buffer_view_release(buffer_view_);
-}
+BufferInstance::~BufferInstance() = default;
 
 iree_status_t BufferInstance::GetXlaShape(xla::Shape** out_shape) {
   if (cached_shape_) {
@@ -311,13 +309,13 @@ iree_status_t BufferInstance::GetXlaShape(xla::Shape** out_shape) {
   }
 
   iree_hal_element_type_t hal_element_type =
-      iree_hal_buffer_view_element_type(buffer_view_);
+      iree_hal_buffer_view_element_type(buffer_view());
   xla::PrimitiveType xla_element_type;
   IREE_RETURN_IF_ERROR(
       MapElementTypeToXlaElementType(hal_element_type, &xla_element_type));
 
-  size_t rank = iree_hal_buffer_view_shape_rank(buffer_view_);
-  const iree_hal_dim_t* dims = iree_hal_buffer_view_shape_dims(buffer_view_);
+  size_t rank = iree_hal_buffer_view_shape_rank(buffer_view());
+  const iree_hal_dim_t* dims = iree_hal_buffer_view_shape_dims(buffer_view());
   std::array<int64_t, 9> xla_dims;
   if (rank > xla_dims.size()) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -419,7 +417,7 @@ void BufferInstance::BindApi(PJRT_Api* api) {
 }
 
 iree_status_t BufferInstance::GetHostSizeInBytes(iree_host_size_t* host_size) {
-  *host_size = iree_hal_buffer_view_byte_length(buffer_view_);
+  *host_size = iree_hal_buffer_view_byte_length(buffer_view());
   return iree_ok_status();
 }
 
@@ -429,7 +427,7 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
   iree_hal_device_t* hal_device;
   IREE_RETURN_IF_ERROR(device_.GetHalDevice(&hal_device));
   IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
-      hal_device, iree_hal_buffer_view_buffer(buffer_view_), 0, dst, dst_size,
+      hal_device, iree_hal_buffer_view_buffer(buffer_view()), 0, dst, dst_size,
       IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
 
   *done_event = new EventInstance();
@@ -440,11 +438,7 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
 // DeviceInstance
 //===----------------------------------------------------------------------===//
 
-DeviceInstance::~DeviceInstance() {
-  if (device_) {
-    iree_hal_device_release(device_);
-  }
-}
+DeviceInstance::~DeviceInstance() = default;
 
 void DeviceInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Device_Id = +[](PJRT_Device_Id_Args* args) -> PJRT_Error* {
@@ -551,8 +545,8 @@ iree_status_t DeviceInstance::HostBufferToDevice(
 
   iree_hal_buffer_view_t* buffer_view = nullptr;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
-      iree_hal_device_allocator(device_), num_dims, &shape[0], element_type,
-      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
+      iree_hal_device_allocator(device_.get()), num_dims, &shape[0],
+      element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
       iree_make_const_byte_span(data, byte_length), &buffer_view));
 
   // Since we synchronously copied, return an already signalled event.
@@ -566,7 +560,7 @@ iree_status_t DeviceInstance::HostBufferToDevice(
 
 iree_status_t DeviceInstance::GetHalDevice(iree_hal_device_t** out_device) {
   IREE_RETURN_IF_ERROR(OpenDevice());
-  *out_device = device_;
+  *out_device = device_.get();
   return iree_ok_status();
 }
 
@@ -587,6 +581,10 @@ ClientInstance::~ClientInstance() {
   if (device_infos_) {
     iree_allocator_free(host_allocator_, device_infos_);
   }
+  // Explicitly releasing vs using a ref so as to better control shut-down
+  // ordering (bad shutdown ordering of the driver is a frequent cause of
+  // bugs).
+  iree_hal_driver_release(driver_);
 }
 
 void ClientInstance::BindApi(PJRT_Api* api) {
