@@ -54,13 +54,8 @@ class AbstractCompiler {
   virtual std::unique_ptr<CompilerJob> StartJob() = 0;
 };
 
-class InprocessStubCompiler : public AbstractCompiler {
+class InprocessCompiler : public AbstractCompiler {
  public:
-  // Creates a new inprocess compiler by loading a shared library.
-  // This has a number of ergonomic issues that need straightening (i.e.
-  // it will fail on multiple calls, etc).
-  static std::shared_ptr<AbstractCompiler> Initialize(const char* libraryPath);
-
   std::unique_ptr<CompilerJob> StartJob() override;
 };
 

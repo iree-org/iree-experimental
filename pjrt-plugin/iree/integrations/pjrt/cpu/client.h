@@ -14,7 +14,7 @@ namespace iree::pjrt::cpu {
 
 class CPUClientInstance final : public ClientInstance {
  public:
-  CPUClientInstance(Globals& globals);
+  CPUClientInstance(std::unique_ptr<Platform> platform);
   ~CPUClientInstance();
   iree_status_t CreateDriver(iree_hal_driver_t** out_driver) override;
 

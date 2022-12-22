@@ -15,6 +15,7 @@
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/integrations/pjrt/common/compiler.h"
+#include "iree/integrations/pjrt/common/platform.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -24,53 +25,9 @@
 namespace iree::pjrt {
 
 class ClientInstance;
-class ConfigVars;
 class DeviceInstance;
 class ErrorInstance;
 class EventInstance;
-class Globals;
-class Logger;
-
-//===----------------------------------------------------------------------===//
-// Logger
-// The plugin API currently does not have any logging facilities, but since
-// these are easier added later, we have a placeholder Logger that we thread
-// through. It can be extended later.
-//===----------------------------------------------------------------------===//
-
-class Logger {
- public:
-  Logger() = default;
-  void debug(std::string_view message);
-  void error(std::string_view message);
-};
-
-//===----------------------------------------------------------------------===//
-// ConfigVars
-// Placeholder for API-level configuration (i.e. from environment, files, etc).
-//===----------------------------------------------------------------------===//
-
-struct ConfigVars {
- public:
-  ConfigVars() = default;
-};
-
-//===----------------------------------------------------------------------===//
-// Globals
-// Static globals passed to API objects on construction.
-//===----------------------------------------------------------------------===//
-
-class Globals {
- public:
-  Globals(Logger& logger, ConfigVars config_vars)
-      : logger_(logger), config_vars_(std::move(config_vars)) {}
-
-  Logger& logger() { return logger_; }
-
- private:
-  Logger& logger_;
-  ConfigVars config_vars_;
-};
 
 //===----------------------------------------------------------------------===//
 // PJRT_Error wrapper
@@ -278,7 +235,7 @@ class ExecutableInstance {
 
 struct ClientInstance {
  public:
-  ClientInstance(Globals& globals);
+  ClientInstance(std::unique_ptr<Platform> platform);
   virtual ~ClientInstance();
 
   // Binds monomorphic entry-points for the client.
@@ -293,9 +250,8 @@ struct ClientInstance {
 
   // Must be defined by concrete subclasses.
   virtual iree_status_t CreateDriver(iree_hal_driver_t** out_driver) = 0;
-
-  Globals& globals() { return globals_; }
-  Logger& logger() { return globals_.logger(); }
+  Platform& platform() { return *platform_; }
+  Logger& logger() { return platform_->logger(); }
   iree_allocator_t host_allocator() { return host_allocator_; }
   const std::vector<DeviceInstance*>& devices() { return devices_; }
   const std::vector<DeviceInstance*>& addressable_devices() {
@@ -331,10 +287,7 @@ struct ClientInstance {
   iree_status_t InitializeVM();
   iree_status_t PopulateDevices();
 
-  Globals& globals_;
-
-  // Populated during initialization.
-  std::shared_ptr<AbstractCompiler> compiler_;
+  std::unique_ptr<Platform> platform_;
 
   // HAL.
   iree_hal_driver_t* driver_ = nullptr;
@@ -352,23 +305,26 @@ struct ClientInstance {
 //===----------------------------------------------------------------------===//
 
 // Binds all monomorphic API members and top-level API struct setup.
-void BindMonomorphicApi(PJRT_Api* api, Globals& globals);
+void BindMonomorphicApi(PJRT_Api* api);
 
 // Fully binds the PJRT_Api struct for all types. Polymorphic types must be
 // specified by template parameters.
-template <typename ClientInstanceTy>
+template <typename PlatformTy, typename ClientInstanceTy>
 static void BindApi(PJRT_Api* api) {
-  // TODO: We should be stashing Globals* on api->priv and then constructor
-  // function arguments should have a member pointing back to the api so they
-  // can retrieve it. Once that is done, don't hardcode here.
-  static Logger logger;
-  static Globals globals(logger, ConfigVars());
-
-  BindMonomorphicApi(api, globals);
+  BindMonomorphicApi(api);
 
   // Bind polymorphic entry-points.
   api->PJRT_Client_Create = +[](PJRT_Client_Create_Args* args) -> PJRT_Error* {
-    auto client = std::make_unique<ClientInstanceTy>(globals);
+    auto platform = std::make_unique<PlatformTy>();
+
+    // TODO: Once a client can be created with config, use it to populate
+    // platform->config_vars().
+    auto status = platform->Initialize();
+    if (!iree_status_is_ok(status)) {
+      return MakeError(status);
+    }
+
+    auto client = std::make_unique<ClientInstanceTy>(std::move(platform));
     auto* error = client->Initialize();
     if (error) return error;
 

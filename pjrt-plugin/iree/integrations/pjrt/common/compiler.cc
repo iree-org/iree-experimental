@@ -17,8 +17,6 @@
 #include <iostream>  // TODO: Remove
 #include <vector>
 
-#include "iree/compiler/API2/Stub/Loader.h"
-
 namespace iree::pjrt {
 
 //===----------------------------------------------------------------------===//
@@ -149,17 +147,7 @@ class InprocessCompilerJob : public CompilerJob {
 
 }  // namespace
 
-std::shared_ptr<AbstractCompiler> InprocessStubCompiler::Initialize(
-    const char* libraryPath) {
-  if (!ireeCompilerLoadLibrary(libraryPath)) {
-    return nullptr;
-  }
-
-  ireeCompilerGlobalInitialize(/*initializeCommandLine=*/false);
-  return std::make_shared<InprocessStubCompiler>();
-}
-
-std::unique_ptr<CompilerJob> InprocessStubCompiler::StartJob() {
+std::unique_ptr<CompilerJob> InprocessCompiler::StartJob() {
   auto* session = ireeCompilerSessionCreate();
   auto* inv = ireeCompilerInvocationCreate(session);
 

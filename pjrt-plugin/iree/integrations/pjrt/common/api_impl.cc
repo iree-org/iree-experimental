@@ -211,18 +211,6 @@ iree_status_t MapBufferTypeToElementType(
 }  // namespace
 
 //===----------------------------------------------------------------------===//
-// Logger
-//===----------------------------------------------------------------------===//
-
-void Logger::debug(std::string_view message) {
-  std::cerr << "[IREE-PJRT] DEBUG: " << message << std::endl;
-}
-
-void Logger::error(std::string_view message) {
-  std::cerr << "[IREE-PJRT] ERROR: " << message << std::endl;
-}
-
-//===----------------------------------------------------------------------===//
 // Error
 //===----------------------------------------------------------------------===//
 
@@ -586,7 +574,8 @@ iree_status_t DeviceInstance::GetHalDevice(iree_hal_device_t** out_device) {
 // ClientInstance
 //===----------------------------------------------------------------------===//
 
-ClientInstance::ClientInstance(Globals& globals) : globals_(globals) {
+ClientInstance::ClientInstance(std::unique_ptr<Platform> platform)
+    : platform_(std::move(platform)) {
   host_allocator_ = iree_allocator_system();
   cached_platform_version_ = "git";  // TODO: Plumb through version info.
 }
@@ -703,26 +692,8 @@ PJRT_Error* ClientInstance::Initialize() {
   status = PopulateDevices();
   if (!iree_status_is_ok(status)) return MakeError(status);
 
-  status = InitializeCompiler();
-  if (!iree_status_is_ok(status)) return MakeError(status);
-
   // More initialization.
   return nullptr;
-}
-
-iree_status_t ClientInstance::InitializeCompiler() {
-  // TODO: This needs an overhaul obviously. Should be backed by a Platform
-  // factory that can be more customized for different deployment scenarios
-  // (i.e. static linking, etc).
-  compiler_ = InprocessStubCompiler::Initialize(
-      "/home/stella/src/iree-build/lib/libIREECompiler.so");
-  if (!compiler_) {
-    return iree_make_status(
-        IREE_STATUS_UNAVAILABLE,
-        "because the compiler shared library could not be loaded");
-  }
-
-  return iree_ok_status();
 }
 
 iree_status_t ClientInstance::InitializeVM() {
@@ -762,7 +733,7 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
         "because IREE only supports MLIR input but got something else"));
   }
 
-  std::unique_ptr<CompilerJob> job = compiler_->StartJob();
+  std::unique_ptr<CompilerJob> job = platform().compiler().StartJob();
   auto MakeCompilerError = [&]() {
     std::string message = job->GetErrorMessage();
     return MakeError(iree_make_status(IREE_STATUS_INVALID_ARGUMENT, ": %s",
@@ -1084,9 +1055,9 @@ iree_status_t ExecutableInstance::BatchExecute(
 // Top-level API binding.
 //===----------------------------------------------------------------------===//
 
-void BindMonomorphicApi(PJRT_Api* api, Globals& globals) {
+void BindMonomorphicApi(PJRT_Api* api) {
   api->struct_size = PJRT_Api_STRUCT_SIZE;
-  api->priv = &globals;
+  api->priv = nullptr;
 
   // Bind by object types.
   BufferInstance::BindApi(api);

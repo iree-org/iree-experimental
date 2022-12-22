@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/integrations/pjrt/common/dylib_platform.h"
 #include "iree/integrations/pjrt/cpu/client.h"
 
 // Provides the shared library exports.
@@ -13,7 +14,9 @@ namespace iree::pjrt {
 namespace {
 
 // Declared but not implemented by the include file.
-void InitializeAPI(PJRT_Api* api) { BindApi<cpu::CPUClientInstance>(api); }
+void InitializeAPI(PJRT_Api* api) {
+  BindApi<DylibPlatform, cpu::CPUClientInstance>(api);
+}
 
 }  // namespace
 }  // namespace iree::pjrt

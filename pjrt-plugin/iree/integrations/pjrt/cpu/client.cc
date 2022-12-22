@@ -12,8 +12,8 @@
 
 namespace iree::pjrt::cpu {
 
-CPUClientInstance::CPUClientInstance(Globals& globals)
-    : ClientInstance(globals) {
+CPUClientInstance::CPUClientInstance(std::unique_ptr<Platform> platform)
+    : ClientInstance(std::move(platform)) {
   // Seems that it must match how registered. Action at a distance not
   // great.
   // TODO: Get this when constructing the client so it is guaranteed to

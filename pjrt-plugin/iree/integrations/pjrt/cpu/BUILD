@@ -32,7 +32,7 @@ cc_binary(
     deps = [
         ":client",
         "//iree/integrations/pjrt/common:impl",
-        "@iree//runtime/src/iree/base/internal:path",
+        "//iree/integrations/pjrt/common:dylib_platform",
     ],
     defines = [
         "PJRT_PLUGIN_BUILDING_LIBRARY",
