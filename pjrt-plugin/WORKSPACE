@@ -13,7 +13,7 @@ local_repository(
 )
 
 local_repository(
-    name = "iree",
+    name = "iree_core",
     path = "../../iree",
 )
 
@@ -35,10 +35,12 @@ load("@org_tensorflow//tensorflow:workspace0.bzl", "tf_workspace0")
 tf_workspace0()
 
 # Setup IREE dependencies.
-load("@iree//build_tools/bazel:workspace.bzl", "configure_iree_submodule_deps")
+load("@iree_core//build_tools/bazel:workspace.bzl", "configure_iree_submodule_deps", "configure_iree_cuda_deps")
 
 # TODO: Path hard-coding is... not great. Oh bazel.
 configure_iree_submodule_deps(
-    iree_repo_alias = "@iree",
+    iree_repo_alias = "@iree_core",
     iree_path = "../../iree",
 )
+
+configure_iree_cuda_deps()

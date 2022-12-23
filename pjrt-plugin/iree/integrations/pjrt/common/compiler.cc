@@ -69,7 +69,7 @@ class InprocessCompilerJob : public CompilerJob {
     return std::string(cstr);
   }
 
-  bool SetFlag(const char* flag) {
+  bool SetFlag(const char* flag) override {
     auto* error = ireeCompilerSessionSetFlags(session_, 1, &flag);
     if (error) {
       SetError(error);

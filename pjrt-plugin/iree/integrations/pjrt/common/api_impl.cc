@@ -9,7 +9,7 @@
 #include <iostream>
 #include <optional>
 
-#include "iree/hal/buffer_view.h"
+#include "iree/hal/api.h"
 
 namespace iree::pjrt {
 
@@ -237,38 +237,55 @@ void ErrorInstance::BindApi(PJRT_Api* api) {
     switch (status_code) {
       case IREE_STATUS_CANCELLED:
         args->code = PJRT_Error_Code_CANCELLED;
+        break;
       case IREE_STATUS_UNKNOWN:
         args->code = PJRT_Error_Code_UNKNOWN;
+        break;
       case IREE_STATUS_INVALID_ARGUMENT:
         args->code = PJRT_Error_Code_INVALID_ARGUMENT;
+        break;
       case IREE_STATUS_DEADLINE_EXCEEDED:
         args->code = PJRT_Error_Code_DEADLINE_EXCEEDED;
+        break;
       case IREE_STATUS_NOT_FOUND:
         args->code = PJRT_Error_Code_NOT_FOUND;
+        break;
       case IREE_STATUS_ALREADY_EXISTS:
         args->code = PJRT_Error_Code_ALREADY_EXISTS;
+        break;
       case IREE_STATUS_PERMISSION_DENIED:
         args->code = PJRT_Error_Code_PERMISSION_DENIED;
+        break;
       case IREE_STATUS_RESOURCE_EXHAUSTED:
         args->code = PJRT_Error_Code_RESOURCE_EXHAUSTED;
+        break;
       case IREE_STATUS_FAILED_PRECONDITION:
         args->code = PJRT_Error_Code_FAILED_PRECONDITION;
+        break;
       case IREE_STATUS_ABORTED:
         args->code = PJRT_Error_Code_ABORTED;
+        break;
       case IREE_STATUS_OUT_OF_RANGE:
         args->code = PJRT_Error_Code_OUT_OF_RANGE;
+        break;
       case IREE_STATUS_UNIMPLEMENTED:
         args->code = PJRT_Error_Code_UNIMPLEMENTED;
+        break;
       case IREE_STATUS_INTERNAL:
         args->code = PJRT_Error_Code_INTERNAL;
+        break;
       case IREE_STATUS_UNAVAILABLE:
         args->code = PJRT_Error_Code_UNAVAILABLE;
+        break;
       case IREE_STATUS_DATA_LOSS:
         args->code = PJRT_Error_Code_DATA_LOSS;
+        break;
       case IREE_STATUS_UNAUTHENTICATED:
         args->code = PJRT_Error_Code_UNAUTHENTICATED;
+        break;
       case IREE_STATUS_DEFERRED:
         args->code = PJRT_Error_Code_UNKNOWN;  // No mapping
+        break;
       default:
         // Should not happen.
         args->code = PJRT_Error_Code_UNKNOWN;

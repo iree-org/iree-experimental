@@ -4,15 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Stuff needed to be able to load the tensorflow workspace.
-build --experimental_repo_remote_exec
+import %workspace%/build_tools/bazel/iree_pjrt.bazelrc
 
-# C++17
-build --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+# Import the main IREE bazel configuration.
+import %workspace%/../../iree/build_tools/bazel/iree.bazelrc
+try-import %workspace%/../../iree/configured.bazelrc
 
-# Build the whole thing with hidden visibility. We are creating a limited
-# export library.
-build --copt=-fvisibility=hidden
-
-# TensorFlow... TODO: Use IREE's bazelrc
-build --copt=-Wno-sign-compare
+try-import %workspace%/user.bazelrc
