@@ -16,11 +16,11 @@ iree_pjrt_cc_library(
     ],
     deps = [
         "//iree/integrations/pjrt/common:impl",
-        "@iree//runtime/src/iree/hal/drivers/local_task:task_driver",
-        "@iree//runtime/src/iree/hal/local",
-        "@iree//runtime/src/iree/hal/local:executable_loader",
-        "@iree//runtime/src/iree/hal/local/loaders/registration",
-        "@iree//runtime/src/iree/task:api",
+        "@iree_core//runtime/src/iree/hal/drivers/local_task:task_driver",
+        "@iree_core//runtime/src/iree/hal/local",
+        "@iree_core//runtime/src/iree/hal/local:executable_loader",
+        "@iree_core//runtime/src/iree/hal/local/loaders/registration",
+        "@iree_core//runtime/src/iree/task:api",
     ],
 )
 
