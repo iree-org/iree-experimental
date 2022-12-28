@@ -49,3 +49,11 @@ export JAX_USE_PJRT_C_API_ON_TPU=1
 python test/test_cpu.py
 python test/test_cuda.py
 ```
+
+## Generating runtime traces
+
+The plugins can be build with tracing enabled by adding the bazel build flag
+`--iree_enable_runtime_tracing`. With this flag, if a profiler is running,
+instrumentation will be sent to it. It can be useful to set the environment
+variable `TRACY_NO_EXIT=1` in order to block termination of one-shot programs
+that exit too quickly to stream all events.
