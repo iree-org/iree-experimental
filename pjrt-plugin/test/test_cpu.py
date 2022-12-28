@@ -13,4 +13,6 @@ xla_bridge.register_backend_factory("iree_cpu", iree_backend_factory)
 jax.config.update("jax_platforms", "iree_cpu")
 
 
-print(jax.numpy.add(1, 1))
+print(jax.numpy.add(
+  jax.numpy.asarray([100, 200]),
+  jax.numpy.asarray([3])))

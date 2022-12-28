@@ -518,13 +518,6 @@ iree_status_t DeviceInstance::HostBufferToDevice(
     BufferInstance** out_buffer) {
   IREE_RETURN_IF_ERROR(OpenDevice());
 
-  // Early-exit on unimplemented features.
-  if (byte_strides && num_dims > 0) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "because host buffers with strides are note yet implemented");
-  }
-
   // Map element type.
   iree_hal_element_type_t element_type;
   IREE_RETURN_IF_ERROR(MapBufferTypeToElementType(type, &element_type));
@@ -535,6 +528,28 @@ iree_status_t DeviceInstance::HostBufferToDevice(
         IREE_STATUS_INVALID_ARGUMENT,
         "opaque and sub-byte aligned element types cannot be indexed");
   }
+  iree_device_size_t element_type_byte_size =
+      iree_hal_element_dense_byte_count(element_type);
+
+  // Handle strided layouts.
+  bool dense_row_major_layout = true;
+  if (byte_strides && num_dims > 0) {
+    int64_t stride = element_type_byte_size;
+    for (int64_t i = num_dims - 1; i >= 0; --i) {
+      if (byte_strides[i] != stride) {
+        dense_row_major_layout = false;
+        break;
+      }
+      stride *= dims[i];
+    }
+  }
+  if (!dense_row_major_layout) {
+    // TODO: Compile a transpose program and invoke that to load the
+    // array.
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "only dense, row-major layouts currently supported");
+  }
 
   // Compute dense size.
   std::array<iree_hal_dim_t, 9> shape;
@@ -544,8 +559,6 @@ iree_status_t DeviceInstance::HostBufferToDevice(
                             (int)shape.size(), (int)num_dims);
   }
 
-  iree_device_size_t element_type_byte_size =
-      iree_hal_element_dense_byte_count(element_type);
   iree_device_size_t byte_length = element_type_byte_size;
   for (size_t i = 0; i < num_dims; ++i) {
     shape[i] = dims[i];
