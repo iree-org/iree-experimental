@@ -5,29 +5,30 @@ experiments based on the transform dialect.
 
 ## Script
 
-Contains shell functions that simplify running IREE tools with the transform 
-dialect. These should generally considered brittle and may be useful to some.
+Contains shell functions that simplify running IREE tools with the transform
+dialect. These should generally be considered brittle but may be useful to some.
 
 Assumptions are:
   1. execution starts from the IREE source dir root
   2. the IREE build directory lives at `./build`
-  3. `./build/tools` is in the path 
-  4. for CUDA execution, `nvprof` is in the path.
-
+  3. `mlir-opt` is in the path
+  4. `./build/tools` is in the path
+  5. for CUDA execution, `nvprof` is in the path.
 
 Disclaimers:
-  1. since the exploration process can involve modfying source IR, transform IR
-  and the compiler itself, each command compiles what it needs to simplify and 
+  1. since the exploration process can involve modifying source IR, transform IR
+  and the compiler itself, each command compiles what it needs to simplify and
   automate the process. This may be surprising if one does not want recompilation
   to occur.
   2. examples are restricted to the CUDA case for now.
-  3. examples are restricted to 2-D redution cases for now.
-  4. the stub file should have only 1 function for now, until we add a simple
-  mlir-extract like tool to focus on a single function or until we have a better
-  way to export transform IR and apply it to payload IR in different processes.
+  3. examples are restricted to 2-D reduction cases for now.
+  4. the stub file can have multiple functions, but they all should have private
+  visibility. We use a poor man's `sed`-based filter of the function we care
+  about by replacing the visibility of that one function and letting
+  `mlir-opt -symbol-dce` clean the IR for us.
 
 Note: the underlying helper functions `iree-transform-xxx` can be parameterized to
-other backends and CUDA is not a stong restriction, just a convenience.
+other backends and CUDA is not a strong restriction, just a convenience.
 
 ### Create a New Problem To Map
 
@@ -35,7 +36,7 @@ Run:
 ```
 (\
   benchmark-transform-create \
-  tests/transform_dialect/cuda/benchmark_linalg_reductions.stub.mlir \
+  <iree-samples-dir-path>/transform_dialect/benchmark_linalg_reductions.stub.mlir \
   reduction_2d_static \
   123 \
   456 \
@@ -45,7 +46,7 @@ Run:
 This should print something resembling:
 ```
 ==========================================================
-Problem created successufully, reproduction instructions:
+Problem created successfully, reproduction instructions:
 ==========================================================
 Transform dialect source file is: /tmp/reduction_2d_static_123x456.mlir
 Transform dialect transform file is: /tmp/iree_transform_dialect_ac2e60.mlir
@@ -91,10 +92,10 @@ This should print the transformed PTX (or appropriate error messages when releva
 The following requires nvprof to be in the PATH.
 
 When things look good, one can execute, get a filtered nvprof trace and a rough
-estimate of the performace by pasting the last repro command:
+estimate of the performance by pasting the last repro command:
 
 ```
-( 
+(
   benchmark-transform-run-nvprof \
   /tmp/reduction_2d_static_123x456.mlir \
   /tmp/iree_transform_dialect_ac2e60.mlir \
@@ -131,9 +132,10 @@ The reproduction instructions can be run independently and adapted.
 
 It is the responsibility of the user to convert the number of elements processed
 per second (i.e. the product of the sizes) to the relevant metric for the benchmark.
-In the case of reduction_2d_static, a tensor<123x456xf32> is read and reduced into
-a tensor<123xf32>. This corresponds to 4 bytes read per element and a negligible 
-amount of bytes written per element.
+In the case of reduction_2d_static, a `tensor<123x456xf32>` is read and reduced
+into a `tensor<123xf32>`.
+This corresponds to 4 bytes read per element and a negligible amount of bytes
+written per element.
 
 This gives us roughly `80GB/s` read bandwidth, in `2.8us` (latency-bound).
 
@@ -141,7 +143,7 @@ We can generate and run another problem by adding the `run` argument:
 ```
 ( \
   benchmark-transform-create \
-  tests/transform_dialect/cuda/benchmark_linalg_reductions.stub.mlir \
+  <iree-samples-dir-path>/transform_dialect/benchmark_linalg_reductions.stub.mlir \
   reduction_2d_static \
   123 \
   45678 \
@@ -165,8 +167,8 @@ reduction_2d_static --function_input="123x45678xf32=1" P50: 42499.000 ns 132.200
 
 This corresponds to roughly `528GB/s` read bandwidth.
 
-As a rough point of reference, running the CUDA samples 
-[bandwidth test](https://github.com/NVIDIA/cuda-samples/tree/master/Samples/1_Utilities/bandwidthTest) on this auhor's machines prints:
+As a rough point of reference, running the CUDA samples
+[bandwidth test](https://github.com/NVIDIA/cuda-samples/tree/master/Samples/1_Utilities/bandwidthTest) on this author's machines prints:
 
 ```
 [CUDA Bandwidth Test] - Starting...

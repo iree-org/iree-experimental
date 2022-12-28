@@ -225,9 +225,14 @@ function benchmark-transform-create() {
   fi
 
   TRANSFORM_DIALECT_SOURCE_FILE=/tmp/${FUNCTION_NAME}_${SZ1}x${SZ2}.mlir
+  # Extract exactly the func we care about and let `mlir-opt -symbol-dce ` clean
+  # up the rest of the IR.
+  # This lets us use files with multiple funcs
   cat ${TRANSFORM_DIALECT_BENCHMARK_STUB_FILE} | \
+    sed "s/private @${FUNCTION_NAME}(/@${FUNCTION_NAME}(/g" | \
     sed "s/\${SZ1}/${SZ1}/g" | \
-    sed "s/\${SZ2}/${SZ2}/g" > ${TRANSFORM_DIALECT_SOURCE_FILE}
+    sed "s/\${SZ2}/${SZ2}/g" | \
+    mlir-opt -symbol-dce > ${TRANSFORM_DIALECT_SOURCE_FILE}
 
   echo iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
   iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
