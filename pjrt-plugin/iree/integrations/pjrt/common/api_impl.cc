@@ -698,14 +698,25 @@ void ClientInstance::BindApi(PJRT_Api* api) {
 }
 
 PJRT_Error* ClientInstance::Initialize() {
+  // TODO: Remove calls to iree_status_fprint once JAX properly reports
+  // initialization errors: https://github.com/google/jax/issues/13763
   auto status = CreateDriver(&driver_);
-  if (!iree_status_is_ok(status)) return MakeError(status);
+  if (!iree_status_is_ok(status)) {
+    iree_status_fprint(stderr, status);
+    return MakeError(status);
+  }
 
   status = InitializeVM();
-  if (!iree_status_is_ok(status)) return MakeError(status);
+  if (!iree_status_is_ok(status)) {
+    iree_status_fprint(stderr, status);
+    return MakeError(status);
+  }
 
   status = PopulateDevices();
-  if (!iree_status_is_ok(status)) return MakeError(status);
+  if (!iree_status_is_ok(status)) {
+    iree_status_fprint(stderr, status);
+    return MakeError(status);
+  }
 
   // More initialization.
   return nullptr;
@@ -759,8 +770,10 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
   // TODO: This should be done as part of session setup from a named pool.
   // TODO: The HAL backends and other flags should come from the assigned
   // devices.
-  if (!job->SetFlag("--iree-input-type=mhlo") ||
-      !job->SetFlag("--iree-hal-target-backends=llvm-cpu")) {
+  if (!job->SetFlag("--iree-input-type=mhlo")) {
+    return MakeCompilerError();
+  }
+  if (!SetDefaultCompilerFlags(job.get())) {
     return MakeCompilerError();
   }
 

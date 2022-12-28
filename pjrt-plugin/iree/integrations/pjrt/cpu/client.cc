@@ -75,4 +75,8 @@ iree_status_t CPUClientInstance::CreateDriver(iree_hal_driver_t** out_driver) {
   return iree_ok_status();
 }
 
+bool CPUClientInstance::SetDefaultCompilerFlags(CompilerJob* compiler_job) {
+  return compiler_job->SetFlag("--iree-hal-target-backends=llvm-cpu");
+}
+
 }  // namespace iree::pjrt::cpu

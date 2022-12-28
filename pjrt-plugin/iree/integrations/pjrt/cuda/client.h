@@ -17,6 +17,7 @@ class CUDAClientInstance final : public ClientInstance {
   CUDAClientInstance(std::unique_ptr<Platform> platform);
   ~CUDAClientInstance();
   iree_status_t CreateDriver(iree_hal_driver_t** out_driver) override;
+  bool SetDefaultCompilerFlags(CompilerJob* compiler_job) override;
 
  private:
 };

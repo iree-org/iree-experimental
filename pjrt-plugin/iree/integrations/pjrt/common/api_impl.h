@@ -248,8 +248,6 @@ struct ClientInstance {
   // Before the client is usable, it must be initialized.
   PJRT_Error* Initialize();
 
-  // Must be defined by concrete subclasses.
-  virtual iree_status_t CreateDriver(iree_hal_driver_t** out_driver) = 0;
   Platform& platform() { return *platform_; }
   Logger& logger() { return platform_->logger(); }
   iree_allocator_t host_allocator() { return host_allocator_; }
@@ -268,6 +266,12 @@ struct ClientInstance {
   // See TODOs in PJRT_Client_Compile.
   PJRT_Error* Compile(PJRT_Program* program, ExecutableInstance** executable);
 
+  // ---------------------------------------------------------------------------
+  // Subclass hooks.
+  // ---------------------------------------------------------------------------
+  // Must be defined by concrete subclasses.
+  virtual iree_status_t CreateDriver(iree_hal_driver_t** out_driver) = 0;
+
   // Populates the list of modules to load into a context for an executable
   // on a device. This can be customized by subclasses. The default
   // implementation constructs a hal module and appends:
@@ -276,6 +280,11 @@ struct ClientInstance {
       std::vector<iree::vm::ref<iree_vm_module_t>>& modules,
       iree_hal_device_t* hal_device,
       iree::vm::ref<iree_vm_module_t>& main_module);
+
+  // Sets default compiler flags for the client which apply to all executables
+  // and devices.
+  // Returns false on failure (and sets error information on the compiler_job).
+  virtual bool SetDefaultCompilerFlags(CompilerJob* compiler_job) = 0;
 
  protected:
   iree_allocator_t host_allocator_;

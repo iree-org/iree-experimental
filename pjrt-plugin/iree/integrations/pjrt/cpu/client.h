@@ -17,6 +17,7 @@ class CPUClientInstance final : public ClientInstance {
   CPUClientInstance(std::unique_ptr<Platform> platform);
   ~CPUClientInstance();
   iree_status_t CreateDriver(iree_hal_driver_t** out_driver) override;
+  bool SetDefaultCompilerFlags(CompilerJob* compiler_job) override;
 
  private:
   iree_status_t InitializeDeps();

@@ -39,30 +39,13 @@ ls -lh $IREE_PLUGIN_PATH
 ```
 # Tells the IREE plugin where to find the compiler. Only needed for now.
 export IREE_PJRT_COMPILER_LIB_PATH=$IREE_BUILD_DIR/lib/libIREECompiler.so
-export PJRT_NAMES_AND_LIBRARY_PATHS="iree_cpu:$IREE_PLUGIN_PATH"
+export PJRT_NAMES_AND_LIBRARY_PATHS="iree_cpu:$PWD/bazel-bin/iree/integrations/pjrt/cpu/pjrt_plugin_iree_cpu.so,iree_cuda:$PWD/bazel-bin/iree/integrations/pjrt/cuda/pjrt_plugin_iree_cuda.so"
 # Jax only enable the plugin path if TPUs enabled for the moment.
 export JAX_USE_PJRT_C_API_ON_TPU=1
 
-python test_init.py
-```
+# Optional: path to libcuda.so
+# export LD_LIBRARY_PATH=/usr/lib/wsl/lib
 
-### test_init.py
-
-```
-import jax
-from jax._src.lib import xla_bridge
-from jax._src.lib import xla_client
-
-def iree_backend_factory():
-  # Can also load in code:
-  # xla_client._xla.load_pjrt_plugin("iree_cpu", "/path/to/plugin.so")
-  return xla_client._xla.get_c_api_client("iree_cpu")
-
-xla_bridge.register_backend_factory("iree_cpu", iree_backend_factory)
-
-# actually this is a better way to make sure jax uses your plugin, it'll raise an error if it can't initialize
-jax.config.update("jax_platforms", "iree_cpu")
-
-
-print(jax.numpy.add(1, 1))
+python test/test_cpu.py
+python test/test_cuda.py
 ```
