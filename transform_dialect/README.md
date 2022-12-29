@@ -139,15 +139,14 @@ written per element.
 
 This gives us roughly `80GB/s` read bandwidth, in `2.8us` (latency-bound).
 
-We can generate and run another problem by adding the `run` argument:
+We can generate and run another problem by adding the `-r` argument:
 ```
 ( \
-  benchmark-transform-create \
+  benchmark-transform-create -r \
   <iree-samples-dir-path>/transform_dialect/benchmark_linalg_reductions.stub.mlir \
   reduction_2d_static \
   123 \
   45678 \
-  run \
 )
 ```
 

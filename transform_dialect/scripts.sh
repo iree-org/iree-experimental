@@ -211,28 +211,37 @@ function get-p50-from-nvprof() {
 ################################################################################
 function benchmark-transform-create() {
   cmake --build ./build --target iree-opt iree-compile iree-run-module
-
-  if [[ $# < 4 || $# > 5 ]]; then
-    echo "Usage: benchmark-transform-run-nvprof stub_file_name function_name SZ1 SZ2 [optional run keyword]"
+  
+  if [[ $# < 3 || $# > 7 ]]; then
+    echo "Usage: benchmark-transform-run-nvprof [-r] stub_file_name function_name SZ1 [SZ2] [SZ3] [SZ4] "
     return 1
   fi
-  TRANSFORM_DIALECT_BENCHMARK_STUB_FILE=$1; shift
-  FUNCTION_NAME=$1; shift
-  SZ1=$1; shift
-  SZ2=$1; shift
-  if [[ $# == 1 ]]; then
-    RUN=$1
-  fi
 
-  TRANSFORM_DIALECT_SOURCE_FILE=/tmp/${FUNCTION_NAME}_${SZ1}x${SZ2}.mlir
+  RUN=0
+  if [[ $1 == "-r" ]]; then
+    RUN=1; shift
+    TRANSFORM_DIALECT_BENCHMARK_STUB_FILE=$1; shift
+  else
+    TRANSFORM_DIALECT_BENCHMARK_STUB_FILE=$1; shift
+  fi
+  FUNCTION_NAME=$1; shift
+
+  SIZES_LIST=$@
+  IFS=' ' read -r -a SIZES <<< "${SIZES_LIST}"
+  FILE_NAME_SIZES=$(echo ${SIZES} | sed "s/ /x/g")
+
+  TRANSFORM_DIALECT_TMP_SOURCE_FILE=/tmp/tmp_${FUNCTION_NAME}_${FILE_NAME_SIZES}.mlir
+  TRANSFORM_DIALECT_SOURCE_FILE=/tmp/${FUNCTION_NAME}_${FILE_NAME_SIZES}.mlir
   # Extract exactly the func we care about and let `mlir-opt -symbol-dce ` clean
   # up the rest of the IR.
   # This lets us use files with multiple funcs
-  cat ${TRANSFORM_DIALECT_BENCHMARK_STUB_FILE} | \
-    sed "s/private @${FUNCTION_NAME}(/@${FUNCTION_NAME}(/g" | \
-    sed "s/\${SZ1}/${SZ1}/g" | \
-    sed "s/\${SZ2}/${SZ2}/g" | \
-    mlir-opt -symbol-dce > ${TRANSFORM_DIALECT_SOURCE_FILE}
+  cat ${TRANSFORM_DIALECT_BENCHMARK_STUB_FILE} > ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
+  sed -i "s/private @${FUNCTION_NAME}(/@${FUNCTION_NAME}(/g" ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
+  sed -i "s/\${SZ1}/$(test ${SIZES[0]} && echo ${SIZES[0]} || echo 0 )/g" ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
+  sed -i "s/\${SZ2}/$(test ${SIZES[1]} && echo ${SIZES[1]} || echo 0 )/g" ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
+  sed -i "s/\${SZ3}/$(test ${SIZES[2]} && echo ${SIZES[2]} || echo 0 )/g" ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
+  sed -i "s/\${SZ4}/$(test ${SIZES[3]} && echo ${SIZES[3]} || echo 0 )/g" ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
+  mlir-opt ${TRANSFORM_DIALECT_TMP_SOURCE_FILE} -symbol-dce > ${TRANSFORM_DIALECT_SOURCE_FILE}
 
   echo iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
   iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
@@ -242,6 +251,7 @@ function benchmark-transform-create() {
     : # noop
   else
     echo "Could not create TRANSFORM_DIALECT_TRANSFORM_FILE (match failure or compile failure)?"
+    echo Try inspecting: ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
     echo Try running:    iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda  -- --mlir-disable-threading
     return 1
   fi
@@ -253,11 +263,14 @@ function benchmark-transform-create() {
   echo Transform dialect transform file is: ${TRANSFORM_DIALECT_TRANSFORM_FILE}
   echo Dump transformed IR with: benchmark-transform-run-iree-opt ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE}
   echo Dump transformed PTX with: benchmark-transform-run-iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE}
-  echo Run nvprof with e.g.: benchmark-transform-run-nvprof ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE} ${FUNCTION_NAME} ${SZ1} ${SZ2}
+  echo Run nvprof with e.g.: benchmark-transform-run-nvprof ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE} ${FUNCTION_NAME} ${SIZES_LIST}
+  echo Run nvprof without transform dialect: iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
+  echo "    "nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} \| \\
+  echo "    "grep ${FUNCTION_NAME}
   echo ==========================================================
 
-  if [[ ${RUN} == "run" ]]; then
-    benchmark-transform-run-nvprof ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE} ${FUNCTION_NAME} ${SZ1} ${SZ2}
+  if [[ ${RUN} != 0 ]]; then
+    benchmark-transform-run-nvprof ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE} ${FUNCTION_NAME} ${SIZES_LIST}
   fi
 }
 
@@ -278,7 +291,7 @@ function benchmark-transform-run-iree-opt() {
 function benchmark-transform-run-iree-compile() {
   cmake --build ./build --target iree-compile
 
-  if (($# != 2)); then
+  if [[ $# != 2 ]]; then
     echo "Usage: benchmark-transform-run-iree-compile source-file transform-file [optional extra args]"
     return 1
   fi
@@ -292,23 +305,23 @@ function benchmark-transform-run-iree-compile() {
 function benchmark-transform-run-nvprof() {
   cmake --build ./build --target iree-compile
 
-  if (($# < 5)); then
-    echo "Usage: benchmark-transform-run-nvprof source-file transform-file function_name SZ1 SZ2"
+  NUM_ITERATIONS=6
+  NVPROF_TRACE_FILE=/tmp/nvprof_trace
+
+  if [[ $# < 4 || $# > 7 ]]; then
+    echo "Usage: benchmark-transform-run-nvprof source-file transform-file function_name SZ1 [SZ2] [SZ3] [SZ4]"
     return 1
   fi
 
   TRANSFORM_DIALECT_SOURCE_FILE=$1; shift
   TRANSFORM_DIALECT_TRANSFORM_FILE=$1; shift
   FUNCTION_NAME=$1; shift
-  SZ1=$1; shift
-  SZ2=$1; shift
 
-  NUM_ITERATIONS=6
-  NVPROF_TRACE_FILE=/tmp/nvprof_trace
-  NUM_ELEMENTS="${SZ1}*${SZ2}"
-  FUNCTION_INPUT="--function_input=\"${SZ1}x${SZ2}xf32=1\""
-  
-  
+  IFS=' ' read -r -a SIZES <<< "$@"
+  NUM_ELEMENTS=$(echo ${SIZES} | sed "s/ /*/g" | sed "s/0/1/g")
+  FUNCTION_INPUT=$(echo ${SIZES_LIST} | sed "s/ /x/g" | sed "s/x0//g")
+  FUNCTION_INPUT="--function_input=\"${FUNCTION_INPUT}xf32\""
+
   echo ==========================================================
   echo Reproduction instructions:
   echo iree-transform-compile ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} -- --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
@@ -327,4 +340,16 @@ function benchmark-transform-run-nvprof() {
   P50_TIME=$(get-p50-from-nvprof "${NVPROF_TRACE}" ${FUNCTION_NAME} ${NUM_ITERATIONS})
   ELT_PER_S=$(echo "${NUM_ELEMENTS}/${P50_TIME}" | bc -l) 
   echo ${FUNCTION_NAME} ${FUNCTION_INPUT} P50: ${P50_TIME} ns ${ELT_PER_S} GElements/s
+}
+
+function test-benchmark-transform-create() {
+  STUB_FILENAME=$1
+  benchmark-transform-create -r ${STUB_FILENAME} reduction_2d_static 2 3 && \
+  benchmark-transform-create -r ${STUB_FILENAME} reduction_2d_elementwise_static 2 3 && \
+  benchmark-transform-create -r ${STUB_FILENAME} reduction_3d_elementwise_static 2 3 4 && \
+  benchmark-transform-create -r ${STUB_FILENAME} reduction_2d_dynamic 2 3 && \
+  benchmark-transform-create -r ${STUB_FILENAME} reduction_2d_elementwise_dynamic 2 3
+
+  # TODO: the vanilla 3-d case is collapsed by IREE and we fail to match it.
+  # benchmark-transform-create -r ${STUB_FILENAME} reduction_3d_static 2 3 4
 }
