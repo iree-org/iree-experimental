@@ -228,7 +228,9 @@ function benchmark-transform-create() {
 
   SIZES_LIST=$@
   IFS=' ' read -r -a SIZES <<< "${SIZES_LIST}"
-  FILE_NAME_SIZES=$(echo ${SIZES} | sed "s/ /x/g")
+  FILE_NAME_SIZES=$(echo ${SIZES[@]} | sed "s/ /x/g")
+  FUNCTION_INPUT=$(echo ${SIZES[@]} | sed "s/ /x/g" | sed "s/x0//g")
+  FUNCTION_INPUT="--function_input=\"${FUNCTION_INPUT}xf32\""
 
   TRANSFORM_DIALECT_TMP_SOURCE_FILE=/tmp/tmp_${FUNCTION_NAME}_${FILE_NAME_SIZES}.mlir
   TRANSFORM_DIALECT_SOURCE_FILE=/tmp/${FUNCTION_NAME}_${FILE_NAME_SIZES}.mlir
@@ -317,9 +319,11 @@ function benchmark-transform-run-nvprof() {
   TRANSFORM_DIALECT_TRANSFORM_FILE=$1; shift
   FUNCTION_NAME=$1; shift
 
-  IFS=' ' read -r -a SIZES <<< "$@"
-  NUM_ELEMENTS=$(echo ${SIZES} | sed "s/ /*/g" | sed "s/0/1/g")
-  FUNCTION_INPUT=$(echo ${SIZES_LIST} | sed "s/ /x/g" | sed "s/x0//g")
+  SIZES_LIST=$@
+  IFS=' ' read -r -a SIZES <<< "${SIZES_LIST}"
+  NUM_ELEMENTS=$(echo ${SIZES[@]} | sed "s/ /*/g" | sed "s/0/1/g")
+  FILE_NAME_SIZES=$(echo ${SIZES[@]} | sed "s/ /x/g")
+  FUNCTION_INPUT=$(echo ${SIZES[@]} | sed "s/ /x/g" | sed "s/x0//g")
   FUNCTION_INPUT="--function_input=\"${FUNCTION_INPUT}xf32\""
 
   echo ==========================================================
