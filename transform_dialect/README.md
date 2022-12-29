@@ -168,7 +168,9 @@ reduction_2d_static --function_input="123x45678xf32=1" P50: 42499.000 ns 132.200
 This corresponds to roughly `528GB/s` read bandwidth.
 
 As a rough point of reference, running the CUDA samples
-[bandwidth test](https://github.com/NVIDIA/cuda-samples/tree/master/Samples/1_Utilities/bandwidthTest) on this author's machines prints:
+[bandwidth test](https://github.com/NVIDIA/cuda-samples/tree/master/Samples/1_Utilities/bandwidthTest) on this author's machines runs at roughly `520GB/s`.
+
+The full dump is:
 
 ```
 [CUDA Bandwidth Test] - Starting...
