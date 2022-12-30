@@ -210,7 +210,7 @@ function get-p50-from-nvprof() {
 # provide reproducers for the interpreted mode.
 ################################################################################
 function benchmark-transform-create() {
-  cmake --build ./build --target iree-opt iree-compile iree-run-module
+  cmake --build ./build --target iree-opt > /dev/null
   
   if [[ $# < 3 || $# > 7 ]]; then
     echo "Usage: benchmark-transform-run-nvprof [-r] stub_file_name function_name SZ1 [SZ2] [SZ3] [SZ4] "
@@ -258,18 +258,20 @@ function benchmark-transform-create() {
     return 1
   fi
 
-  echo ==========================================================
-  echo Problem created successufully, reproduction instructions:
-  echo ==========================================================
-  echo Transform dialect source file is: ${TRANSFORM_DIALECT_SOURCE_FILE}
-  echo Transform dialect transform file is: ${TRANSFORM_DIALECT_TRANSFORM_FILE}
-  echo Dump transformed IR with: benchmark-transform-run-iree-opt ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE}
-  echo Dump transformed PTX with: benchmark-transform-run-iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE}
-  echo Run nvprof with e.g.: benchmark-transform-run-nvprof ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE} ${FUNCTION_NAME} ${SIZES_LIST}
-  echo Run nvprof without transform dialect: iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
-  echo "    "nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1 \| \\
-  echo "    "grep ${FUNCTION_NAME}
-  echo ==========================================================
+  if [[ -z ${TRANSFORM_DIALECT_NO_DEBUG} ]]; then
+    echo ==========================================================
+    echo Problem created successufully, reproduction instructions:
+    echo ==========================================================
+    echo Transform dialect source file is: ${TRANSFORM_DIALECT_SOURCE_FILE}
+    echo Transform dialect transform file is: ${TRANSFORM_DIALECT_TRANSFORM_FILE}
+    echo Dump transformed IR with: benchmark-transform-run-iree-opt ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE}
+    echo Dump transformed PTX with: benchmark-transform-run-iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE}
+    echo Run nvprof with e.g.: benchmark-transform-run-nvprof ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE} ${FUNCTION_NAME} ${SIZES_LIST}
+    echo Run nvprof without transform dialect: iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
+    echo "    "nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1 \| \\
+    echo "    "grep ${FUNCTION_NAME}
+    echo ==========================================================
+  fi
 
   if [[ ${RUN} != 0 ]]; then
     benchmark-transform-run-nvprof ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE} ${FUNCTION_NAME} ${SIZES_LIST}
@@ -277,7 +279,7 @@ function benchmark-transform-create() {
 }
 
 function benchmark-transform-run-iree-opt() {
-  cmake --build ./build --target iree-opt
+  cmake --build ./build --target iree-opt > /dev/null
 
   if (($# != 2)); then
     echo "Usage: benchmark-transform-run-iree-opt source-file transform-file [optional extra args]"
@@ -291,7 +293,7 @@ function benchmark-transform-run-iree-opt() {
 }
 
 function benchmark-transform-run-iree-compile() {
-  cmake --build ./build --target iree-compile
+  cmake --build ./build --target iree-compile > /dev/null
 
   if [[ $# != 2 ]]; then
     echo "Usage: benchmark-transform-run-iree-compile source-file transform-file [optional extra args]"
@@ -305,7 +307,7 @@ function benchmark-transform-run-iree-compile() {
 }
 
 function benchmark-transform-run-nvprof() {
-  cmake --build ./build --target iree-compile
+  cmake --build ./build --target iree-compile iree-run-module > /dev/null
 
   NUM_ITERATIONS=6
   NVPROF_TRACE_FILE=/tmp/nvprof_trace
@@ -326,17 +328,19 @@ function benchmark-transform-run-nvprof() {
   FUNCTION_INPUT=$(echo ${SIZES[@]} | sed "s/ /x/g" | sed "s/x0//g")
   FUNCTION_INPUT="--function_input=\"${FUNCTION_INPUT}xf32\""
 
-  echo ==========================================================
-  echo Reproduction instructions:
-  echo "  "-- Witho transform dialect
-  echo iree-transform-compile ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} -- --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
-  echo "     "nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1 \| \\
-  echo "     "grep ${FUNCTION_NAME}
-  echo "  "-- Without transform dialect: 
-  echo iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
-  echo "    "nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1 \| \\
-  echo "    "grep ${FUNCTION_NAME}
-  echo ==========================================================
+  if [[ -z ${TRANSFORM_DIALECT_NO_DEBUG} ]]; then
+    echo ==========================================================
+    echo Reproduction instructions:
+    echo "  "-- Witho transform dialect
+    echo iree-transform-compile ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} -- --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
+    echo "     "nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1 \| \\
+    echo "     "grep ${FUNCTION_NAME}
+    echo "  "-- Without transform dialect: 
+    echo iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
+    echo "    "nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1 \| \\
+    echo "    "grep ${FUNCTION_NAME}
+    echo ==========================================================
+  fi
   
   ###
   ### With transform dialect:
