@@ -180,7 +180,7 @@ function iree-transform-compile() {
 # Basic benchmarking helpers.
 ################################################################################
 function get-p50-from-nvprof() {
-  if (($# < 3)); then
+  if [[ $# < 3 ]]; then
     echo "Usage: get-p50-from-nvprof nvprof_trace_string function_name num_iterations"
     return 1
   fi
@@ -211,6 +211,10 @@ function get-p50-from-nvprof() {
 ################################################################################
 function benchmark-transform-create() {
   cmake --build ./build --target iree-opt > /dev/null
+  if [[ $? -ne 0 ]]; then 
+    echo "Compilation failed"
+    return 1
+  fi
   
   if [[ $# < 3 || $# > 7 ]]; then
     echo "Usage: benchmark-transform-run-nvprof [-r] stub_file_name function_name SZ1 [SZ2] [SZ3] [SZ4] "
@@ -286,8 +290,12 @@ function benchmark-transform-create() {
 
 function benchmark-transform-run-iree-opt() {
   cmake --build ./build --target iree-opt > /dev/null
+  if [[ $? -ne 0 ]]; then 
+    echo "Compilation failed"
+    return 1
+  fi
 
-  if (($# != 2)); then
+  if [[ $# != 2 ]]; then
     echo "Usage: benchmark-transform-run-iree-opt source-file transform-file [optional extra args]"
     return 1
   fi
@@ -300,6 +308,10 @@ function benchmark-transform-run-iree-opt() {
 
 function benchmark-transform-run-iree-compile() {
   cmake --build ./build --target iree-compile > /dev/null
+  if [[ $? -ne 0 ]]; then 
+    echo "Compilation failed"
+    return 1
+  fi
 
   if [[ $# != 2 ]]; then
     echo "Usage: benchmark-transform-run-iree-compile source-file transform-file [optional extra args]"
@@ -314,6 +326,10 @@ function benchmark-transform-run-iree-compile() {
 
 function benchmark-transform-run-nvprof() {
   cmake --build ./build --target iree-compile iree-run-module > /dev/null
+  if [[ $? -ne 0 ]]; then 
+    echo "Compilation failed"
+    return 1
+  fi
 
   NUM_ITERATIONS=6
   NVPROF_TRACE_FILE=/tmp/nvprof_trace
