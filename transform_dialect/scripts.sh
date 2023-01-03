@@ -234,7 +234,7 @@ function benchmark-transform-create() {
   IFS=' ' read -r -a SIZES <<< "${SIZES_LIST}"
   FILE_NAME_SIZES=$(echo ${SIZES[@]} | sed "s/ /x/g")
   FUNCTION_INPUT=$(echo ${SIZES[@]} | sed "s/ /x/g" | sed "s/x0//g")
-  FUNCTION_INPUT="--function_input=\"${FUNCTION_INPUT}xf32\""
+  FUNCTION_INPUT="--function_input=\"${FUNCTION_INPUT}xf32=1\""
 
   TRANSFORM_DIALECT_TMP_SOURCE_FILE=/tmp/tmp_${FUNCTION_NAME}_${FILE_NAME_SIZES}.mlir
   TRANSFORM_DIALECT_SOURCE_FILE=/tmp/${FUNCTION_NAME}_${FILE_NAME_SIZES}.mlir
@@ -348,7 +348,7 @@ function benchmark-transform-run-nvprof() {
   NUM_ELEMENTS=$(echo ${SIZES[@]} | sed "s/ /*/g" | sed "s/0/1/g")
   FILE_NAME_SIZES=$(echo ${SIZES[@]} | sed "s/ /x/g")
   FUNCTION_INPUT=$(echo ${SIZES[@]} | sed "s/ /x/g" | sed "s/x0//g")
-  FUNCTION_INPUT="--function_input=\"${FUNCTION_INPUT}xf32\""
+  FUNCTION_INPUT="--function_input=\"${FUNCTION_INPUT}xf32=1\""
 
   if [ -z ${TRANSFORM_DIALECT_NO_DEBUG+x} ]; then
     echo ==========================================================
@@ -370,7 +370,7 @@ function benchmark-transform-run-nvprof() {
   iree-transform-compile ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} \
       -- --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} | \
   nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1 | \
-  grep ${FUNCTION_NAME} > ${NVPROF_TRACE_FILE}
+  grep -v \.\.\. | grep ${FUNCTION_NAME} > ${NVPROF_TRACE_FILE}
   
   NVPROF_TRACE=$(cat ${NVPROF_TRACE_FILE})
   if [ -z ${TRANSFORM_DIALECT_NO_DEBUG+x} ]; then
@@ -385,7 +385,7 @@ function benchmark-transform-run-nvprof() {
   ###
   iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} | \
   nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1 | \
-  grep ${FUNCTION_NAME} > ${NVPROF_TRACE_FILE}
+  grep -v \.\.\. | grep ${FUNCTION_NAME} > ${NVPROF_TRACE_FILE}
   
   NVPROF_TRACE=$(cat ${NVPROF_TRACE_FILE})
   if [ -z ${TRANSFORM_DIALECT_NO_DEBUG+x} ]; then
