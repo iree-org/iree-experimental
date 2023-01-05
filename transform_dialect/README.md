@@ -38,6 +38,7 @@ Run:
   benchmark-transform-create \
   <iree-samples-dir-path>/transform_dialect/benchmark_linalg_reductions.stub.mlir \
   reduction_2d_static \
+  f32 \
   123 \
   456 \
 )
@@ -100,6 +101,7 @@ estimate of the performance by pasting the last repro command:
   /tmp/reduction_2d_static_123x456.mlir \
   /tmp/iree_transform_dialect_ac2e60.mlir \
   reduction_2d_static \
+  f32 \
   123 \
   456 \
 )
@@ -145,6 +147,7 @@ We can generate and run another problem by adding the `-r` argument:
   benchmark-transform-create -r \
   <iree-samples-dir-path>/transform_dialect/benchmark_linalg_reductions.stub.mlir \
   reduction_2d_static \
+  f32 \
   123 \
   45678 \
 )
@@ -164,7 +167,7 @@ EXEC @reduction_2d_static
 reduction_2d_static --function_input="123x45678xf32=1" P50: 42499.000 ns 132.20061648509376691216 GElements/s
 ```
 
-This corresponds to roughly `528GB/s` read bandwidth.
+This corresponds to roughly `528GB/s` read bandwidth (i.e. 4B / element with `f32`).
 
 As a rough point of reference, running the CUDA samples
 [bandwidth test](https://github.com/NVIDIA/cuda-samples/tree/master/Samples/1_Utilities/bandwidthTest) on this author's machines runs at roughly `520GB/s`.
