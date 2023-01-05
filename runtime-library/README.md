@@ -19,6 +19,8 @@ the IREE repository proper as a standalone project.
 
 ## Options:
 
+* `-DIREE_ROOT_DIR=<path>` : Override the path to the main IREE repo. Defaults
+  to assuming that `iree` is checked out adjacent to `iree-samples`.
 * `-DBUILD_SHARED_LIBS=ON` : Builds a libireert.so (or corresponding DLL/dylib)
   for development use. Note that the low-level IREE runtime API is fine grained
   and usage in a shared library will pessimize optimizations. Therefore, this
@@ -41,7 +43,6 @@ C/library level, not the build system level.
 
 ```
 cmake -GNinja -Bbuild .
-cd build
-ninja
-./bin/ireert_test
+cmake --build build
+./build/bin/ireert_test
 ```
