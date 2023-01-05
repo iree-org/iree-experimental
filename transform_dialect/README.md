@@ -8,11 +8,16 @@ experiments based on the transform dialect.
 Contains shell functions that simplify running IREE tools with the transform
 dialect. These should generally be considered brittle but may be useful to some.
 
-Assumptions are:
+First, source the script file:
+```
+source iree-samples/transform_dialect/scripts.sh
+```
+
+For execution, assumptions are:
   1. execution starts from the IREE source dir root
   2. the IREE build directory lives at `./build`
   3. `mlir-opt` is in the path
-  4. `./build/tools` is in the path
+  4. `./build/tools` (i.e. `iree-opt`, `iree-compile`, `iree-run-module`) is in the path
   5. for CUDA execution, `nvprof` is in the path.
 
 Disclaimers:
