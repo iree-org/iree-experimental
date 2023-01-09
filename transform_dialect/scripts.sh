@@ -113,6 +113,10 @@ function iree-transform-opt() {
     return 1
   fi
 
+  # echo iree-transform-opt-dispatch-only ${MLIR_FILE} -b ${BACKEND} -c ${CODEGEN_SPEC_FILE} -d ${DISPATCH_SPEC_FILE} \| \\
+  # echo iree-opt --iree-hal-target-backends=${BACKEND} --iree-stream-transformation-pipeline --iree-hal-configuration-pipeline \| \\
+  # echo iree-opt ${CODEGEN_FLAG} ${EXTRA_ARGS}
+
   iree-transform-opt-dispatch-only ${MLIR_FILE} -b ${BACKEND} -c ${CODEGEN_SPEC_FILE} -d ${DISPATCH_SPEC_FILE} | \
   iree-opt --iree-hal-target-backends=${BACKEND} --iree-stream-transformation-pipeline --iree-hal-configuration-pipeline | \
   iree-opt ${CODEGEN_FLAG} ${EXTRA_ARGS}
@@ -180,7 +184,7 @@ function iree-transform-compile() {
 # Basic benchmarking helpers.
 ################################################################################
 function get-p50-from-nvprof() {
-  if [[ $# < 3 ]]; then
+  if [[ "$#" -lt  3 ]]; then
     echo "Usage: get-p50-from-nvprof nvprof_trace_string function_name num_iterations"
     return 1
   fi
@@ -191,7 +195,7 @@ function get-p50-from-nvprof() {
 
 
   P50_TIME=$(echo "${NVPROF_TRACE}" | \
-    grep ${FUNCTION_NAME} | \
+    grep ${FUNCTION_NAME}_dispatch | \
     awk {'print $2'} | \
     tail -n ${NUM_ITERATIONS} | \
     sed "s/us/*1000/g" | \
@@ -232,18 +236,31 @@ function benchmark-transform-create() {
     return 1
   fi
   
-  if [[ $# < 5 || $# > 8 ]]; then
-    echo "Usage: benchmark-transform-create [-r] stub_file_name function_name ELEMENTAL_TYPE SZ1 [SZ2] [SZ3] [SZ4] "
+  if [[ "$#" -lt  7 || "$#" -gt  10 ]]; then
+    echo "Got "$#" args"
+    echo "Usage: benchmark-transform-create [-r] -b <backend> stub_file_name function_name ELEMENTAL_TYPE SZ1 [SZ2] [SZ3] [SZ4] "
     return 1
   fi
 
   RUN=0
   if [[ $1 == "-r" ]]; then
     RUN=1; shift
-    TRANSFORM_DIALECT_BENCHMARK_STUB_FILE=$1; shift
   else
-    TRANSFORM_DIALECT_BENCHMARK_STUB_FILE=$1; shift
+    : # noop
   fi
+  if [[ $1 == "-b" ]]; then
+    shift
+    BACKEND=$1; shift
+  else
+    echo "Expected -b <backend> but got "$1
+    echo "Usage: benchmark-transform-create [-r] -b <backend> stub_file_name function_name ELEMENTAL_TYPE SZ1 [SZ2] [SZ3] [SZ4] "
+    return 1
+  fi
+  if [[ ${BACKEND} != "cuda" && ${BACKEND} != "llvm-cpu" ]]; then
+    echo "Unknown IREE backend: " ${BACKEND}
+    return 1
+  fi
+  TRANSFORM_DIALECT_BENCHMARK_STUB_FILE=$1; shift
   FUNCTION_NAME=$1; shift
   ELEMENTAL_TYPE=$1; shift
 
@@ -272,44 +289,55 @@ function benchmark-transform-create() {
   sed -i "s/\${SZ2}/$(test ${SIZES[1]} && echo ${SIZES[1]} || echo 0 )/g" ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
   sed -i "s/\${SZ3}/$(test ${SIZES[2]} && echo ${SIZES[2]} || echo 0 )/g" ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
   sed -i "s/\${SZ4}/$(test ${SIZES[3]} && echo ${SIZES[3]} || echo 0 )/g" ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
+  
+  # echo mlir-opt ${TRANSFORM_DIALECT_TMP_SOURCE_FILE} -symbol-dce > ${TRANSFORM_DIALECT_SOURCE_FILE}
   mlir-opt ${TRANSFORM_DIALECT_TMP_SOURCE_FILE} -symbol-dce > ${TRANSFORM_DIALECT_SOURCE_FILE}
 
-  echo iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
-  iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
-  TRANSFORM_DIALECT_TRANSFORM_FILE=$(DUMP_TRANSFORM_REPRO=1 iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda  -- --mlir-disable-threading 2>&1 > /dev/null | grep iree-opt | awk '{print $4}')
+  # echo iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
+  iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
+  TRANSFORM_DIALECT_TRANSFORM_FILE=$(DUMP_TRANSFORM_REPRO=1 iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null | grep iree-opt | awk '{print $4}')
   
   if [[ ${TRANSFORM_DIALECT_TRANSFORM_FILE} =~ "tmp" ]] ; then
     : # noop
   else
     echo "Could not create TRANSFORM_DIALECT_TRANSFORM_FILE (match failure or compile failure)?"
     echo Try inspecting: ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
-    echo Try running:    iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda  -- --mlir-disable-threading
+    echo Try running:   DUMP_TRANSFORM_REPRO=1 iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading
     return 1
   fi
 
   if [ -z ${TRANSFORM_DIALECT_NO_DEBUG+x} ]; then
     echo ==========================================================
-    echo Problem created successufully, reproduction instructions:
+    echo Problem created successfully, reproduction instructions:
     echo ==========================================================
     echo Transform dialect source file is: 
     echo "    "${TRANSFORM_DIALECT_SOURCE_FILE}
     echo Transform dialect transform file is: 
     echo "    "${TRANSFORM_DIALECT_TRANSFORM_FILE}
     echo Dump transformed IR with: 
-    echo "    "benchmark-transform-run-iree-opt ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE}
-    echo Dump transformed PTX with: 
-    echo "    "benchmark-transform-run-iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE}
-    echo Run nvprof with e.g.: 
-    echo "    "benchmark-transform-run-nvprof ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE} ${FUNCTION_NAME} ${ELEMENTAL_TYPE} ${SIZES_LIST}
-    echo Run nvprof without transform dialect: 
-    echo "    "iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
-    echo "    "nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2\>\&1 \| \\
-    echo "    "grep ${FUNCTION_NAME}
+    echo "    "benchmark-transform-run-iree-opt -b ${BACKEND} ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE}
+    echo Dump transformed binary/PTX with: 
+    echo "    "benchmark-transform-run-iree-compile -b ${BACKEND} ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE}
+    if [[ ${BACKEND} == "cuda" ]]; then
+      echo Run nvprof with e.g.: 
+      echo "    "benchmark-transform-run-nvprof ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE} ${FUNCTION_NAME} ${ELEMENTAL_TYPE} ${SIZES_LIST}
+      echo Run nvprof without transform dialect: 
+      echo "    "iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=${BACKEND} --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
+      echo "    "nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=${BACKEND} ${FUNCTION_INPUT} 2\>\&1 \| \\
+      echo "    "grep ${FUNCTION_NAME}_dispatch
+    else
+      # Non-GPU run not yet supported
+      : #noop
+    fi
     echo ==========================================================
   fi
 
   if [[ ${RUN} != 0 ]]; then
-    benchmark-transform-run-nvprof ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE} ${FUNCTION_NAME} ${ELEMENTAL_TYPE} ${SIZES_LIST}
+    if [[ ${BACKEND} == "cuda" ]]; then
+      benchmark-transform-run-nvprof ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE} ${FUNCTION_NAME} ${ELEMENTAL_TYPE} ${SIZES_LIST}
+    else
+      benchmark-transform-run-cpu ${TRANSFORM_DIALECT_SOURCE_FILE} ${TRANSFORM_DIALECT_TRANSFORM_FILE} ${FUNCTION_NAME} ${ELEMENTAL_TYPE} ${SIZES_LIST}
+    fi
   fi
 }
 
@@ -320,15 +348,26 @@ function benchmark-transform-run-iree-opt() {
     return 1
   fi
 
-  if [[ $# < 2 ]]; then
-    echo "Usage: benchmark-transform-run-iree-opt source-file transform-file [optional extra args]"
+  if [[ "$#" -lt  4 ]]; then
+    echo "Usage: benchmark-transform-run-iree-opt -b <backend> source-file transform-file [optional extra args]"
     return 1
   fi
 
+  if [[ $1 == "-b" ]]; then
+    shift
+    BACKEND=$1; shift
+  else
+    echo "Usage: benchmark-transform-run-iree-opt -b <backend> source-file transform-file [optional extra args]"
+    return 1
+  fi
+  if [[ ${BACKEND} != "cuda" && ${BACKEND} != "llvm-cpu" ]]; then
+    echo "Unknown IREE backend: " ${BACKEND}
+    return 1
+  fi
   TRANSFORM_DIALECT_SOURCE_FILE=$1; shift
   TRANSFORM_DIALECT_TRANSFORM_FILE=$1; shift
-  echo iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} -- $@
-  iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} -- $@
+  echo iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND} -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} -- $@
+  iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND} -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} -- $@
 }
 
 function benchmark-transform-run-iree-compile() {
@@ -338,15 +377,107 @@ function benchmark-transform-run-iree-compile() {
     return 1
   fi
 
-  if [[ $# < 2 ]]; then
-    echo "Usage: benchmark-transform-run-iree-compile source-file transform-file [optional extra args]"
+  if [[ "$#" -lt  4 ]]; then
+    echo "Usage: benchmark-transform-run-iree-compile -b <backend> source-file transform-file [optional extra args]"
+    return 1
+  fi
+
+  if [[ $1 == "-b" ]]; then
+    shift
+    BACKEND=$1; shift
+  else
+    echo "Usage: benchmark-transform-run-iree-compile -b <backend> source-file transform-file [optional extra args]"
+    return 1
+  fi
+  if [[ ${BACKEND} != "cuda" && ${BACKEND} != "llvm-cpu" ]]; then
+    echo "Unknown IREE backend: " ${BACKEND}
+    return 1
+  fi
+  TRANSFORM_DIALECT_SOURCE_FILE=$1; shift
+  TRANSFORM_DIALECT_TRANSFORM_FILE=$1; shift
+  echo iree-transform-compile ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND} -c ${TRANSFORM_DIALECT_TRANSFORM_FILE}
+  iree-transform-compile ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND} -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} -- $@
+}
+
+function benchmark-transform-run-cpu() {
+  cmake --build ./build --target iree-compile iree-run-module iree-benchmark-module > /dev/null
+  if [[ $? -ne 0 ]]; then 
+    echo "Compilation failed"
+    return 1
+  fi
+
+  NUM_ITERATIONS=6
+
+  if [[ "$#" -lt  5 || "$#" -gt  7 ]]; then
+    echo "Usage: benchmark-transform-run-cpu source-file transform-file function_name ELEMENTAL_TYPE SZ1 [SZ2] [SZ3] [SZ4]"
     return 1
   fi
 
   TRANSFORM_DIALECT_SOURCE_FILE=$1; shift
   TRANSFORM_DIALECT_TRANSFORM_FILE=$1; shift
-  echo iree-transform-compile ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda -c ${TRANSFORM_DIALECT_TRANSFORM_FILE}
-  iree-transform-compile ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} -- $@
+  FUNCTION_NAME=$1; shift
+  ELEMENTAL_TYPE=$1; shift
+
+  SIZES_LIST=$@
+  IFS=' ' read -r -a SIZES <<< "${SIZES_LIST}"
+  NUM_ELEMENTS=$(echo ${SIZES[@]} | sed "s/ /*/g" | sed "s/0/1/g")
+  FILE_NAME_SIZES=$(echo ${SIZES[@]} | sed "s/ /x/g")
+  FUNCTION_INPUT=$(echo ${SIZES[@]} | sed "s/ /x/g" | sed "s/x0//g")
+  FUNCTION_INPUT="--function_input=\"${FUNCTION_INPUT}x${ELEMENTAL_TYPE}=1\""
+
+  if [ -z ${TRANSFORM_DIALECT_NO_DEBUG+x} ]; then
+    echo ==========================================================
+    echo Reproduction instructions:
+    echo -- With transform dialect:
+    echo "    "iree-transform-compile ${TRANSFORM_DIALECT_SOURCE_FILE} -b llvm-cpu -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} \\
+    echo "    "-- --iree-llvm-target-triple=x86_64-pc-linux-gnu \\
+    echo "    "   --iree-llvm-target-cpu-features=host \\
+    echo "    "   --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
+    echo "    "iree-benchmark-module --entry_function=${FUNCTION_NAME} --device=local-task --task_topology_group_count=0 --batch_size=100 ${FUNCTION_INPUT}
+    echo -- Without transform dialect:
+    echo "    "iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=llvm-cpu \\
+    echo "    "   --iree-llvm-target-triple=x86_64-pc-linux-gnu \\
+    echo "    "   --iree-llvm-target-cpu-features=host \\
+    echo "    "   --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
+    echo "    "iree-benchmark-module --entry_function=${FUNCTION_NAME} --device=local-task --task_topology_group_count=0 --batch_size=100 ${FUNCTION_INPUT}
+    echo ==========================================================
+  fi
+  
+  ###
+  ### With transform dialect:
+  ###
+  iree-transform-compile ${TRANSFORM_DIALECT_SOURCE_FILE} -b llvm-cpu -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} \
+      -- --iree-llvm-target-triple=x86_64-pc-linux-gnu \
+         --iree-llvm-target-cpu-features=host \
+         --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} | \
+  iree-benchmark-module --entry_function=${FUNCTION_NAME} --device=local-task --task_topology_group_count=0 --batch_size=100 ${FUNCTION_INPUT}
+
+
+  # iree-benchmark-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1  | \
+  # grep ${FUNCTION_NAME}_dispatch > ${NVPROF_TRACE_FILE}
+  
+  # NVPROF_TRACE=$(cat ${NVPROF_TRACE_FILE})
+  # if [ -z ${TRANSFORM_DIALECT_NO_DEBUG+x} ]; then
+  #   echo "${NVPROF_TRACE}"
+  # fi
+  # P50_TIME=$(get-p50-from-nvprof "${NVPROF_TRACE}" ${FUNCTION_NAME} ${NUM_ITERATIONS})
+  # ELT_PER_S=$(echo "${NUM_ELEMENTS}/${P50_TIME}" | bc -l) 
+  # echo With transform dialect: ${FUNCTION_NAME} ${FUNCTION_INPUT} P50: ${P50_TIME} ns ${ELT_PER_S} GElements/s
+
+  # ###
+  # ### Without transform dialect:
+  # ###
+  # iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} | \
+  # nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1 | \
+  # grep ${FUNCTION_NAME}_dispatch > ${NVPROF_TRACE_FILE}
+  
+  # NVPROF_TRACE=$(cat ${NVPROF_TRACE_FILE})
+  # if [ -z ${TRANSFORM_DIALECT_NO_DEBUG+x} ]; then
+  #   echo "${NVPROF_TRACE}"
+  # fi
+  # P50_TIME=$(get-p50-from-nvprof "${NVPROF_TRACE}" ${FUNCTION_NAME} ${NUM_ITERATIONS})
+  # ELT_PER_S=$(echo "${NUM_ELEMENTS}/${P50_TIME}" | bc -l) 
+  # echo Without transform dialect: ${FUNCTION_NAME} ${FUNCTION_INPUT} P50: ${P50_TIME} ns ${ELT_PER_S} GElements/s
 }
 
 function benchmark-transform-run-nvprof() {
@@ -359,7 +490,7 @@ function benchmark-transform-run-nvprof() {
   NUM_ITERATIONS=6
   NVPROF_TRACE_FILE=/tmp/nvprof_trace
 
-  if [[ $# < 5 || $# > 7 ]]; then
+  if [[ "$#" -lt  5 || "$#" -gt  7 ]]; then
     echo "Usage: benchmark-transform-run-nvprof source-file transform-file function_name ELEMENTAL_TYPE SZ1 [SZ2] [SZ3] [SZ4]"
     return 1
   fi
@@ -382,11 +513,11 @@ function benchmark-transform-run-nvprof() {
     echo -- With transform dialect
     echo "    "iree-transform-compile ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} -- --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
     echo "    "nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2\>\&1 \| \\
-    echo "    "grep ${FUNCTION_NAME}
+    echo "    "grep ${FUNCTION_NAME}_dispatch
     echo -- Without transform dialect: 
     echo "    "iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
     echo "    "nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2\>\&1 \| \\
-    echo "    "grep ${FUNCTION_NAME}
+    echo "    "grep ${FUNCTION_NAME}_dispatch
     echo ==========================================================
   fi
   
@@ -396,7 +527,7 @@ function benchmark-transform-run-nvprof() {
   iree-transform-compile ${TRANSFORM_DIALECT_SOURCE_FILE} -b cuda -c ${TRANSFORM_DIALECT_TRANSFORM_FILE} \
       -- --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} | \
   nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1  | \
-  grep ${FUNCTION_NAME} > ${NVPROF_TRACE_FILE}
+  grep ${FUNCTION_NAME}_dispatch > ${NVPROF_TRACE_FILE}
   
   NVPROF_TRACE=$(cat ${NVPROF_TRACE_FILE})
   if [ -z ${TRANSFORM_DIALECT_NO_DEBUG+x} ]; then
@@ -411,7 +542,7 @@ function benchmark-transform-run-nvprof() {
   ###
   iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} | \
   nvprof --print-gpu-trace iree-run-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1 | \
-  grep ${FUNCTION_NAME} > ${NVPROF_TRACE_FILE}
+  grep ${FUNCTION_NAME}_dispatch > ${NVPROF_TRACE_FILE}
   
   NVPROF_TRACE=$(cat ${NVPROF_TRACE_FILE})
   if [ -z ${TRANSFORM_DIALECT_NO_DEBUG+x} ]; then
@@ -423,13 +554,25 @@ function benchmark-transform-run-nvprof() {
 }
 
 function test-benchmark-transform-create() {
+  if [[ $1 == "-b" ]]; then
+    shift
+    BACKEND=$1; shift
+  else
+    echo "Usage: test-benchmark-transform-create -b <backend> stub-file"
+    return 1
+  fi
+  if [[ ${BACKEND} != "cuda" && ${BACKEND} != "llvm-cpu" ]]; then
+    echo "Unknown IREE backend: " ${BACKEND}
+    return 1
+  fi
+
   STUB_FILENAME=$1
-  benchmark-transform-create -r ${STUB_FILENAME} reduction_2d_static f16 2 3 && \
-  benchmark-transform-create -r ${STUB_FILENAME} reduction_2d_elementwise_static f32 2 3 && \
-  benchmark-transform-create -r ${STUB_FILENAME} reduction_3d_elementwise_static f16 2 3 4 && \
-  benchmark-transform-create -r ${STUB_FILENAME} reduction_2d_dynamic f32 2 3 && \
-  benchmark-transform-create -r ${STUB_FILENAME} reduction_2d_elementwise_dynamic f64 2 3
+  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_2d_static f16 2 3 && \
+  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_2d_elementwise_static f32 2 3 && \
+  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_3d_elementwise_static f16 2 3 4 && \
+  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_2d_dynamic f32 2 3 && \
+  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_2d_elementwise_dynamic f64 2 3
 
   # TODO: the vanilla 3-d case is collapsed by IREE and we fail to match it.
-  # benchmark-transform-create -r ${STUB_FILENAME} reduction_3d_static 2 3 4
+  # benchmark-transform-create -r -b cuda ${STUB_FILENAME} reduction_3d_static 2 3 4
 }

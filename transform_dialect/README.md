@@ -41,6 +41,7 @@ Run:
 ```
 (\
   benchmark-transform-create \
+  -b cuda \
   <iree-samples-dir-path>/transform_dialect/benchmark_linalg_reductions.stub.mlir \
   reduction_2d_static \
   f32 \
@@ -56,8 +57,8 @@ Problem created successfully, reproduction instructions:
 ==========================================================
 Transform dialect source file is: /tmp/reduction_2d_static_123x456.mlir
 Transform dialect transform file is: /tmp/iree_transform_dialect_ac2e60.mlir
-Dump transformed IR with: benchmark-transform-run-iree-opt /tmp/reduction_2d_static_123x456.mlir /tmp/iree_transform_dialect_ac2e60.mlir
-Dump transformed PTX with: benchmark-transform-run-iree-compile /tmp/reduction_2d_static_123x456.mlir /tmp/iree_transform_dialect_ac2e60.mlir
+Dump transformed IR with: benchmark-transform-run-iree-opt -b cuda /tmp/reduction_2d_static_123x456.mlir /tmp/iree_transform_dialect_ac2e60.mlir
+Dump transformed PTX with: benchmark-transform-run-iree-compile -b cuda /tmp/reduction_2d_static_123x456.mlir /tmp/iree_transform_dialect_ac2e60.mlir
 Run nvprof with e.g.: benchmark-transform-run-nvprof /tmp/reduction_2d_static_123x456.mlir /tmp/iree_transform_dialect_ac2e60.mlir reduction_2d_static 123 456
 ==========================================================
 ```
@@ -70,6 +71,7 @@ Manually modify the content of the transform IR file (or not) (i.e. /tmp/iree_tr
 ```
 ( \
   benchmark-transform-run-iree-opt \
+  -b cuda \
   /tmp/reduction_2d_static_123x456.mlir \
   /tmp/iree_transform_dialect_ac2e60.mlir \
 )
@@ -86,6 +88,7 @@ Once the transformed IR is in a satisfactory state, one can inspect the PTX.
 ```
 ( \
   benchmark-transform-run-iree-compile \
+  -b cuda \
   /tmp/reduction_2d_static_123x456.mlir \
   /tmp/iree_transform_dialect_ac2e60.mlir \
 )
@@ -103,6 +106,7 @@ estimate of the performance by pasting the last repro command:
 ```
 (
   benchmark-transform-run-nvprof \
+  -b cuda \
   /tmp/reduction_2d_static_123x456.mlir \
   /tmp/iree_transform_dialect_ac2e60.mlir \
   reduction_2d_static \
@@ -150,6 +154,7 @@ We can generate and run another problem by adding the `-r` argument:
 ```
 ( \
   benchmark-transform-create -r \
+  -b cuda \
   <iree-samples-dir-path>/transform_dialect/benchmark_linalg_reductions.stub.mlir \
   reduction_2d_static \
   f32 \
