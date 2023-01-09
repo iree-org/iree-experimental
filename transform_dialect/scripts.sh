@@ -293,8 +293,7 @@ function benchmark-transform-create() {
   # echo mlir-opt ${TRANSFORM_DIALECT_TMP_SOURCE_FILE} -symbol-dce > ${TRANSFORM_DIALECT_SOURCE_FILE}
   mlir-opt ${TRANSFORM_DIALECT_TMP_SOURCE_FILE} -symbol-dce > ${TRANSFORM_DIALECT_SOURCE_FILE}
 
-  # echo iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
-  iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
+  echo DUMP_TRANSFORM_REPRO=1 iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading
   TRANSFORM_DIALECT_TRANSFORM_FILE=$(DUMP_TRANSFORM_REPRO=1 iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null | grep iree-opt | awk '{print $4}')
   
   if [[ ${TRANSFORM_DIALECT_TRANSFORM_FILE} =~ "tmp" ]] ; then
@@ -305,6 +304,9 @@ function benchmark-transform-create() {
     echo Try running:   DUMP_TRANSFORM_REPRO=1 iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading
     return 1
   fi
+
+  # echo iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
+  iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
 
   if [ -z ${TRANSFORM_DIALECT_NO_DEBUG+x} ]; then
     echo ==========================================================
@@ -406,7 +408,7 @@ function benchmark-transform-run-cpu() {
     return 1
   fi
 
-  NUM_ITERATIONS=6
+  NUM_ITERATIONS=10
 
   if [[ "$#" -lt  5 || "$#" -gt  7 ]]; then
     echo "Usage: benchmark-transform-run-cpu source-file transform-file function_name ELEMENTAL_TYPE SZ1 [SZ2] [SZ3] [SZ4]"
@@ -433,13 +435,13 @@ function benchmark-transform-run-cpu() {
     echo "    "-- --iree-llvm-target-triple=x86_64-pc-linux-gnu \\
     echo "    "   --iree-llvm-target-cpu-features=host \\
     echo "    "   --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
-    echo "    "iree-benchmark-module --entry_function=${FUNCTION_NAME} --device=local-task --task_topology_group_count=0 --batch_size=100 ${FUNCTION_INPUT}
+    echo "    "iree-benchmark-module --entry_function=${FUNCTION_NAME} --device=local-task --task_topology_group_count=1 --batch_size=${NUM_ITERATIONS} ${FUNCTION_INPUT}
     echo -- Without transform dialect:
     echo "    "iree-compile ${TRANSFORM_DIALECT_SOURCE_FILE} --iree-hal-target-backends=llvm-cpu \\
     echo "    "   --iree-llvm-target-triple=x86_64-pc-linux-gnu \\
     echo "    "   --iree-llvm-target-cpu-features=host \\
     echo "    "   --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} \| \\
-    echo "    "iree-benchmark-module --entry_function=${FUNCTION_NAME} --device=local-task --task_topology_group_count=0 --batch_size=100 ${FUNCTION_INPUT}
+    echo "    "iree-benchmark-module --entry_function=${FUNCTION_NAME} --device=local-task --task_topology_group_count=1 --batch_size=${NUM_ITERATIONS} ${FUNCTION_INPUT}
     echo ==========================================================
   fi
   
@@ -487,7 +489,7 @@ function benchmark-transform-run-nvprof() {
     return 1
   fi
 
-  NUM_ITERATIONS=6
+  NUM_ITERATIONS=10
   NVPROF_TRACE_FILE=/tmp/nvprof_trace
 
   if [[ "$#" -lt  5 || "$#" -gt  7 ]]; then
