@@ -452,7 +452,7 @@ function benchmark-transform-run-cpu() {
       -- --iree-llvm-target-triple=x86_64-pc-linux-gnu \
          --iree-llvm-target-cpu-features=host \
          --iree-hal-benchmark-dispatch-repeat-count=${NUM_ITERATIONS} | \
-  iree-benchmark-module --entry_function=${FUNCTION_NAME} --device=local-task --task_topology_group_count=0 --batch_size=100 ${FUNCTION_INPUT}
+  iree-benchmark-module --entry_function=${FUNCTION_NAME} --device=local-task --task_topology_group_count=1 --batch_size=${NUM_ITERATIONS} ${FUNCTION_INPUT}
 
 
   # iree-benchmark-module --entry_function=${FUNCTION_NAME} --device=cuda ${FUNCTION_INPUT} 2>&1  | \
