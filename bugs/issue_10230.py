@@ -1,5 +1,4 @@
 # RUN: %PYTHON %s
-# XFAIL: *
 
 import iree.compiler
 import iree.jax
@@ -27,6 +26,7 @@ print(ir)
 iree_config = iree.runtime.system_api.Config("local-task")
 iree_binary = iree.compiler.compile_str(
     ir, target_backends=["llvm-cpu"], input_type="mhlo")
+instance = iree.runtime.VmInstance()
 vm_module = iree.runtime.VmModule.from_flatbuffer(instance, iree_binary)
 module_object = iree.runtime.load_vm_module(vm_module, iree_config)
 out = module_object["main"](arg0, arg1)
