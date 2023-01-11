@@ -180,7 +180,7 @@ reduction_2d_static --function_input="123x45678xf32=1" P50: 42499.000 ns 132.200
 This corresponds to roughly `528GB/s` read bandwidth (i.e. 4B / element with `f32`).
 
 As a rough point of reference, running the CUDA samples
-[bandwidth test](https://github.com/NVIDIA/cuda-samples/tree/master/Samples/1_Utilities/bandwidthTest) on this author's machines runs at roughly `520GB/s`.
+[bandwidth test](https://github.com/NVIDIA/cuda-samples/tree/master/Samples/1_Utilities/bandwidthTest) on this author's machine runs at roughly `520GB/s`.
 
 The full dump is:
 
@@ -209,3 +209,25 @@ Running on...
 Result = PASS
 ```
 
+As a better point of reference, running the BabelStream [benchmarks](https://github.com/UoB-HPC/BabelStream)
+on this author's machine runs at roughly `550GB/s`.
+
+The full dump is:
+
+```
+BabelStream
+Version: 4.0
+Implementation: CUDA
+Running kernels 100 times
+Precision: double
+Array size: 268.4 MB (=0.3 GB)
+Total size: 805.3 MB (=0.8 GB)
+Using CUDA device NVIDIA GeForce RTX 2080 Ti
+Driver: 11060
+Function    MBytes/sec  Min (sec)   Max         Average     
+Copy        547796.718  0.00098     0.00101     0.00100
+Mul         544875.681  0.00099     0.00101     0.00100
+Add         556654.794  0.00145     0.00148     0.00147
+Triad       556770.252  0.00145     0.00148     0.00147
+Dot         574513.619  0.00093     0.00096     0.00094
+```
