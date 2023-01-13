@@ -12,6 +12,11 @@ there are sharp edges still. The following procedure is being used to develop.
 It is recommended to checkout `jax`, `iree`, `iree-samples`, and `tensorflow`
 side by side, as we will be overriding them all to build at head.
 
+Note that although Jax is emitting serialized stablehlo bytecode, which should
+be compatible across versions eventually, it is still early days and things
+are not stable yet. It is recommended to use a `tensorflow` repo at the same
+commit that IREE uses.
+
 ## Build and install custom jaxlib
 
 From a Jax checkout:
