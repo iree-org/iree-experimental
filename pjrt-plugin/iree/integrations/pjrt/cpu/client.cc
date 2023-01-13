@@ -38,8 +38,9 @@ iree_status_t CPUClientInstance::InitializeDeps() {
   // great for this use since there is no way to set the flags :/
   IREE_RETURN_IF_ERROR(iree_task_executor_options_initialize_from_flags(
       &task_executor_options_));
-  IREE_RETURN_IF_ERROR(
-      iree_task_topology_initialize_from_flags(&task_topology_options_));
+  // TODO: Do something smarter than pinning to NUMA node 0.
+  IREE_RETURN_IF_ERROR(iree_task_topology_initialize_from_flags(
+      /*node_id=*/0, &task_topology_options_));
 
   // loaders_
   IREE_RETURN_IF_ERROR(iree_hal_create_all_available_executable_loaders(

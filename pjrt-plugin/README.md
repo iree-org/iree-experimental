@@ -21,7 +21,7 @@ From a Jax checkout:
 # working on it :/
 pip install -e .
 python build/build.py \
-  --bazel_options=--override_repository=org_tensorflow=../tensorflow \
+  --bazel_options=--override_repository=org_tensorflow=$PWD/../tensorflow \
   --enable_tpu
 pip install dist/*.whl --force-reinstall
 ```
