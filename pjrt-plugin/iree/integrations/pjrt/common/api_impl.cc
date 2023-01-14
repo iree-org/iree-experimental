@@ -799,6 +799,10 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
   if (!SetDefaultCompilerFlags(job.get())) {
     return MakeCompilerError();
   }
+  if (artifact_tx) {
+    artifact_tx->WriteArtifact(
+        /*label=*/"flags", /*extension=*/"txt", /*index=*/-1, job->GetFlags());
+  }
 
   // Parse the source.
   if (!job->ParseSourceBuffer(code.data(), code.size())) {

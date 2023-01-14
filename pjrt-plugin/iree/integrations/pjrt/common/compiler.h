@@ -31,6 +31,10 @@ class CompilerJob {
   // Returns false on failure.
   virtual bool SetFlag(const char* flag) = 0;
 
+  // Gets all flags as a string. This is intended for debug printing a plausible
+  // command line to reproduce compilation.
+  virtual std::string GetFlags() = 0;
+
   // Parses the source buffer. The buffer must remain valid for the life of
   // the job. Some implementations will parse it immediately, while other
   // backends may need to defer processing it.

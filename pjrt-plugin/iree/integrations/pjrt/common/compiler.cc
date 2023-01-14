@@ -78,6 +78,21 @@ class InprocessCompilerJob : public CompilerJob {
     return true;
   }
 
+  std::string GetFlags() override {
+    std::string flags;
+    ireeCompilerSessionGetFlags(
+        session_, /*nonDefaultOnly=*/false,
+        [](const char* flag, size_t length, void* userData) {
+          std::string* capture_flags = static_cast<std::string*>(userData);
+          if (!capture_flags->empty()) {
+            capture_flags->append(" ");
+          }
+          capture_flags->append(flag, length);
+        },
+        &flags);
+    return flags;
+  }
+
   bool ParseSourceBuffer(const void* buffer, size_t length) override {
     iree_compiler_source_t* source;
     auto* error = ireeCompilerSourceWrapBuffer(
