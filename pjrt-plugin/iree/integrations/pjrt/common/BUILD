@@ -25,6 +25,7 @@ iree_pjrt_cc_library(
     ],
     deps = [
         ":compiler",
+        ":debugging",
         "@iree_core//runtime/src/iree/hal",
         "@iree_core//runtime/src/iree/modules/hal",
         "@iree_core//runtime/src/iree/vm",
@@ -44,6 +45,7 @@ iree_pjrt_cc_library(
     ],
     deps = [
         ":impl",
+        ":debugging",
         "@iree_core//compiler/src/iree/compiler/API2/Stub",
         "@iree_core//runtime/src/iree/base/internal:file_io",
         "@iree_core//runtime/src/iree/base/internal:path",
@@ -59,6 +61,17 @@ iree_pjrt_cc_library(
         "compiler.h",
     ],
     deps = [
+        ":debugging",
         "@iree_core//compiler/src/iree/compiler/API2:EmbedHeaders",
+    ],
+)
+
+iree_pjrt_cc_library(
+    name = "debugging",
+    srcs = [
+        "debugging.cc",
+    ],
+    hdrs = [
+        "debugging.h",
     ],
 )
