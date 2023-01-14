@@ -96,7 +96,8 @@ class InprocessCompilerJob : public CompilerJob {
   bool ParseSourceBuffer(const void* buffer, size_t length) override {
     iree_compiler_source_t* source;
     auto* error = ireeCompilerSourceWrapBuffer(
-        session_, "<jit>", static_cast<const char*>(buffer), length, &source);
+        session_, "<jit>", static_cast<const char*>(buffer), length,
+        /*isNullTerminated=*/false, &source);
     if (error) {
       SetError(error);
       return false;
