@@ -27,7 +27,7 @@ class CompilerJob {
  public:
   virtual ~CompilerJob() = default;
 
-  // Enables crash dumping via an ArtifactDumper transation. The transaction
+  // Enables crash dumping via an ArtifactDumper transaction. The transaction
   // must remain valid for the duration of the job.
   virtual void EnableCrashDumps(
       ArtifactDumper::Transaction* artifact_transaction) = 0;
