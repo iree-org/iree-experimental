@@ -41,6 +41,9 @@ ls -lh $IREE_PLUGIN_PATH
 
 ## Run a Jax test program.
 
+Note that the JAX plugin initialization sequence needs a patch:
+https://github.com/google/jax/pull/14011
+
 ```
 # Tells the IREE plugin where to find the compiler. Only needed for now.
 export IREE_PJRT_COMPILER_LIB_PATH=$IREE_BUILD_DIR/lib/libIREECompiler.so
@@ -51,8 +54,8 @@ export JAX_USE_PJRT_C_API_ON_TPU=1
 # Optional: path to libcuda.so
 # export LD_LIBRARY_PATH=/usr/lib/wsl/lib
 
-python test/test_cpu.py
-python test/test_cuda.py
+JAX_PLATFORMS=iree_cpu python test/test_simple.py
+JAX_PLATFORMS=iree_cuda python test/test_simple.py
 ```
 
 ## Generating runtime traces
