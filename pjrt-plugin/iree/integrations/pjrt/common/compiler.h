@@ -11,6 +11,7 @@
 #include <string>
 
 #include "iree/compiler/API2/Embed.h"
+#include "iree/integrations/pjrt/common/debugging.h"
 
 namespace iree::pjrt {
 
@@ -25,6 +26,11 @@ class CompilerOutput {
 class CompilerJob {
  public:
   virtual ~CompilerJob() = default;
+
+  // Enables crash dumping via an ArtifactDumper transation. The transaction
+  // must remain valid for the duration of the job.
+  virtual void EnableCrashDumps(
+      ArtifactDumper::Transaction* artifact_transaction) = 0;
 
   // Sets a flag on the compiler job. This should only be done during shared
   // setup of a job (or if the underlying session will not be re-used).

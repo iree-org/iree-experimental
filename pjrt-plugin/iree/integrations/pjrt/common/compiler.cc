@@ -69,6 +69,28 @@ class InprocessCompilerJob : public CompilerJob {
     return std::string(cstr);
   }
 
+  void EnableCrashDumps(
+      ArtifactDumper::Transaction* artifact_transaction) override {
+    if (crash_dump_transaction_) return;
+    crash_dump_transaction_ = artifact_transaction;
+    ireeCompilerInvocationSetCrashHandler(
+        inv_, /*genLocalReproducer=*/false,
+        [](iree_compiler_output_t** outOutput,
+           void* userData) -> iree_compiler_error_t* {
+          auto* self = static_cast<InprocessCompilerJob*>(userData);
+          auto maybePath = self->crash_dump_transaction_->AllocateArtifactPath(
+              /*label=*/"crash_reproducer", /*extension=*/"mlir",
+              /*index=*/self->crash_dump_count_++);
+          if (!maybePath) {
+            *outOutput = nullptr;
+            return nullptr;
+          }
+
+          return ireeCompilerOutputOpenFile(maybePath->c_str(), outOutput);
+        },
+        this);
+  }
+
   bool SetFlag(const char* flag) override {
     auto* error = ireeCompilerSessionSetFlags(session_, 1, &flag);
     if (error) {
@@ -155,6 +177,8 @@ class InprocessCompilerJob : public CompilerJob {
 
   std::vector<iree_compiler_source_t*> retained_sources_;
   iree_compiler_error_t* error_ = nullptr;
+  ArtifactDumper::Transaction* crash_dump_transaction_ = nullptr;
+  int crash_dump_count_ = 0;
 
   // Output.
   iree_compiler_output_t* output_ = nullptr;

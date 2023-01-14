@@ -783,6 +783,9 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
   }
 
   std::unique_ptr<CompilerJob> job = platform().compiler().StartJob();
+  if (artifact_tx) {
+    job->EnableCrashDumps(artifact_tx.get());
+  }
   auto MakeCompilerError = [&]() {
     std::string message = job->GetErrorMessage();
     return MakeError(iree_make_status(IREE_STATUS_INVALID_ARGUMENT, ": %s",
