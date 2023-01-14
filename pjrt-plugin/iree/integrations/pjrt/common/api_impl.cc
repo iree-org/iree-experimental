@@ -771,7 +771,8 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
   std::string_view format(program->format, program->format_size);
   std::string_view code(program->code, program->code_size);
   if (artifact_tx) {
-    artifact_tx->WriteArtifact("program", "mlir", -1, code);
+    artifact_tx->WriteArtifact(/*label=*/"program", /*extension=*/"mlir",
+                               /*index=*/-1, code);
   }
 
   if (format != "mlir") {
@@ -811,7 +812,7 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
   }
   if (artifact_tx) {
     artifact_tx->WriteArtifact(
-        "program", "vmfb", -1,
+        /*label=*/"program", /*extension=*/"vmfb", /*index=*/-1,
         std::string_view(static_cast<const char*>(output->GetData()),
                          output->GetDataSize()));
   }

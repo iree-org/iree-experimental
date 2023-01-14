@@ -78,18 +78,18 @@ iree_status_t DylibPlatform::SubclassInitialize() {
 
   // Initialize the artifact dumper.
   auto artifact_path_spec = config_vars().Lookup("SAVE_ARTIFACTS");
-  if (!artifact_path_spec) {
-    artifact_dumper_ = std::make_unique<ArtifactDumper>();
-    logger().debug(
-        "Artifact dumping disabled. Enable by setting the 'SAVE_ARTIFACTS' "
-        "config var ('IREE_PJRT_SAVE_ARTIFACTS' env var)");
-  } else {
+  if (artifact_path_spec) {
     // TODO: Use a config key like "SAVE_ALL" to control all artifact saving.
     artifact_dumper_ = std::make_unique<FilesArtifactDumper>(
         logger(), *artifact_path_spec, /*retain_all=*/false);
     std::string message("Dumping artifacts to: ");
     message.append(artifact_dumper_->DebugString());
     logger().debug(message);
+  } else {
+    artifact_dumper_ = std::make_unique<ArtifactDumper>();
+    logger().debug(
+        "Artifact dumping disabled. Enable by setting the 'SAVE_ARTIFACTS' "
+        "config var ('IREE_PJRT_SAVE_ARTIFACTS' env var)");
   }
 
   return iree_ok_status();

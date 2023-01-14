@@ -84,7 +84,7 @@ class ArtifactDumper {
                                std::string_view extension, int index,
                                std::string_view contents) = 0;
 
-    // Completes the transation and retains all artifacts.
+    // Completes the transaction and retains all artifacts.
     virtual void Retain() = 0;
 
     // Completes the transaction and removes all artifacts.
