@@ -762,9 +762,18 @@ iree_status_t ClientInstance::PopulateDevices() {
 
 PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
                                     ExecutableInstance** out_executable) {
+  std::unique_ptr<ArtifactDumper::Transaction> artifact_tx;
+  if (platform().artifact_dumper().enabled()) {
+    artifact_tx = platform().artifact_dumper().CreateTransaction();
+  }
+
   iree_status_t status;
   std::string_view format(program->format, program->format_size);
   std::string_view code(program->code, program->code_size);
+  if (artifact_tx) {
+    artifact_tx->WriteArtifact("program", "mlir", -1, code);
+  }
+
   if (format != "mlir") {
     // See: https://github.com/google/jax/issues/13722
     return MakeError(iree_make_status(
@@ -800,6 +809,12 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
   if (!output) {
     return MakeCompilerError();
   }
+  if (artifact_tx) {
+    artifact_tx->WriteArtifact(
+        "program", "vmfb", -1,
+        std::string_view(static_cast<const char*>(output->GetData()),
+                         output->GetDataSize()));
+  }
 
   auto executable = std::make_unique<ExecutableInstance>(
       *this, std::move(output), addressable_devices_);
@@ -809,6 +824,10 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
   }
 
   *out_executable = executable.release();
+
+  if (artifact_tx) {
+    artifact_tx->Cancel();
+  }
   return nullptr;
 }
 
