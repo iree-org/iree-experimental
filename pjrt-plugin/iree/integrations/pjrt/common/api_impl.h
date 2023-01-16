@@ -7,6 +7,7 @@
 #ifndef IREE_PJRT_PLUGIN_PJRT_COMMON_API_IMPL_H_
 #define IREE_PJRT_PLUGIN_PJRT_COMMON_API_IMPL_H_
 
+#include <atomic>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -68,8 +69,11 @@ inline PJRT_Error* MakeError(iree_status_t status) {
 
 class BufferInstance {
  public:
-  BufferInstance(DeviceInstance& device, iree_hal_buffer_view_t* buffer_view)
-      : device_(device), buffer_view_(buffer_view) {}
+  BufferInstance(DeviceInstance& device, iree_hal_buffer_view_t* buffer_view,
+                 iree::vm::ref<iree_hal_fence_t> ready_fence)
+      : device_(device),
+        buffer_view_(buffer_view),
+        ready_fence_(std::move(ready_fence)) {}
   ~BufferInstance();
   operator PJRT_Buffer*() { return reinterpret_cast<PJRT_Buffer*>(this); }
   static BufferInstance* Unwrap(PJRT_Buffer* buffer) {
@@ -94,7 +98,8 @@ class BufferInstance {
 
  private:
   DeviceInstance& device_;
-  iree::vm::ref<iree_hal_buffer_view_t> buffer_view_;  // Owned.
+  iree::vm::ref<iree_hal_buffer_view_t> buffer_view_;
+  iree::vm::ref<iree_hal_fence_t> ready_fence_;
   // Various things require XLA's idea of shapes, layouts, etc.
   // We keep one around for such cases.
   std::optional<xla::Shape> cached_shape_;
@@ -137,7 +142,16 @@ class DeviceInstance {
       EventInstance** out_done_with_host_buffer_event,
       BufferInstance** out_buffer);
 
+  // TODO(laurenzo): Eagerly set up device to allow simple access.
   iree_status_t GetHalDevice(iree_hal_device_t** out_device);
+
+  // Only valid once device opened.
+  iree_hal_semaphore_t* main_timeline() { return main_timeline_.get(); }
+
+  iree_hal_device_t* device() { return device_.get(); }
+  iree_hal_allocator_t* device_allocator() {
+    return iree_hal_device_allocator(device_.get());
+  }
 
  private:
   iree_status_t OpenDevice();
@@ -145,6 +159,7 @@ class DeviceInstance {
   ClientInstance& client_;
   iree_hal_driver_t* driver_;  // Owned by client.
   iree::vm::ref<iree_hal_device_t> device_;
+  iree::vm::ref<iree_hal_semaphore_t> main_timeline_;
   iree_hal_device_info_t* info_;
 };
 
@@ -154,8 +169,20 @@ class DeviceInstance {
 
 class EventInstance {
  public:
+  enum class Type {
+    // An event that is always signalled.
+    SIGNALLED,
+
+    // An EXTERNAL event will have an outside caller invoke
+    // ExternalSignalReady() when it is ready.
+    // Any further OnReady callback will happen within the context of that
+    // call (which can be on any thread).
+    EXTERNAL,
+  };
+
   // Default construction is always signalled.
-  EventInstance() = default;
+  EventInstance(Type type);
+  ~EventInstance();
   operator PJRT_Event*() { return reinterpret_cast<PJRT_Event*>(this); }
   static void BindApi(PJRT_Api* api);
   static EventInstance* Unwrap(PJRT_Event* exe) {
@@ -163,12 +190,18 @@ class EventInstance {
   }
 
   iree_status_t OnReady(PJRT_Event_OnReadyCallback callback, void* user_arg);
-  ErrorInstance* error() { return error_; }
-  bool is_ready() { return is_ready_; }
+  ErrorInstance* error();
+  bool is_ready();
+
+  // For EXTERNAL events: Signals that the event is ready.
+  void ExternalSignalReady(iree_status_t status);
 
  private:
-  ErrorInstance* error_ = nullptr;
-  bool is_ready_ = true;
+  std::mutex lock_;
+  Type type_;
+  iree_status_t status_ = iree_ok_status();
+  bool is_ready_;
+  std::vector<std::pair<PJRT_Event_OnReadyCallback, void*>> pending_callbacks_;
 };
 
 //===----------------------------------------------------------------------===//
@@ -286,6 +319,9 @@ struct ClientInstance {
   // Returns false on failure (and sets error information on the compiler_job).
   virtual bool SetDefaultCompilerFlags(CompilerJob* compiler_job) = 0;
 
+  // Advances the timeline, returning (current, next) time point values.
+  std::tuple<uint64_t, uint64_t> AdvanceTimeline();
+
  protected:
   iree_allocator_t host_allocator_;
   std::string cached_platform_name_;
@@ -307,6 +343,16 @@ struct ClientInstance {
 
   // VM.
   iree::vm::ref<iree_vm_instance_t> vm_instance_;
+
+  // Synchronization.
+  // We keep one global execution timeline across all devices. The management
+  // of this is currently somewhat primitive: we increment it by one for each
+  // invocation. Batch invocations (i.e. across multiple devices), only
+  // increment by one. In the future, additional parallelism could be plumbed
+  // up to the framework to allow different kinds of timeline management.
+  // Waiting on the current value of |execution_timeline_| will drain all
+  // scheduled work to date.
+  uint64_t execution_timeline_ = 0ull;
 };
 
 //===----------------------------------------------------------------------===//
