@@ -9,6 +9,7 @@
 #include <iostream>
 #include <optional>
 
+#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 
 namespace iree::pjrt {
@@ -298,7 +299,7 @@ const std::string& ErrorInstance::message() const {
   if (cached_message_.empty()) {
     std::string buffer;
     iree_host_size_t actual_len;
-    buffer.resize(128);
+    buffer.resize(256);
     if (!iree_status_format(status_, buffer.size(), buffer.data(),
                             &actual_len)) {
       buffer.resize(actual_len);
@@ -352,11 +353,13 @@ iree_status_t BufferInstance::GetXlaShape(xla::Shape** out_shape) {
 void BufferInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Buffer_Destroy =
       +[](PJRT_Buffer_Destroy_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Buffer_Destroy");
     delete BufferInstance::Unwrap(args->buffer);
     return nullptr;
   };
   api->PJRT_Buffer_OnDeviceTrimmedShape =
       +[](PJRT_Buffer_OnDeviceTrimmedShape_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Buffer_OnDeviceTrimmedShape");
     auto impl = [&]() -> iree_status_t {
       // TODO: This function is terrible and not exposed properly to C.
       // It is slated to be deleted...
@@ -382,6 +385,7 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Buffer_ToHostBuffer =
       +[](PJRT_Buffer_ToHostBuffer_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Buffer_ToHostBuffer");
     BufferInstance* buffer = BufferInstance::Unwrap(args->src);
     if (!args->dst) {
       // Size query.
@@ -395,10 +399,12 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Buffer_OnDeviceSizeInBytes =
       +[](PJRT_Buffer_OnDeviceSizeInBytes_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Buffer_OnDeviceSizeInBytes");
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                       "PJRT_Buffer_OnDeviceSizeInBytes"));
   };
   api->PJRT_Buffer_Delete = +[](PJRT_Buffer_Delete_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Buffer_Delete");
     return MakeError(
         iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_Delete"));
   };
@@ -409,6 +415,7 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Buffer_CopyToDevice =
       +[](PJRT_Buffer_CopyToDevice_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Buffer_CopyToDevice");
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                       "PJRT_Buffer_CopyToDevice"));
   };
@@ -423,6 +430,7 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Buffer_ReadyEvent =
       +[](PJRT_Buffer_ReadyEvent_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Buffer_ReadyEvent");
     return MakeError(
         iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_ReadyEvent"));
   };
@@ -439,15 +447,58 @@ iree_status_t BufferInstance::GetHostSizeInBytes(iree_host_size_t* host_size) {
 }
 
 iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
-                                         EventInstance** done_event) {
-  // TODO: Do an async transfer on a transfer queue like a grown up.
-  iree_hal_device_t* hal_device;
-  IREE_RETURN_IF_ERROR(device_.GetHalDevice(&hal_device));
-  IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
-      hal_device, iree_hal_buffer_view_buffer(buffer_view()), 0, dst, dst_size,
-      IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+                                         EventInstance** out_done_event) {
+  // Set up an event for external triggering. While a little wonky, we
+  // trigger it in the host buffer release callback, which happens once the
+  // transfer is done. I don't love this option but it seems to match what
+  // I'm looking for.
+  EventInstance* capture_done_event =
+      new EventInstance(EventInstance::Type::EXTERNAL);
+  *out_done_event = capture_done_event;
 
-  *done_event = new EventInstance();
+  // Import the destination (host) buffer as an iree_hal_buffer_t so that we
+  // can issue copy commands.
+  iree::vm::ref<iree_hal_buffer_t> dst_buffer;
+  iree_hal_buffer_params_t dst_buffer_params = {
+      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET};
+  iree_hal_external_buffer_t dst_external_buffer;
+  memset(&dst_external_buffer, 0, sizeof(dst_external_buffer));
+  dst_external_buffer.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION;
+  dst_external_buffer.flags = IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE;
+  dst_external_buffer.size = dst_size;
+  dst_external_buffer.handle.host_allocation.ptr = dst;
+  auto release_callback = +[](void* user_data, iree_hal_buffer_t* buffer) {
+    IREE_TRACE_SCOPE0("PJRT_CopyToHost_ReleaseCallback");
+    auto* local_done_event = static_cast<EventInstance*>(user_data);
+    local_done_event->ExternalSignalReady(iree_ok_status());
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_import_buffer(
+      device_.device_allocator(), dst_buffer_params, &dst_external_buffer,
+      /*release_callback=*/{release_callback, capture_done_event},
+      &dst_buffer));
+
+  // Create the transfer command buffer.
+  iree::vm::ref<iree_hal_command_buffer_t> transfer_cb;
+  iree_hal_transfer_command_t transfer_command;
+  memset(&transfer_command, 0, sizeof(transfer_command));
+  transfer_command.type = IREE_HAL_TRANSFER_COMMAND_TYPE_COPY;
+  transfer_command.copy.source_buffer =
+      iree_hal_buffer_view_buffer(buffer_view());
+  transfer_command.copy.source_offset = 0;
+  transfer_command.copy.target_buffer = dst_buffer.get();
+  transfer_command.copy.target_offset = 0;
+  transfer_command.copy.length = dst_size;
+  IREE_RETURN_IF_ERROR(iree_hal_create_transfer_command_buffer(
+      device_.device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*transfer_count=*/1, &transfer_command, &transfer_cb));
+
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
+      device_.device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*wait_semaphore_list=*/iree_hal_fence_semaphore_list(ready_fence_.get()),
+      /*signal_semaphore_list=*/iree_hal_semaphore_list_empty(),
+      /*command_buffer_count=*/1, &transfer_cb));
+
   return iree_ok_status();
 }
 
@@ -504,10 +555,13 @@ void DeviceInstance::BindApi(PJRT_Api* api) {
 
 iree_status_t DeviceInstance::OpenDevice() {
   if (device_) return iree_ok_status();
-  return iree_hal_driver_create_device_by_id(
+  IREE_RETURN_IF_ERROR(iree_hal_driver_create_device_by_id(
       driver_, /*device_id=*/info_->device_id,
       /*param_count=*/0, /*params=*/nullptr, client_.host_allocator(),
-      &device_);
+      &device_));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_create(device_.get(), 0ull, &main_timeline_));
+  return iree_ok_status();
 }
 
 iree_status_t DeviceInstance::HostBufferToDevice(
@@ -580,10 +634,11 @@ iree_status_t DeviceInstance::HostBufferToDevice(
       iree_make_const_byte_span(data, byte_length), &buffer_view));
 
   // Since we synchronously copied, return an already signalled event.
-  *out_done_with_host_buffer_event = new EventInstance();
+  *out_done_with_host_buffer_event =
+      new EventInstance(EventInstance::Type::SIGNALLED);
 
   // Construct and return a BufferInstance.
-  *out_buffer = new BufferInstance(*this, buffer_view);
+  *out_buffer = new BufferInstance(*this, buffer_view, /*ready_fence=*/nullptr);
 
   return iree_ok_status();
 }
@@ -621,6 +676,7 @@ void ClientInstance::BindApi(PJRT_Api* api) {
   // PJRT_Client_Create is polymorphic
   api->PJRT_Client_Destroy =
       +[](PJRT_Client_Destroy_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Client_Destroy");
     delete ClientInstance::Unwrap(args->client);
     return nullptr;
   };
@@ -674,6 +730,7 @@ void ClientInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Client_Compile =
       +[](PJRT_Client_Compile_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Client_Compile");
     // TODO: It is not great that we only get a client here vs a list of
     // devices to consider (or something). The issue is that systems often
     // have unrelated devices that will not actually be scheduled and those
@@ -698,6 +755,7 @@ void ClientInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Client_BufferFromHostBuffer =
       +[](PJRT_Client_BufferFromHostBuffer_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Client_BufferFromHostBuffer");
     auto status =
         DeviceInstance::Unwrap(args->device)
             ->HostBufferToDevice(
@@ -799,6 +857,9 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
   if (!job->SetFlag("--iree-input-type=mhlo")) {
     return MakeCompilerError();
   }
+  if (!job->SetFlag("--iree-execution-model=async-external")) {
+    return MakeCompilerError();
+  }
   if (!SetDefaultCompilerFlags(job.get())) {
     return MakeCompilerError();
   }
@@ -854,37 +915,117 @@ iree_status_t ClientInstance::PopulateVMModules(
   return iree_ok_status();
 }
 
+std::tuple<uint64_t, uint64_t> ClientInstance::AdvanceTimeline() {
+  uint64_t current = execution_timeline_;
+  uint64_t next = current + 1;
+  execution_timeline_ = next;
+  return std::make_tuple(current, next);
+}
+
 //===----------------------------------------------------------------------===//
 // EventInstance
 //===----------------------------------------------------------------------===//
 
+EventInstance::EventInstance(Type type) : type_(type) {
+  switch (type) {
+    case Type::SIGNALLED:
+      is_ready_ = true;
+      break;
+    case Type::EXTERNAL:
+      is_ready_ = false;
+      break;
+  }
+}
+
+EventInstance::~EventInstance() { iree_status_ignore(status_); }
+
 void EventInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Event_Destroy = +[](PJRT_Event_Destroy_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Event_Destroy");
     delete EventInstance::Unwrap(args->event);
     return nullptr;
   };
   api->PJRT_Event_IsReady = +[](PJRT_Event_IsReady_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Event_IsReady");
     args->is_ready = EventInstance::Unwrap(args->event)->is_ready();
     return nullptr;
   };
   api->PJRT_Event_Error = +[](PJRT_Event_Error_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Event_Error");
     return (PJRT_Error*)EventInstance::Unwrap(args->event)->error();
   };
   api->PJRT_Event_Await = +[](PJRT_Event_Await_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Event_Await");
     return MakeError(
         iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Event_Await"));
   };
   api->PJRT_Event_OnReady = +[](PJRT_Event_OnReady_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Event_OnReady");
     return MakeError(EventInstance::Unwrap(args->event)
                          ->OnReady(args->callback, args->user_arg));
   };
 }
 
+ErrorInstance* EventInstance::error() {
+  std::lock_guard<std::mutex> guard(lock_);
+  if (!iree_status_is_ok(status_)) return new ErrorInstance(status_);
+  return nullptr;
+}
+bool EventInstance::is_ready() {
+  std::lock_guard<std::mutex> guard(lock_);
+  return is_ready_;
+}
+
 iree_status_t EventInstance::OnReady(PJRT_Event_OnReadyCallback callback,
                                      void* user_arg) {
-  // TODO: Detect if not ready.
-  callback((PJRT_Error*)error_, user_arg);
+  iree_status_t local_status;
+  {
+    std::lock_guard<std::mutex> guard(lock_);
+    if (!is_ready_) {
+      pending_callbacks_.push_back({callback, user_arg});
+      return iree_ok_status();
+    }
+    local_status = status_;
+  }
+
+  // Already signalled. Callback out of lock scope.
+  // Note that the callback may destroy the event - so must only operate on
+  // locals.
+  callback(
+      iree_status_is_ok(local_status)
+          ? nullptr
+          : (PJRT_Error*)new ErrorInstance(iree_status_clone(local_status)),
+      user_arg);
   return iree_ok_status();
+}
+
+void EventInstance::ExternalSignalReady(iree_status_t status) {
+  IREE_TRACE_SCOPE();
+  assert(type_ == Type::EXTERNAL && "expected EXTERNAL Event type");
+  iree_status_t local_status;
+  std::vector<std::pair<PJRT_Event_OnReadyCallback, void*>> local_callbacks;
+  {
+    std::lock_guard<std::mutex> guard(lock_);
+    if (is_ready_) {
+      return;
+    }
+    local_callbacks.swap(pending_callbacks_);
+    is_ready_ = true;
+    status_ = status;
+    local_status = status_;
+  }
+
+  // Trigger callbacks outside of the lock.
+  // Note that the callback may destroy the event - so must only operate on
+  // locals.
+  for (auto& cb : local_callbacks) {
+    IREE_TRACE_SCOPE0("PJRT_User_Callback_Invoke");
+    cb.first(
+        iree_status_is_ok(local_status)
+            ? nullptr
+            : (PJRT_Error*)new ErrorInstance(iree_status_clone(local_status)),
+        cb.second);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -894,6 +1035,7 @@ iree_status_t EventInstance::OnReady(PJRT_Event_OnReadyCallback callback,
 void ExecutableInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Executable_Destroy =
       +[](PJRT_Executable_Destroy_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Executable_Destroy");
     delete ExecutableInstance::Unwrap(args->executable);
     return nullptr;
   };
@@ -930,11 +1072,13 @@ void ExecutableInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Executable_Execute =
       +[](PJRT_Executable_Execute_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Executable_Execute");
     return MakeError(
         ExecutableInstance::Unwrap(args->executable)->BatchExecute(args));
   };
   api->PJRT_Executable_NumOutputs =
       +[](PJRT_Executable_NumOutputs_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Executable_NumOutputs");
     auto* exec = ExecutableInstance::Unwrap(args->executable);
     iree_host_size_t arg_count;
     iree_host_size_t result_count;
@@ -967,6 +1111,7 @@ void ExecutableInstance::BindApi(PJRT_Api* api) {
 }
 
 iree_status_t ExecutableInstance::LoadAll() {
+  IREE_TRACE_SCOPE();
   if (!loaded_executables_.empty()) return iree_ok_status();
 
   std::vector<LoadedExecutable> new_list;
@@ -1052,6 +1197,9 @@ iree_status_t ExecutableInstance::BatchExecute(
   // Make sure loaded.
   IREE_RETURN_IF_ERROR(LoadAll());
 
+  // Timeline setup.
+  auto [wait_timepoint, signal_timepoint] = client_.AdvanceTimeline();
+
   // Initialize invocations.
   auto allocator = client_.host_allocator();
   auto& loaded_execs = loaded_executables_;
@@ -1059,6 +1207,7 @@ iree_status_t ExecutableInstance::BatchExecute(
     LoadedExecutable* dev_exe;
     iree::vm::ref<iree_vm_list_t> inputs;
     iree::vm::ref<iree_vm_list_t> outputs;
+    iree::vm::ref<iree_hal_fence_t> signal_fence;
   };
   std::vector<Invocation> invs;
   invs.resize(args->num_devices);
@@ -1079,6 +1228,26 @@ iree_status_t ExecutableInstance::BatchExecute(
       IREE_RETURN_IF_ERROR(
           iree_vm_list_push_ref_move(inv.inputs.get(), &bv_ref));
     }
+
+    // Add (wait, signal) fences as required by the async-external execution
+    // model.
+    // This is currently doing very simplistic in-execution-order scheduling.
+    // Alternatives would be to compute the wait timepoint based on some
+    // combination of max timepoints of input buffers, but this would put us
+    // in the position of defining scheduling semantics that need to be
+    // carefully specified (i.e. in multi device or memory constrained cases).
+    iree::vm::ref<iree_hal_fence_t> wait_fence;
+    iree_hal_semaphore_t* semaphore =
+        inv.dev_exe->device_instance->main_timeline();
+    IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(
+        semaphore, wait_timepoint, client_.host_allocator(), &wait_fence));
+    IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(semaphore, signal_timepoint,
+                                                  client_.host_allocator(),
+                                                  &inv.signal_fence));
+
+    // TODO: Is this the right way to move into the list?
+    iree_vm_list_push_ref_move(inv.inputs.get(), wait_fence);
+    iree_vm_list_push_ref_retain(inv.inputs.get(), inv.signal_fence);
   }
 
   // Issue invocations.
@@ -1108,11 +1277,15 @@ iree_status_t ExecutableInstance::BatchExecute(
       IREE_ASSERT_ARGUMENT(ret_buffer_view);
       iree_hal_buffer_view_retain(ret_buffer_view);
       args->output_lists[dev_index][i] =
-          *(new BufferInstance(*inv.dev_exe->device_instance, ret_buffer_view));
+          *(new BufferInstance(*inv.dev_exe->device_instance, ret_buffer_view,
+                               /*ready_fence=*/inv.signal_fence));
     }
 
     if (args->device_complete_events) {
-      args->device_complete_events[dev_index] = *(new EventInstance());
+      // TODO: Plumb through signal fence. This doesn't seem to be used in
+      // the simple cases I've seen so far.
+      args->device_complete_events[dev_index] =
+          *(new EventInstance(EventInstance::Type::SIGNALLED));
     }
   }
 
