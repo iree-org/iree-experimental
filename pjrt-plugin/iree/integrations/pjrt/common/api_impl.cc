@@ -12,6 +12,8 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 
+using iree::vm::retain_ref;
+
 namespace iree::pjrt {
 
 // Chopped down utilities from various TPU support libraries. Basically all for
@@ -299,7 +301,7 @@ const std::string& ErrorInstance::message() const {
   if (cached_message_.empty()) {
     std::string buffer;
     iree_host_size_t actual_len;
-    buffer.resize(256);
+    buffer.resize(1024);  // TODO: Actually reallocate to full size on trunc.
     if (!iree_status_format(status_, buffer.size(), buffer.data(),
                             &actual_len)) {
       buffer.resize(actual_len);
@@ -350,12 +352,21 @@ iree_status_t BufferInstance::GetXlaShape(xla::Shape** out_shape) {
   return iree_ok_status();
 }
 
+BufferInstance::BufferInstance(
+    DeviceInstance& device, iree::vm::ref<iree_hal_buffer_view_t> buffer_view)
+    : device_(device), buffer_view_(std::move(buffer_view)) {
+  IREE_CHECK_OK(device.CreateFence(&ready_fence_));
+  IREE_CHECK_OK(device.CreateFence(&done_fence_));
+}
+
 void BufferInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Buffer_Destroy =
       +[](PJRT_Buffer_Destroy_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE0("PJRT_Buffer_Destroy");
+    iree_status_t status =
+        BufferInstance::Unwrap(args->buffer)->AsyncDeallocate();
     delete BufferInstance::Unwrap(args->buffer);
-    return nullptr;
+    return MakeError(status);
   };
   api->PJRT_Buffer_OnDeviceTrimmedShape =
       +[](PJRT_Buffer_OnDeviceTrimmedShape_Args* args) -> PJRT_Error* {
@@ -446,6 +457,16 @@ iree_status_t BufferInstance::GetHostSizeInBytes(iree_host_size_t* host_size) {
   return iree_ok_status();
 }
 
+iree_status_t BufferInstance::AsyncDeallocate() {
+  IREE_TRACE_SCOPE();
+  return iree_hal_device_queue_dealloca(
+      device().device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*wait_semaphore_list=*/iree_hal_fence_semaphore_list(done_fence()),
+      /*signal_semaphore_list=*/iree_hal_semaphore_list_empty(),
+      iree_hal_buffer_view_buffer(buffer_view_.get()));
+  return iree_ok_status();
+}
+
 iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
                                          EventInstance** out_done_event) {
   // Set up an event for external triggering. While a little wonky, we
@@ -492,6 +513,7 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
       device_.device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_QUEUE_AFFINITY_ANY,
       /*transfer_count=*/1, &transfer_command, &transfer_cb));
+  dst_buffer.reset();
 
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
       device_.device(), IREE_HAL_QUEUE_AFFINITY_ANY,
@@ -500,6 +522,16 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
       /*command_buffer_count=*/1, &transfer_cb));
 
   return iree_ok_status();
+}
+
+iree_status_t BufferInstance::AdvanceReadyFence(iree_hal_semaphore_t* semaphore,
+                                                uint64_t timepoint) {
+  return iree_hal_fence_insert(ready_fence_.get(), semaphore, timepoint);
+}
+
+iree_status_t BufferInstance::AdvanceDoneFence(iree_hal_semaphore_t* semaphore,
+                                               uint64_t timepoint) {
+  return iree_hal_fence_insert(done_fence_.get(), semaphore, timepoint);
 }
 
 //===----------------------------------------------------------------------===//
@@ -553,6 +585,11 @@ void DeviceInstance::BindApi(PJRT_Api* api) {
   };
 }
 
+iree_status_t DeviceInstance::CreateFence(iree_hal_fence_t** out_fence) {
+  return iree_hal_fence_create(/*capacity=*/2, client_.host_allocator(),
+                               out_fence);
+}
+
 iree_status_t DeviceInstance::OpenDevice() {
   if (device_) return iree_ok_status();
   IREE_RETURN_IF_ERROR(iree_hal_driver_create_device_by_id(
@@ -560,7 +597,12 @@ iree_status_t DeviceInstance::OpenDevice() {
       /*param_count=*/0, /*params=*/nullptr, client_.host_allocator(),
       &device_));
   IREE_RETURN_IF_ERROR(
-      iree_hal_semaphore_create(device_.get(), 0ull, &main_timeline_));
+      iree_hal_semaphore_create(device(), 0ull, &main_timeline_));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_create(device(), 0ull, &transfer_timeline_));
+  // IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(transfer_timeline_.get(), 0,
+  //                                               client_.host_allocator(),
+  //                                               &transfer_now_fence_));
   return iree_ok_status();
 }
 
@@ -619,27 +661,113 @@ iree_status_t DeviceInstance::HostBufferToDevice(
     byte_length *= dims[i];
   }
 
-  // TODO: Don't do synchronous h2d transfer. Instead issue a command against
-  // the transfer queue like a grown-up. Also pay attention to zero copy flags
-  // and such. Plenty to make efficient here.
+  iree::vm::ref<iree_hal_buffer_t> buffer;
+  // There are multiple ways to implement zero-copy/staged transfers and each
+  // implementation will have different performance cliffs associated with
+  // directly operating on imported host buffers. In many actual
+  // host/device situations, such unified memory is a productivity (not a
+  // performance) feature and best avoided. As such, we always need to be
+  // able to decide to do a staged transfer and implement that here. Using
+  // an imported buffer on the device is left as an optimization for
+  // implementations on which we believe it will be beneficial.
+  bool require_snapshot_now = host_buffer_semantics ==
+                              PJRT_HostBufferSemantics_kImmutableOnlyDuringCall;
+  bool caller_data_done = false;
+  iree::vm::ref<iree_hal_buffer_t> host_staging_buffer;
+  IREE_RETURN_IF_ERROR(AcquireHostStagingBuffer(
+      iree_make_const_byte_span(data, byte_length), require_snapshot_now,
+      &caller_data_done, &host_staging_buffer));
+  if (!caller_data_done) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Deferred snapshot of host data not yet implemented");
+  }
+
+  // Allocate on stream. We serialize across 3 timepoints:
+  //   0. Last transfer complete
+  //   1. Allocation
+  //   2. This transfer complete
+  // There are various ways to be smarter about this but without more
+  // information from the caller, this is ok. If we wanted to favor smaller
+  // allocation scopes, it may be desirable to join with the main execution
+  // timeline, but that would obviously serialize more.
+  uint64_t wait_transfer_start = last_transfer_timepoint_;
+  uint64_t signal_alloca_complete = ++last_transfer_timepoint_;
+  uint64_t signal_copy_complete = ++last_transfer_timepoint_;
   iree_hal_buffer_params_t params;
   memset(&params, 0, sizeof(params));
   params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
-  params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
+  params.usage =
+      IREE_HAL_BUFFER_USAGE_DEFAULT | IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET;
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_alloca(
+      device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*wait_semaphore_list=*/
+      {1, &transfer_timeline_, &wait_transfer_start},
+      /*signal_semaphore_list=*/
+      {1, &transfer_timeline_, &signal_alloca_complete},
+      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, byte_length, &buffer));
 
-  iree_hal_buffer_view_t* buffer_view = nullptr;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
-      iree_hal_device_allocator(device_.get()), num_dims, &shape[0],
-      element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
-      iree_make_const_byte_span(data, byte_length), &buffer_view));
+  // Queue up the transfer command.
+  iree::vm::ref<iree_hal_command_buffer_t> transfer_cb;
+  iree_hal_transfer_command_t transfer_command;
+  memset(&transfer_command, 0, sizeof(transfer_command));
+  transfer_command.type = IREE_HAL_TRANSFER_COMMAND_TYPE_COPY;
+  transfer_command.copy.source_buffer = host_staging_buffer.get(),
+  transfer_command.copy.source_offset = 0;
+  transfer_command.copy.target_buffer = buffer.get();
+  transfer_command.copy.target_offset = 0;
+  transfer_command.copy.length = byte_length;
+  IREE_RETURN_IF_ERROR(iree_hal_create_transfer_command_buffer(
+      device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*transfer_count=*/1, &transfer_command, &transfer_cb));
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
+      device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*wait_semaphore_list=*/
+      {1, &transfer_timeline_, &signal_alloca_complete},
+      /*signal_semaphore_list=*/
+      {1, &transfer_timeline_, &signal_copy_complete},
+      /*command_buffer_count=*/1, &transfer_cb));
 
-  // Since we synchronously copied, return an already signalled event.
+  // Wrap in a buffer view and return.
+  iree::vm::ref<iree_hal_buffer_view_t> result_buffer_view;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
+      buffer.get(), num_dims, &shape[0], element_type,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, client_.host_allocator(),
+      &result_buffer_view));
+
+  *out_buffer = new BufferInstance(*this, std::move(result_buffer_view));
+  (*out_buffer)
+      ->AdvanceReadyFence(transfer_timeline_.get(), signal_copy_complete);
+  (*out_buffer)
+      ->AdvanceDoneFence(transfer_timeline_.get(), signal_copy_complete);
+
+  // We snapshotted the caller data when acquiring the host staging buffer,
+  // so we won't be touching it again.
   *out_done_with_host_buffer_event =
       new EventInstance(EventInstance::Type::SIGNALLED);
 
-  // Construct and return a BufferInstance.
-  *out_buffer = new BufferInstance(*this, buffer_view, /*ready_fence=*/nullptr);
+  return iree_ok_status();
+}
 
+iree_status_t DeviceInstance::AcquireHostStagingBuffer(
+    iree_const_byte_span_t initial_contents, bool snapshot_initial_contents_now,
+    bool* initial_contents_snapshotted, iree_hal_buffer_t** out_buffer) {
+  IREE_TRACE_SCOPE();
+  // There are multiple ways to do this that have different cost/benefits.
+  // Here we do the simplest thing and snapshot into a new host allocation.
+  // This could be replaced with either some form of staging ring buffer
+  // or importing from a raw pointer (on implementations where the cost of
+  // unified addressing is zero).
+  iree_hal_buffer_params_t params;
+  memset(&params, 0, sizeof(params));
+  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+      device_allocator(), params, initial_contents.data_length,
+      initial_contents, out_buffer));
+  // We did a synchronous snapshot (memcpy).
+  *initial_contents_snapshotted = true;
   return iree_ok_status();
 }
 
@@ -1197,7 +1325,9 @@ iree_status_t ExecutableInstance::BatchExecute(
   // Make sure loaded.
   IREE_RETURN_IF_ERROR(LoadAll());
 
-  // Timeline setup.
+  // Timeline setup. There are two timelines that we synchronize to:
+  // the main execution timeline, which preserves as-called ordering to
+  // execution, and the transfer timeline of each device.
   auto [wait_timepoint, signal_timepoint] = client_.AdvanceTimeline();
 
   // Initialize invocations.
@@ -1207,6 +1337,7 @@ iree_status_t ExecutableInstance::BatchExecute(
     LoadedExecutable* dev_exe;
     iree::vm::ref<iree_vm_list_t> inputs;
     iree::vm::ref<iree_vm_list_t> outputs;
+    iree::vm::ref<iree_hal_fence_t> wait_fence;
     iree::vm::ref<iree_hal_fence_t> signal_fence;
   };
   std::vector<Invocation> invs;
@@ -1214,6 +1345,26 @@ iree_status_t ExecutableInstance::BatchExecute(
   for (size_t dev_index = 0; dev_index < args->num_devices; ++dev_index) {
     auto& inv = invs[dev_index];
     inv.dev_exe = &loaded_execs[dev_index];
+
+    // Wait fence initial value.
+    // We allocate it to be able to hold two semaphores (main timeline and
+    // transfer timeline) and initialize it with the global invocation order
+    // of the main timeline. As we process inputs, we will also insert their
+    // transfer ready semaphore value so that execution can only begin once
+    // all dependencies are ready. This at most represents two unique
+    // semaphores.
+    IREE_RETURN_IF_ERROR(
+        inv.dev_exe->device_instance->CreateFence(&inv.wait_fence));
+    IREE_RETURN_IF_ERROR(iree_hal_fence_insert(
+        inv.wait_fence.get(), inv.dev_exe->device_instance->main_timeline(),
+        wait_timepoint));
+
+    // Signal fence. This signals the next tick on the main execution
+    // timeline.
+    IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(
+        inv.dev_exe->device_instance->main_timeline(), signal_timepoint,
+        client_.host_allocator(), &inv.signal_fence));
+
     IREE_RETURN_IF_ERROR(iree_vm_list_create(
         /*element_type=*/nullptr, args->num_args, allocator, &inv.inputs));
     IREE_RETURN_IF_ERROR(iree_vm_list_create(
@@ -1227,26 +1378,19 @@ iree_status_t ExecutableInstance::BatchExecute(
           iree_hal_buffer_view_retain_ref(buffer->buffer_view());
       IREE_RETURN_IF_ERROR(
           iree_vm_list_push_ref_move(inv.inputs.get(), &bv_ref));
+
+      // Extend the execute wait to include the input's ready signal.
+      IREE_RETURN_IF_ERROR(
+          iree_hal_fence_extend(inv.wait_fence.get(), buffer->ready_fence()));
+
+      // And extend the buffer's done fence to close over this execution.
+      buffer->AdvanceDoneFence(inv.dev_exe->device_instance->main_timeline(),
+                               signal_timepoint);
     }
 
     // Add (wait, signal) fences as required by the async-external execution
     // model.
-    // This is currently doing very simplistic in-execution-order scheduling.
-    // Alternatives would be to compute the wait timepoint based on some
-    // combination of max timepoints of input buffers, but this would put us
-    // in the position of defining scheduling semantics that need to be
-    // carefully specified (i.e. in multi device or memory constrained cases).
-    iree::vm::ref<iree_hal_fence_t> wait_fence;
-    iree_hal_semaphore_t* semaphore =
-        inv.dev_exe->device_instance->main_timeline();
-    IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(
-        semaphore, wait_timepoint, client_.host_allocator(), &wait_fence));
-    IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(semaphore, signal_timepoint,
-                                                  client_.host_allocator(),
-                                                  &inv.signal_fence));
-
-    // TODO: Is this the right way to move into the list?
-    iree_vm_list_push_ref_move(inv.inputs.get(), wait_fence);
+    iree_vm_list_push_ref_retain(inv.inputs.get(), inv.wait_fence);
     iree_vm_list_push_ref_retain(inv.inputs.get(), inv.signal_fence);
   }
 
@@ -1270,15 +1414,18 @@ iree_status_t ExecutableInstance::BatchExecute(
   for (size_t dev_index = 0; dev_index < args->num_devices; ++dev_index) {
     auto& inv = invs[dev_index];
     for (size_t i = 0; i < inv.dev_exe->result_count; ++i) {
-      iree_hal_buffer_view_t* ret_buffer_view =
-          (iree_hal_buffer_view_t*)iree_vm_list_get_ref_deref(
-              inv.outputs.get(), i, iree_hal_buffer_view_get_descriptor());
+      iree::vm::ref<iree_hal_buffer_view_t> ret_buffer_view =
+          retain_ref((iree_hal_buffer_view_t*)iree_vm_list_get_ref_deref(
+              inv.outputs.get(), i, iree_hal_buffer_view_get_descriptor()));
       // This should not be possible so just hard-assert.
       IREE_ASSERT_ARGUMENT(ret_buffer_view);
-      iree_hal_buffer_view_retain(ret_buffer_view);
-      args->output_lists[dev_index][i] =
-          *(new BufferInstance(*inv.dev_exe->device_instance, ret_buffer_view,
-                               /*ready_fence=*/inv.signal_fence));
+      auto result_buffer = std::make_unique<BufferInstance>(
+          *inv.dev_exe->device_instance, std::move(ret_buffer_view));
+      IREE_RETURN_IF_ERROR(result_buffer->AdvanceReadyFence(
+          inv.dev_exe->device_instance->main_timeline(), signal_timepoint));
+      IREE_RETURN_IF_ERROR(result_buffer->AdvanceDoneFence(
+          inv.dev_exe->device_instance->main_timeline(), signal_timepoint));
+      args->output_lists[dev_index][i] = *(result_buffer.release());
     }
 
     if (args->device_complete_events) {
