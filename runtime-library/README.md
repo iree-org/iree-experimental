@@ -46,3 +46,27 @@ cmake -GNinja -Bbuild .
 cmake --build build
 ./build/bin/ireert_test
 ```
+
+## Build for iOS
+
+Follow [this step](https://iree-org.github.io/iree/building-from-source/ios/#build-the-iree-compiler-for-the-host) to build the IREE compiler for macOS.
+Let's say the CMake build directory is `$HOME/w/iree/build`. To configure and build this project for the iOS Simulator, we could use the following commands.
+
+```
+cmake -S . -B build-ios-sim -GNinja \
+  -DCMAKE_SYSTEM_NAME=iOS \
+  -DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphonesimulator Path) \
+  -DCMAKE_OSX_ARCHITECTURES=arm64 \
+  -DCMAKE_SYSTEM_PROCESSOR=arm64 \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+  -DCMAKE_IOS_INSTALL_COMBINED=YES \
+  -DIREE_HOST_BIN_DIR="$HOME/w/iree-build/install/bin" \
+  -DCMAKE_INSTALL_PREFIX=../build-ios-sim/install \
+  -DIREE_BUILD_COMPILER=OFF
+  
+cmake --build build
+```
+
+This will give us the test binary `build-ios-sim/bin/ireert_test.app` and the IREE runtime library `build-ios-sim/lib/libireert.a`.
+
+To configure and build for iOS devices, we can change `-DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphonesimulator Path)` into `-DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphoneos Path)`.
