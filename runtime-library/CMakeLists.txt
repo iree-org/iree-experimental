@@ -24,13 +24,16 @@ endif()
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT _ireert_lto_supported OUTPUT error)
-if(IREERT_ENABLE_LTO)
-  if(_ireert_lto_supported)
-    message(STATUS "Enabling LTO")
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-  else()
-    message(WARNING "LTO not supported by toolchain bit requested (ignored)")
-  endif()
+if(NOT _ireert_lto_supported)
+  message(WARNING "LTO not supported by toolchain bit requested (ignored)")
+endif()
+if(IREERT_ENABLE_LTO AND _ireert_lto_supported AND NOT APPLE)
+  # Enabling LTO on macOS/iOS is fine to build frameworks. But when we merge
+  # them into an XCframework using the command
+  # xcodebuild -create-xcframework -framework build-ios-sim/ireert.framework ...
+  # it will complain "unable to find any architecture information in the binary".
+  message(STATUS "Enabling LTO")
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 endif()
 
 # Optionally enabled shared library build mode. This is only supported for
