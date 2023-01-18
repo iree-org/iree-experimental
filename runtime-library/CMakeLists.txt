@@ -19,7 +19,7 @@ if(APPLE)
   # xcodebuild -create-xcframework -framework build-ios-sim/ireert.framework ...
   # it will complain "unable to find any architecture information in the binary",
   # even though lipo -info could recognize the architecture of each framework.
-  set(_ireert_lto_supported FALSE)
+  set(IREERT_ENABLE_LTO OFF)
 endif()
 
 include(CheckIPOSupported)
