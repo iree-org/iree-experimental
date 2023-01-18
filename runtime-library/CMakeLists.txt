@@ -53,12 +53,48 @@ add_subdirectory("${IREE_ROOT_DIR}" "iree_core" EXCLUDE_FROM_ALL)
 set(_RUNTIME_ROOT_TARGET "iree::runtime::impl")
 set(_RUNTIME_OBJECTS "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RUNTIME_ROOT_TARGET},INTERFACE_IREE_TRANSITIVE_OBJECTS>>>")
 set(_RUNTIME_LIBS "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RUNTIME_ROOT_TARGET},INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS>>>")
- # For debugging, write out objects and deps to files.
+# For debugging, write out objects and deps to files.
 file(GENERATE OUTPUT "lib/ireert.objects.txt" CONTENT "${_RUNTIME_OBJECTS}\n")
 file(GENERATE OUTPUT "lib/ireert.libs.txt" CONTENT "${_RUNTIME_LIBS}\n")
 
+# List all of the headers so that we can add them when we call add
+# library. This has to be done so that these headers files can be
+# added to the macOS/iOS
+# framework. c.f. https://gitlab.kitware.com/cmake/cmake/-/issues/16739#note_641049
+#
+# It doesn't work if we add these headers later using target_sources.
+#
+# Even though these headers are listed in add_library, that is not yet
+# enough to add them to the framework. We need to add them to
+#
+#   set_target_property(ireert PROPERTIES PUBLIC_HEADER header_files)
+#
+# for that to happen. Unfortunately, CMake would flatten the directory
+# structure of the header files and put all header files in the
+# framework's "Headers/" directory. In the case of IREE runtime, we
+# will have two debugging.h files in the same directory, so it doesn't
+# work.
+#
+# We could also call
+#
+#  set_source_files_properties(
+#     a_header PROPERTIES MACOSX_PACKAGE_LOCATION Headers/where_it_goes)
+#
+# for each header file, which is what we will do later in this
+# file. Note that this method doesn't work with PUBLIC_HEADER, so we
+# can't use both of them at the same
+# time. c.f. https://gitlab.kitware.com/cmake/cmake/-/issues/16739#note_641095
+set(_RUNTIME_HEADER_SOURCE_DIR "${IREE_ROOT_DIR}/runtime/src")
+file(GLOB_RECURSE
+  _RUNTIME_SRC_HEADERS_FULLPATH
+  "${_RUNTIME_HEADER_SOURCE_DIR}/*.h")
+
+
 # Build the library (shared or static).
-add_library(ireert ${_RUNTIME_OBJECTS})
+add_library(ireert
+  ${_RUNTIME_OBJECTS}
+  ${_RUNTIME_SRC_HEADERS_FULLPATH}
+)
 target_include_directories(ireert INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/include")
 target_link_libraries(ireert PUBLIC ${_RUNTIME_LIBS})
 set_target_properties(ireert PROPERTIES
@@ -80,6 +116,26 @@ if(BUILD_SHARED_LIBS)
       $<$<PLATFORM_ID:Darwin>:-Wl,-undefined,error>
     )
   endif()
+endif()
+
+
+if(APPLE)
+  set_target_properties(ireert PROPERTIES
+    FRAMEWORK TRUE
+    FRAMEWORK_VERSION A
+    MACOSX_FRAMEWORK_IDENTIFIER dev.iree.ireert
+    VERSION 16.4.0
+    SOVERSION 1.0.0
+    XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED OFF
+    PUBLIC_HEADER "${_RUNTIME_SRC_HEADERS_FULL_PATH}"
+  )
+
+  foreach(_RUNTIME_HEADER ${_RUNTIME_SRC_HEADERS_FULLPATH})
+    string(REPLACE ${_RUNTIME_HEADER_SOURCE_DIR}/ "" _RUNTIME_HEADER_RELPATH ${_RUNTIME_HEADER})
+    get_filename_component(_REL_DIR "${_RUNTIME_HEADER_RELPATH}" DIRECTORY)
+    set_source_files_properties(
+      ${_RUNTIME_HEADER} PROPERTIES MACOSX_PACKAGE_LOCATION Headers/${_REL_DIR})
+  endforeach()
 endif()
 
 #-------------------------------------------------------------------------------
