@@ -17,7 +17,7 @@ for users to produce one.
 This sample illustrates both modes of use. It may eventually be included in
 the IREE repository proper as a standalone project.
 
-## Options:
+## Options
 
 * `-DIREE_ROOT_DIR=<path>` : Override the path to the main IREE repo. Defaults
   to assuming that `iree` is checked out adjacent to `iree-samples`.
@@ -30,7 +30,7 @@ the IREE repository proper as a standalone project.
   the optimizations stop at the exported symbol boundary. As of early 2023,
   this has the side effect of reducing the binary size by ~16%.
 
-## Using in external builds.
+## Using in external builds
 
 When built, `lib/` and `include/` directories will be populated. It should
 be possible to use these with no further manipulation. While using the main
@@ -46,6 +46,10 @@ cmake -GNinja -Bbuild .
 cmake --build build
 ./build/bin/ireert_test
 ```
+
+If we run the above commands on macOS, we will get
+`build/lib/ireert.framework`, which includes the static library and
+header files.
 
 ## Build for iOS
 
@@ -64,9 +68,9 @@ cmake -S . -B build-ios-sim -GNinja \
   -DCMAKE_INSTALL_PREFIX=../build-ios-sim/install \
   -DIREE_BUILD_COMPILER=OFF
   
-cmake --build build
+cmake --build build-ios-sim
 ```
 
-This will give us the test binary `build-ios-sim/bin/ireert_test.app` and the IREE runtime library `build-ios-sim/lib/libireert.a`.
+This will give us the app bundle `build-ios-sim/bin/ireert_test.app` and the IREE runtime framework `build-ios-sim/lib/ireert.framework`.
 
 To configure and build for iOS devices, we can change `-DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphonesimulator Path)` into `-DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphoneos Path)`.
