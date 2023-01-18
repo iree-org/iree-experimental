@@ -74,15 +74,3 @@ cmake --build build-ios-sim
 This will give us the app bundle `build-ios-sim/bin/ireert_test.app` and the IREE runtime framework `build-ios-sim/lib/ireert.framework`.
 
 To configure and build for iOS devices, we can change `-DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphonesimulator Path)` into `-DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphoneos Path)`.
-
-## Build Apple XCFramework
-
-An [XCFramework
-bundle](https://developer.apple.com/documentation/xcode/creating-a-multi-platform-binary-framework-bundle)
-is a binary package created by Xcode that includes the frameworks and
-libraries necessary to build for multiple platforms (iOS, macOS, tvOS,
-and watchOS), including Simulator builds.  Run the following command to build the `ireert.xcframework`.
-
-```
-./create_xcframework.sh
-```
