@@ -290,10 +290,10 @@ function benchmark-transform-create() {
   sed -i "s/\${SZ3}/$(test ${SIZES[2]} && echo ${SIZES[2]} || echo 0 )/g" ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
   sed -i "s/\${SZ4}/$(test ${SIZES[3]} && echo ${SIZES[3]} || echo 0 )/g" ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
   
-  # echo mlir-opt ${TRANSFORM_DIALECT_TMP_SOURCE_FILE} -symbol-dce > ${TRANSFORM_DIALECT_SOURCE_FILE}
+  # echo mlir-opt ${TRANSFORM_DIALECT_TMP_SOURCE_FILE} -symbol-dce \> ${TRANSFORM_DIALECT_SOURCE_FILE}
   mlir-opt ${TRANSFORM_DIALECT_TMP_SOURCE_FILE} -symbol-dce > ${TRANSFORM_DIALECT_SOURCE_FILE}
 
-  echo DUMP_TRANSFORM_REPRO=1 iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading
+  # echo DUMP_TRANSFORM_REPRO=1 iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading
   TRANSFORM_DIALECT_TRANSFORM_FILE=$(DUMP_TRANSFORM_REPRO=1 iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null | grep iree-opt | awk '{print $4}')
   
   if [[ ${TRANSFORM_DIALECT_TRANSFORM_FILE} =~ "tmp" ]] ; then
@@ -301,6 +301,7 @@ function benchmark-transform-create() {
   else
     echo "Could not create TRANSFORM_DIALECT_TRANSFORM_FILE (match failure or compile failure)?"
     echo Try inspecting: ${TRANSFORM_DIALECT_TMP_SOURCE_FILE}
+    echo Try recreating with: mlir-opt ${TRANSFORM_DIALECT_TMP_SOURCE_FILE} -symbol-dce \> ${TRANSFORM_DIALECT_SOURCE_FILE}
     echo Try running:   DUMP_TRANSFORM_REPRO=1 iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading
     return 1
   fi
@@ -574,11 +575,13 @@ function test-benchmark-transform-create() {
 
   STUB_FILENAME=$1
   benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_2d_static f16 2 3 && \
-  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_2d_elementwise_static f32 2 3 && \
-  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_3d_elementwise_static f16 2 3 4 && \
-  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_2d_dynamic f32 2 3 && \
-  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_2d_elementwise_dynamic f64 2 3
-
+  # Fail to match atm for some reason..
+  # benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_2d_leading_elementwise_static f32 2 3 && \
+  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_2d_trailing_elementwise_static f32 2 3 && \
   # TODO: the vanilla 3-d case is collapsed by IREE and we fail to match it.
-  # benchmark-transform-create -r -b cuda ${STUB_FILENAME} reduction_3d_static 2 3 4
+  # benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_3d_static f16 2 3 4 && \
+  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_3d_trailing_elementwise_static f16 2 3 4 && \
+  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_2d_dynamic f32 2 3 && \
+  benchmark-transform-create -r -b ${BACKEND} ${STUB_FILENAME} reduction_2d_trailing_elementwise_dynamic f64 2 3
+
 }

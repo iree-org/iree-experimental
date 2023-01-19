@@ -37,7 +37,38 @@ func.func private @reduction_2d_static(%input : !in_tensor_reduction_2d_static_t
   return %tmp_reduced : !out_tensor_reduction_2d_static_t
 }
 
-func.func private @reduction_2d_elementwise_static(%input : !in_tensor_reduction_2d_static_t) 
+func.func private @reduction_2d_leading_elementwise_static(%input : !in_tensor_reduction_2d_static_t,
+                                                           %input_to_broadcast: !out_tensor_reduction_2d_static_t)
+    -> (!out_tensor_reduction_2d_static_t) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant ${ZERO} : ${ELEMENTAL_TYPE}
+
+  %result_empty = tensor.empty() : !in_tensor_reduction_2d_static_t
+  %leading = linalg.generic #trait_broadcast_elementwise_2d
+    ins(%input, %input_to_broadcast : !in_tensor_reduction_2d_static_t, !out_tensor_reduction_2d_static_t)
+   outs(%result_empty : !in_tensor_reduction_2d_static_t) {
+      ^bb0(%a: ${ELEMENTAL_TYPE}, %b: ${ELEMENTAL_TYPE}, %c: ${ELEMENTAL_TYPE}):
+        %tmp_filled2 = ${DIV_OP} %a, %b : ${ELEMENTAL_TYPE}
+        linalg.yield %tmp_filled2 : ${ELEMENTAL_TYPE}
+      } -> !in_tensor_reduction_2d_static_t
+      
+  %tmp_empty = tensor.empty() : !out_tensor_reduction_2d_static_t
+  %tmp_filled = linalg.fill ins(%cst : ${ELEMENTAL_TYPE}) outs(%tmp_empty : !out_tensor_reduction_2d_static_t) 
+    ->   !out_tensor_reduction_2d_static_t
+  %reduced = linalg.generic #trait_reduction_2d
+    ins(%leading : !in_tensor_reduction_2d_static_t)
+   outs(%tmp_filled : !out_tensor_reduction_2d_static_t) {
+      ^bb0(%a: ${ELEMENTAL_TYPE}, %b: ${ELEMENTAL_TYPE}):
+        %3 = ${ADD_OP} %a, %b : ${ELEMENTAL_TYPE}
+        linalg.yield %3 : ${ELEMENTAL_TYPE}
+      } -> !out_tensor_reduction_2d_static_t
+
+
+  return %reduced : !out_tensor_reduction_2d_static_t
+}
+
+func.func private @reduction_2d_trailing_elementwise_static(%input : !in_tensor_reduction_2d_static_t) 
     -> (!in_tensor_reduction_2d_static_t) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -101,7 +132,7 @@ func.func private @reduction_3d_static(%input : !in_tensor_reduction_3d_static_t
   return %tmp_reduced : !out_tensor_reduction_3d_static_t
 }
 
-func.func private @reduction_3d_elementwise_static(%input : !in_tensor_reduction_3d_static_t) 
+func.func private @reduction_3d_trailing_elementwise_static(%input : !in_tensor_reduction_3d_static_t) 
     -> (!in_tensor_reduction_3d_static_t) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -158,7 +189,7 @@ func.func private @reduction_2d_dynamic(%input : !in_tensor_reduction_2d_dynamic
   return %tmp_reduced : !out_tensor_reduction_2d_dynamic_t
 }
 
-func.func private @reduction_2d_elementwise_dynamic(%input : !in_tensor_reduction_2d_dynamic_t) 
+func.func private @reduction_2d_trailing_elementwise_dynamic(%input : !in_tensor_reduction_2d_dynamic_t) 
     -> (!in_tensor_reduction_2d_dynamic_t) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
