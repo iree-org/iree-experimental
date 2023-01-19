@@ -55,7 +55,7 @@ option(IREE_BUILD_SAMPLES "Disable samples for runtime-library build" OFF)
 add_subdirectory("${IREE_ROOT_DIR}" "iree_core" EXCLUDE_FROM_ALL)
 
 #-------------------------------------------------------------------------------
-# Build the ireert library
+# Build the iree library
 #-------------------------------------------------------------------------------
 
 # IREE exposes its transitive objects and deps on special target properties.
@@ -63,8 +63,8 @@ set(_RUNTIME_ROOT_TARGET "iree::runtime::impl")
 set(_RUNTIME_OBJECTS "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RUNTIME_ROOT_TARGET},INTERFACE_IREE_TRANSITIVE_OBJECTS>>>")
 set(_RUNTIME_LIBS "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RUNTIME_ROOT_TARGET},INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS>>>")
 # For debugging, write out objects and deps to files.
-file(GENERATE OUTPUT "lib/ireert.objects.txt" CONTENT "${_RUNTIME_OBJECTS}\n")
-file(GENERATE OUTPUT "lib/ireert.libs.txt" CONTENT "${_RUNTIME_LIBS}\n")
+file(GENERATE OUTPUT "lib/iree.objects.txt" CONTENT "${_RUNTIME_OBJECTS}\n")
+file(GENERATE OUTPUT "lib/iree.libs.txt" CONTENT "${_RUNTIME_LIBS}\n")
 
 # List all of the headers so that we can add them when we call add
 # library. This has to be done so that these headers files can be
@@ -76,7 +76,7 @@ file(GENERATE OUTPUT "lib/ireert.libs.txt" CONTENT "${_RUNTIME_LIBS}\n")
 # Even though these headers are listed in add_library, that is not yet
 # enough to add them to the framework. We need to add them to
 #
-#   set_target_property(ireert PROPERTIES PUBLIC_HEADER header_files)
+#   set_target_property(iree PROPERTIES PUBLIC_HEADER header_files)
 #
 # for that to happen. Unfortunately, CMake would flatten the directory
 # structure of the header files and put all header files in the
@@ -100,13 +100,13 @@ file(GLOB_RECURSE
 
 
 # Build the library (shared or static).
-add_library(ireert
+add_library(iree
   ${_RUNTIME_OBJECTS}
   ${_RUNTIME_SRC_HEADERS_FULLPATH}
 )
-target_include_directories(ireert INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/include")
-target_link_libraries(ireert PUBLIC ${_RUNTIME_LIBS})
-set_target_properties(ireert PROPERTIES
+target_include_directories(iree INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/include")
+target_link_libraries(iree PUBLIC ${_RUNTIME_LIBS})
+set_target_properties(iree PROPERTIES
   ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib"
   LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib"
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin"
@@ -114,13 +114,13 @@ set_target_properties(ireert PROPERTIES
 
 if(BUILD_SHARED_LIBS)
   # Import symbols from library on use.
-  target_compile_options(ireert INTERFACE "-UIREE_API_BUILDING_LIBRARY")
+  target_compile_options(iree INTERFACE "-UIREE_API_BUILDING_LIBRARY")
   # Disallow undefined symbols in shared library mode.
   if(NOT IREE_ENABLE_ASAN
     AND NOT IREE_ENABLE_MSAN
     AND NOT IREE_ENABLE_TSAN
     AND NOT IREE_ENABLE_UBSAN)
-    target_link_options(ireert PRIVATE
+    target_link_options(iree PRIVATE
       $<$<PLATFORM_ID:Linux>:-Wl,--no-undefined>
       $<$<PLATFORM_ID:Darwin>:-Wl,-undefined,error>
     )
@@ -129,10 +129,10 @@ endif()
 
 
 if(APPLE)
-  set_target_properties(ireert PROPERTIES
+  set_target_properties(iree PROPERTIES
     FRAMEWORK TRUE
     FRAMEWORK_VERSION A
-    MACOSX_FRAMEWORK_IDENTIFIER dev.iree.ireert
+    MACOSX_FRAMEWORK_IDENTIFIER dev.iree.iree
     VERSION 16.4.0
     SOVERSION 1.0.0
     XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED OFF
@@ -140,7 +140,7 @@ if(APPLE)
   )
 
   foreach(_RUNTIME_HEADER ${_RUNTIME_SRC_HEADERS_FULLPATH})
-    string(REPLACE ${_RUNTIME_HEADER_SOURCE_DIR}/ "" _RUNTIME_HEADER_RELPATH ${_RUNTIME_HEADER})
+    string(REPLACE ${_RUNTIME_HEADER_SOURCE_DIR}/iree "" _RUNTIME_HEADER_RELPATH ${_RUNTIME_HEADER})
     get_filename_component(_REL_DIR "${_RUNTIME_HEADER_RELPATH}" DIRECTORY)
     set_source_files_properties(
       ${_RUNTIME_HEADER} PROPERTIES MACOSX_PACKAGE_LOCATION Headers/${_REL_DIR})
@@ -175,9 +175,9 @@ _copy_runtime_source_headers()
 # Generate a test program.
 #-------------------------------------------------------------------------------
 
-add_executable(ireert_test test_api.c)
-set_target_properties(ireert_test
+add_executable(iree_test test_api.c)
+set_target_properties(iree_test
   PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin"
 )
-target_link_libraries(ireert_test PRIVATE ireert)
+target_link_libraries(iree_test PRIVATE iree)

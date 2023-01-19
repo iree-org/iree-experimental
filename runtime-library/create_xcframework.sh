@@ -39,10 +39,10 @@ cmake -S . -B build-ios-dev -GNinja \
 cmake --build build-ios-dev
 
 echo "Aggregating frameworks into an xcframework ..."
-rm -rf ireert.xcframework
+rm -rf iree.xcframework
 xcodebuild -create-xcframework \
- 	   -framework build/lib/ireert.framework \
- 	   -framework build-ios-sim/lib/ireert.framework \
- 	   -framework build-ios-dev/lib/ireert.framework \
-	   -output ireert.xcframework
+ 	   -framework build/lib/iree.framework \
+ 	   -framework build-ios-sim/lib/iree.framework \
+ 	   -framework build-ios-dev/lib/iree.framework \
+	   -output iree.xcframework
 
