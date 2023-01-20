@@ -4,6 +4,49 @@
 set -e
 
 SCRIPT_DIR=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+
+# BUG(wangkuiyi): Add this function as a walkaround of the issue
+# https://github.com/iree-org/iree-samples/issues/100
+function patch_iree_runtime_tooling() {
+    # TODO(wangkuiyi): Here we assume that we git cloned iree-org/iree and
+    # iree-org/iree-samples to the same directory.  We might want to make
+    # iree-org/iree a git submodule of the repo that builds the IREE
+    # runtime.
+    IREE_SRC_DIR=$SCRIPT_DIR/../../iree
+    if [[ ! -d $IREE_SRC_DIR ]]; then
+	echo "Please git clone IREE into $IREE_SRC_DIR"
+	exit -1
+    fi
+
+    IREE_RUNTIME_TOOLING_CMAKE=$IREE_SRC_DIR/runtime/src/iree/tooling/CMakeLists.txt
+    if [[ ! -f $IREE_RUNTIME_TOOLING_CMAKE ]]; then
+	echo "Cannot find the CMakeLists.txt file for IREE runtime tooling?!"
+	exit -2
+    fi
+
+    if grep "iree_cc_library(NAME impl" $IREE_RUNTIME_TOOLING_CMAKE > /dev/null; then
+	echo "$IREE_RUNTIME_TOOLING_CMAKE has been patched"
+    else
+	cat <<EOT >> $IREE_RUNTIME_TOOLING_CMAKE
+
+iree_cc_library(NAME impl
+  DEPS
+  iree::runtime::impl
+  iree::tooling::buffer_view_matchers
+  iree::tooling::comparison
+  iree::tooling::device_util
+  iree::tooling::numpy_io
+  iree::tooling::vm_util
+  iree::tooling::trace_replay
+  iree::tooling::yaml_util
+  PUBLIC
+)
+EOT
+    fi
+}
+
+patch_iree_runtime_tooling
+
 # TODO(wangkuiyi): Here we assume that we git cloned iree-org/iree and
 # iree-org/iree-samples to the same directory.  We might want to make
 # iree-org/iree a git submodule of the repo that builds the IREE

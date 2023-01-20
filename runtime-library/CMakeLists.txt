@@ -59,7 +59,13 @@ add_subdirectory("${IREE_ROOT_DIR}" "iree_core" EXCLUDE_FROM_ALL)
 #-------------------------------------------------------------------------------
 
 # IREE exposes its transitive objects and deps on special target properties.
-set(_RUNTIME_ROOT_TARGET "iree::runtime::impl")
+#
+# BUG(wangkuiyi): iree::tooling is not part of the official API.  I
+# use it as a walkaround of
+# https://github.com/iree-org/iree-samples/issues/100 The correct
+# target should be iree::runtime::impl in a normal CMake target name
+# with underscores other than the double-colons.
+set(_RUNTIME_ROOT_TARGET "iree::tooling::impl")
 set(_RUNTIME_OBJECTS "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RUNTIME_ROOT_TARGET},INTERFACE_IREE_TRANSITIVE_OBJECTS>>>")
 set(_RUNTIME_LIBS "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RUNTIME_ROOT_TARGET},INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS>>>")
 # For debugging, write out objects and deps to files.
@@ -104,6 +110,7 @@ add_library(iree
   ${_RUNTIME_OBJECTS}
   ${_RUNTIME_SRC_HEADERS_FULLPATH}
 )
+
 target_include_directories(iree INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/include")
 target_link_libraries(iree PUBLIC ${_RUNTIME_LIBS})
 set_target_properties(iree PROPERTIES
