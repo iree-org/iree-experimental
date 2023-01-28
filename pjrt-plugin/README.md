@@ -102,7 +102,8 @@ Example of running tests:
 
 ```
 JAX_PLATFORMS=iree_cuda pytest -n4 --max-worker-restart=9999 \
-  -p openxla_pjrt_artifacts ~/src/jax/tests/nn_test.py
+  -p openxla_pjrt_artifacts --openxla-pjrt-artifact-dir=/tmp/foobar \
+  ~/src/jax/tests/nn_test.py
 ```
 
 Note that you will typically want a small number of workers (`-n4` above) for
