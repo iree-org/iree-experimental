@@ -146,6 +146,13 @@ class DeviceInstance {
   // Not yet implemented but plumbed through.
   bool is_addressable() { return true; }
   int process_index() { return 0; }
+  int local_hardware_id() { return -1; }
+
+  // Various debug descriptions of the device. Backing string data owned by
+  // the device.
+  std::string_view kind_string() { return kind_string_; }
+  std::string_view debug_string() { return debug_string_; }
+  std::string_view user_string() { return user_string_; }
 
   // Copies a host buffer to the device.
   // See PJRT_Client_BufferFromHostBuffer
@@ -189,6 +196,11 @@ class DeviceInstance {
   // The timepoint of the last transfer.
   uint64_t last_transfer_timepoint_ = 0;
   iree_hal_device_info_t* info_;
+
+  // Debug strings (owned by device).
+  std::string kind_string_;
+  std::string debug_string_;
+  std::string user_string_;
 };
 
 //===----------------------------------------------------------------------===//

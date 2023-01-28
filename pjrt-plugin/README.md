@@ -65,3 +65,19 @@ The plugins can be build with tracing enabled by adding the bazel build flag
 instrumentation will be sent to it. It can be useful to set the environment
 variable `TRACY_NO_EXIT=1` in order to block termination of one-shot programs
 that exit too quickly to stream all events.
+
+## ASAN
+
+Developing with ASAN is recommended but requires some special steps because
+of we need to arrange for the plugin to be able to link with undefined
+symbols and load the ASAN runtime library.
+
+* Edit out the `"-Wl,--no-undefined"` from `build_defs.bzl`
+* Set env var `LD_PRELOAD=$(clang-12 -print-file-name=libclang_rt.asan-x86_64.so)`
+  (assuming compiling with `clang-12`. See configured.bazelrc in the IREE repo).
+* Set env var `ASAN_OPTIONS=detect_leaks=0` (Python allocates a bunch of stuff
+  that it never frees. TODO: Make this more fine-grained so we can detect leaks in
+  plugin code).
+* `--config=asan`
+
+This can be improved and made more systematic but should work.

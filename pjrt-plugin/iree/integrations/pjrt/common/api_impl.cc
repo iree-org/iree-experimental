@@ -91,6 +91,9 @@ iree_status_t MapElementTypeToXlaElementType(
   // TODO: Cascade on bit-field sub-types to avoid large linear scan.
   switch (element_type) {
     // TODO: How do I interpret signless?
+    case IREE_HAL_ELEMENT_TYPE_BOOL_8:
+      *xla_primitive = xla::PrimitiveType::PRED;
+      return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_INT_8:
       *xla_primitive = xla::PrimitiveType::U8;
       return iree_ok_status();
@@ -158,10 +161,8 @@ iree_status_t MapBufferTypeToElementType(
     case PJRT_Buffer_Type_INVALID:
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
     case PJRT_Buffer_Type_PRED:
-      // I assume this is equiv to IREE_HAL_ELEMENT_TYPE_BOOL_8 but
-      // need to check.
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "TODO: Support PRED buffer type");
+      *element_type = IREE_HAL_ELEMENT_TYPE_BOOL_8;
+      return iree_ok_status();
     case PJRT_Buffer_Type_S8:
       *element_type = IREE_HAL_ELEMENT_TYPE_SINT_8;
       return iree_ok_status();
@@ -481,7 +482,15 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
   // can issue copy commands.
   iree::vm::ref<iree_hal_buffer_t> dst_buffer;
   iree_hal_buffer_params_t dst_buffer_params = {
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET};
+      /*usage=*/IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET,
+      // TODO: We should be able to use WRITE access here since the buffer
+      // is never actually mapped to read back out (just accessed through the
+      // void* later). However, that seems to cause the memory to never be
+      // committed and the interaction aborted.
+      /*access=*/IREE_HAL_MEMORY_ACCESS_ALL,
+      /*type=*/IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+          IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+  };
   iree_hal_external_buffer_t dst_external_buffer;
   memset(&dst_external_buffer, 0, sizeof(dst_external_buffer));
   dst_external_buffer.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION;
@@ -565,23 +574,30 @@ void DeviceInstance::BindApi(PJRT_Api* api) {
     return nullptr;
   };
   api->PJRT_Device_Kind = +[](PJRT_Device_Kind_Args* args) -> PJRT_Error* {
-    return MakeError(
-        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Device_Kind"));
+    auto sv = DeviceInstance::Unwrap(args->device)->kind_string();
+    args->device_kind = sv.data();
+    args->device_kind_size = sv.size();
+    return nullptr;
   };
   api->PJRT_Device_LocalHardwareId =
       +[](PJRT_Device_LocalHardwareId_Args* args) -> PJRT_Error* {
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Device_LocalHardwareId"));
+    args->local_hardware_id =
+        DeviceInstance::Unwrap(args->device)->local_hardware_id();
+    return nullptr;
   };
   api->PJRT_Device_DebugString =
       +[](PJRT_Device_DebugString_Args* args) -> PJRT_Error* {
-    return MakeError(
-        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Device_DebugString"));
+    auto sv = DeviceInstance::Unwrap(args->device)->debug_string();
+    args->debug_string = sv.data();
+    args->debug_string_size = sv.size();
+    return nullptr;
   };
   api->PJRT_Device_ToString =
       +[](PJRT_Device_ToString_Args* args) -> PJRT_Error* {
-    return MakeError(
-        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Device_ToString"));
+    auto sv = DeviceInstance::Unwrap(args->device)->user_string();
+    args->to_string = sv.data();
+    args->to_string_size = sv.size();
+    return nullptr;
   };
 }
 
@@ -600,9 +616,12 @@ iree_status_t DeviceInstance::OpenDevice() {
       iree_hal_semaphore_create(device(), 0ull, &main_timeline_));
   IREE_RETURN_IF_ERROR(
       iree_hal_semaphore_create(device(), 0ull, &transfer_timeline_));
-  // IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(transfer_timeline_.get(), 0,
-  //                                               client_.host_allocator(),
-  //                                               &transfer_now_fence_));
+
+  // Initialize debug strings.
+  user_string_ = std::string(info_->path.data, info_->path.size);
+  debug_string_ = std::string(info_->name.data, info_->name.size);
+  kind_string_ = std::string(info_->name.data, info_->name.size);
+
   return iree_ok_status();
 }
 
