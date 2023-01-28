@@ -81,3 +81,33 @@ symbols and load the ASAN runtime library.
 * `--config=asan`
 
 This can be improved and made more systematic but should work.
+
+## Running the Jax test suite
+
+The JAX test suite can be run with pytest. We recommend using `pytest-xdist`
+as it spawns tests in workers which can be restarted in the event of individual
+test case crashes.
+
+Setup:
+
+```
+# Install pytest
+pip install pytest pytest-xdist
+
+# Install the ctstools package from this repo (`-e` makes it editable).
+pip install -e ctstools
+```
+
+Example of running tests:
+
+```
+JAX_PLATFORMS=iree_cuda pytest -n4 --max-worker-restart=9999 \
+  -p openxla_pjrt_artifacts ~/src/jax/tests/nn_test.py
+```
+
+Note that you will typically want a small number of workers (`-n4` above) for
+CUDA and a larger number can be tolerated for cpu.
+
+The plugin `openxla_pjrt_artifacts` is in the `ctstools` directory and
+performs additional manipulation of the environment in order to save
+compilation artifacts, reproducers, etc.

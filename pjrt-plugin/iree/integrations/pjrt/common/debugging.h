@@ -8,6 +8,7 @@
 #define IREE_PJRT_PLUGIN_PJRT_DEBUGGING_H_
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -82,7 +83,8 @@ class ArtifactDumper {
   // artifacts. All artifacts associated with a transaction can be removed upon
   // a successful transaction, or they will be retained upon crash or
   // recoverable error.
-  // Must only be called if enabled().
+  // Must only be called if enabled(). May return nullptr if saving should not
+  // be done.
   virtual std::unique_ptr<Transaction> CreateTransaction();
 
   // Returns a string suitable for emitting to the debug log, describing
@@ -94,16 +96,12 @@ class ArtifactDumper {
 };
 
 // Dumps artifacts to a path on the file system.
-// This is initialized with a path_spec. Currently, this is just a path on
-// the file system, but it should be brought into alignment with how the Python
-// side does it.
-// See:
-// https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/API/python/iree/compiler/tools/debugging.py#L29
 class FilesArtifactDumper : public ArtifactDumper {
  public:
   class FilesTransaction;
+  using PathCallback = std::function<std::optional<std::string>()>;
 
-  FilesArtifactDumper(Logger& logger, std::string_view path_spec,
+  FilesArtifactDumper(Logger& logger, PathCallback path_callback,
                       bool retain_all);
   ~FilesArtifactDumper() override;
 
@@ -113,7 +111,7 @@ class FilesArtifactDumper : public ArtifactDumper {
  private:
   Logger& logger_;
   std::atomic<int64_t> next_transaction_id_{0};
-  std::string path_;
+  PathCallback path_callback_;
   bool retain_all_;
 };
 

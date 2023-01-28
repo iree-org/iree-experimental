@@ -135,32 +135,41 @@ class FilesArtifactDumper::FilesTransaction final
 };
 
 FilesArtifactDumper::FilesArtifactDumper(Logger& logger,
-                                         std::string_view path_spec,
+                                         PathCallback path_callback,
                                          bool retain_all)
-    : logger_(logger), retain_all_(retain_all) {
-  path_ = path_spec;
+    : logger_(logger),
+      path_callback_(std::move(path_callback)),
+      retain_all_(retain_all) {
   enabled_ = true;
-
-  std::error_code ec;
-  std::filesystem::create_directories(path_, ec);
-  if (ec) {
-    std::string message("Error creating artifact directory '");
-    message.append(path_);
-    message.append("' (artifact dumping disabled): ");
-    message.append(ec.message());
-    logger_.error(message);
-    enabled_ = false;
-  }
 }
 
 FilesArtifactDumper::~FilesArtifactDumper() = default;
 
 std::unique_ptr<ArtifactDumper::Transaction>
 FilesArtifactDumper::CreateTransaction() {
+  auto maybe_path = path_callback_();
+  if (!maybe_path) {
+    return nullptr;
+  }
+
+  std::filesystem::path path(*maybe_path);
+  std::error_code ec;
+  std::filesystem::create_directories(path, ec);
+  if (ec) {
+    std::string message("Error creating artifact directory '");
+    message.append(path);
+    message.append("' (artifact dumping disabled): ");
+    message.append(ec.message());
+    logger_.error(message);
+    return nullptr;
+  }
+
   return std::make_unique<FilesTransaction>(
-      logger_, path_, next_transaction_id_.fetch_add(1), retain_all_);
+      logger_, path, next_transaction_id_.fetch_add(1), retain_all_);
 }
 
-std::string FilesArtifactDumper::DebugString() { return path_; }
+std::string FilesArtifactDumper::DebugString() {
+  return std::string("dump to files");
+}
 
 }  // namespace iree::pjrt
