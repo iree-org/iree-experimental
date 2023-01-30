@@ -18,7 +18,8 @@ For execution, assumptions are:
   2. the IREE build directory lives at `./build`
   3. `mlir-opt` is in the path
   4. `./build/tools` (i.e. `iree-opt`, `iree-compile`, `iree-run-module`) is in the path
-  5. for CUDA execution, `nvprof` is in the path.
+  5. the iree tools are built with assertions enabled
+  6. for CUDA execution, `nvprof` is in the path.
 
 Disclaimers:
   1. since the exploration process can involve modifying source IR, transform IR
@@ -95,6 +96,10 @@ Once the transformed IR is in a satisfactory state, one can inspect the PTX.
 ```
 
 This should print the transformed PTX (or appropriate error messages when relevant).
+
+Note: Make sure to redirect the output in a `.vmfb` file (which is just a zip
+archive), otherwise, you'll taste the binary output directly. This is
+particularly painful if dumping non-PTX backends.
 
 ## Run and Benchmark
 
