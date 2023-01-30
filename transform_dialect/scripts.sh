@@ -97,7 +97,7 @@ function iree-transform-opt() {
     if test ${CODEGEN_SPEC_FILE} == /dev/null; then
       CODEGEN_FLAG=${CODEGEN_FLAG}" --iree-codegen-llvmgpu-enable-transform-dialect-jit"
     else
-      CODEGEN_FLAG=${CODEGEN_FLAG}" --iree-codegen-llvmgpu-use-transform-dialect=${CODEGEN_SPEC_FILE}"
+      CODEGEN_FLAG=${CODEGEN_FLAG}" --iree-codegen-llvmgpu-enable-transform-dialect-jit=false --iree-codegen-llvmgpu-use-transform-dialect=${CODEGEN_SPEC_FILE}"
     fi
     CODEGEN_FLAG="${CODEGEN_FLAG} ${TRANSFORM_REPRO_FLAG}"
   elif test ${BACKEND} == llvm-cpu; then
@@ -105,7 +105,7 @@ function iree-transform-opt() {
     if test ${CODEGEN_SPEC_FILE} == /dev/null; then
       CODEGEN_FLAG=${CODEGEN_FLAG}" --iree-codegen-llvmcpu-enable-transform-dialect-jit"
     else
-      CODEGEN_FLAG=${CODEGEN_FLAG}" --iree-codegen-llvmcpu-use-transform-dialect=${CODEGEN_SPEC_FILE}"
+      CODEGEN_FLAG=${CODEGEN_FLAG}" --iree-codegen-llvmgpu-enable-transform-dialect-jit=false --iree-codegen-llvmcpu-use-transform-dialect=${CODEGEN_SPEC_FILE}"
     fi
     CODEGEN_FLAG="${CODEGEN_FLAG} ${TRANSFORM_REPRO_FLAG}"
   else
@@ -154,14 +154,14 @@ function iree-transform-compile() {
     if test ${CODEGEN_SPEC_FILE} == /dev/null; then
       CODEGEN_FLAG="--iree-codegen-llvmgpu-enable-transform-dialect-jit"
     else
-      CODEGEN_FLAG="--iree-codegen-llvmgpu-use-transform-dialect=${CODEGEN_SPEC_FILE}"
+      CODEGEN_FLAG="--iree-codegen-llvmgpu-enable-transform-dialect-jit=false --iree-codegen-llvmgpu-use-transform-dialect=${CODEGEN_SPEC_FILE}"
     fi
     CODEGEN_FLAG="${CODEGEN_FLAG} ${TRANSFORM_REPRO_FLAG}"
   elif test ${BACKEND} == "llvm-cpu"; then
     if test ${CODEGEN_SPEC_FILE} == /dev/null; then
       CODEGEN_FLAG="--iree-codegen-llvmcpu-enable-transform-dialect-jit"
     else
-      CODEGEN_FLAG="--iree-codegen-llvmcpu-use-transform-dialect=${CODEGEN_SPEC_FILE}"
+      CODEGEN_FLAG="--iree-codegen-llvmgpu-enable-transform-dialect-jit=false --iree-codegen-llvmcpu-use-transform-dialect=${CODEGEN_SPEC_FILE}"
     fi
     CODEGEN_FLAG="${CODEGEN_FLAG} ${TRANSFORM_REPRO_FLAG}"
   else
