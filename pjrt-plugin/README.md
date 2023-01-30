@@ -33,6 +33,16 @@ pip install dist/*.whl --force-reinstall
 
 ## Build this project and look at a plugin
 
+Currently, enabling Bazel build support for IREE is manual and requires
+setting an environment variable in a way that Bazel uses. In the IREE source
+directory, open `configured.bazelrc` and add a line like this (replacing
+`PATH_TO_IREE_BUILD_DIR` with an actual path to a build dir or set the
+location to a manually installed SDK):
+
+```
+build --action_env IREE_CUDA_TOOLKIT_ROOT="PATH_TO_IREE_BUILD_DIR/build_tools/third_party/cuda/11.6.2/linux-x86_64"
+```
+
 ```
 bazel build ...
 IREE_PLUGIN_PATH="$PWD/bazel-bin/iree/integrations/pjrt/cpu/lib_pjrt_plugin_iree_cpu.so"
