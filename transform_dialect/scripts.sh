@@ -331,8 +331,12 @@ function benchmark-transform-create() {
     echo ==========================================================
   fi
 
-  # echo iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
-  iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null || exit 1
+  # echo iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null
+  iree-transform-opt ${TRANSFORM_DIALECT_SOURCE_FILE} -b ${BACKEND}  -- --mlir-disable-threading 2>&1 > /dev/null
+  if [[ $? -ne 0 ]]; then
+    echo "Transformation failed"
+    return 1
+  fi
 
   if [[ ${RUN} != 0 ]]; then
     if [[ ${BACKEND} == "cuda" ]]; then
