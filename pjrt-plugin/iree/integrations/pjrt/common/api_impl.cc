@@ -976,7 +976,7 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
   std::string_view format(program->format, program->format_size);
   std::string_view code(program->code, program->code_size);
   if (artifact_tx) {
-    artifact_tx->WriteArtifact(/*label=*/"program", /*extension=*/"mlir",
+    artifact_tx->WriteArtifact(/*label=*/"program", /*extension=*/"mlirbc",
                                /*index=*/-1, code);
   }
 
