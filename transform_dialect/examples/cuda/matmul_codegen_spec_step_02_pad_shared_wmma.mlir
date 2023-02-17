@@ -144,4 +144,16 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // TODO: this currently fails to multi-bufferize.
   // %mb_allocs = transform.memref.multibuffer %allocs {factor = 2 : i64} 
   //   : (!transform.op<"memref.alloc">) -> !pdl.operation
+
+  //   %func_a = transform.structured.match ops{["func.func"]} in %variant_op 
+  //     : (!pdl.operation) -> !pdl.operation
+  //   %func_a_2 = transform.iree.create_async_groups %func_a {use_mma_sync = true} 
+  //     : (!pdl.operation) -> (!pdl.operation)
+
+  //   %for = transform.structured.match ops{["scf.for"]} 
+  //     filter_result_type = !gpu.mma_matrix<16x16xf32, "COp"> in %variant_op 
+  //     : (!pdl.operation) -> !transform.op<"scf.for">
+  //   %2 = transform.iree.pipeline_shared_memory_copies %for { depth = 2 } 
+  //     : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
+  //   transform.iree.apply_patterns %func_a_2 { canonicalize }
 }
