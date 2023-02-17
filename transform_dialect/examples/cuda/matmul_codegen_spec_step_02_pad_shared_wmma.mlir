@@ -74,13 +74,22 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Note: hoisting here may be dangerous memory-consumption-wise and we may be
   // better off with pipelining only.
   // ==============================================================================
-  transform.structured.pad %matmul_l2 {
+  %matmul_padded_l2 = transform.structured.pad %matmul_l2 {
     padding_values = [0.0 : f32, 0.0 : f32, 0.0 : f32], 
     padding_dimensions = [0, 1, 2], 
     pack_paddings=[1, 1, 0]
     // hoist padding memory usage may blow up memory without splitK
     // , hoist_paddings=[1, 1, 0]
   }
+
+  // Step 3. Promote buffers.
+  // TODO: This is not yet enough to expose linalg.copy on tensors and cannot yet
+  // be used to tile to scf.foreach_thread.
+  // ==============================================================
+  // %promoted_matmul_l2, %alloc_1_op , %alloc_2_op = transform.iree.promote_operands %matmul_padded_l2 [0, 1] 
+  //   : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation)
+  // %alloc_1 = transform.get_result %alloc_1_op[0] : (!pdl.operation) -> !transform.any_value
+  // %alloc_1_buffer = transform.structured.bufferize_to_allocation %alloc_1 {memory_space = 3}
 
   // Step 3. Rewrite tensor.pad in DPS. 
   // TODO: This must introduce unfoldable copies that disable the 
@@ -90,7 +99,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
     : (!pdl.operation) -> !pdl.operation
   %padded = transform.structured.rewrite_in_destination_passing_style %pad 
     : (!pdl.operation) -> !pdl.operation
-
+  
   // Step 4. Map to threads, **SIMT** programming model.
   // ===================================================
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
@@ -129,4 +138,10 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %func_m_5 = transform.iree.map_nested_foreach_thread_to_gpu_threads %func_m_4
       { workgroup_size = [4, 8, 1] }
   %func_m_6 = transform.iree.apply_buffer_optimizations %func_m_5
+
+  %allocs = transform.structured.match ops{["memref.alloc"]} in %variant_op_3
+    : (!pdl.operation) -> !transform.op<"memref.alloc">
+  // TODO: this currently fails to multi-bufferize.
+  // %mb_allocs = transform.memref.multibuffer %allocs {factor = 2 : i64} 
+  //   : (!transform.op<"memref.alloc">) -> !pdl.operation
 }
