@@ -58,8 +58,43 @@ function iree-transform-opt-dispatch-only() {
   fi
   read -r BACKEND MLIR_FILE CODEGEN_SPEC_FILE DISPATCH_SPEC_FILE EXTRA_ARGS <<<$(echo ${ARGS})
   
+  if [ -z "${DUMP_TRANSFORM_REPRO+x}" ]
+  then
+    TRANSFORM_REPRO_FLAG=""
+  else
+    TRANSFORM_REPRO_FLAG="--debug-only=iree-transform-dialect-save-repro"
+  fi
+
   if test ${DISPATCH_SPEC_FILE} == /dev/null; then
     DISPATCH_FLAG="--iree-flow-enable-aggressive-fusion"
+  else
+    DISPATCH_FLAG="--iree-flow-dispatch-use-transform-dialect=${DISPATCH_SPEC_FILE}"
+  fi
+
+  iree-opt ${MLIR_FILE} \
+    --iree-abi-transformation-pipeline \
+    --iree-flow-transformation-pipeline \
+    ${DISPATCH_FLAG} \
+    ${EXTRA_ARGS}
+}
+
+function iree-transform-opt-dispatch-only-jit() {
+  ARGS=$(iree-transform-get-args $@)
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  read -r BACKEND MLIR_FILE CODEGEN_SPEC_FILE DISPATCH_SPEC_FILE EXTRA_ARGS <<<$(echo ${ARGS})
+  
+  if [ -z "${DUMP_TRANSFORM_REPRO+x}" ]
+  then
+    TRANSFORM_REPRO_FLAG=""
+  else
+    TRANSFORM_REPRO_FLAG="--debug-only=iree-transform-dialect-save-repro"
+  fi
+
+  if test ${DISPATCH_SPEC_FILE} == /dev/null; then
+    # DISPATCH_FLAG="--iree-flow-dispatch-use-transform-dialect-jit"
+    DISPATCH_FLAG=""
   else
     DISPATCH_FLAG="--iree-flow-dispatch-use-transform-dialect=${DISPATCH_SPEC_FILE}"
   fi
@@ -117,7 +152,8 @@ function iree-transform-opt() {
   # echo iree-opt --iree-hal-target-backends=${BACKEND} --iree-stream-transformation-pipeline --iree-hal-configuration-pipeline \| \\
   # echo iree-opt ${CODEGEN_FLAG} ${EXTRA_ARGS}
 
-  iree-transform-opt-dispatch-only ${MLIR_FILE} -b ${BACKEND} -c ${CODEGEN_SPEC_FILE} -d ${DISPATCH_SPEC_FILE} | \
+  # iree-transform-opt-dispatch-only ${MLIR_FILE} -b ${BACKEND} -c ${CODEGEN_SPEC_FILE} -d ${DISPATCH_SPEC_FILE} | \
+  iree-transform-opt-dispatch-only-jit ${MLIR_FILE} -b ${BACKEND} -c ${CODEGEN_SPEC_FILE} -d ${DISPATCH_SPEC_FILE} | \
   iree-opt --iree-hal-target-backends=${BACKEND} --iree-stream-transformation-pipeline --iree-hal-configuration-pipeline | \
   iree-opt ${CODEGEN_FLAG} ${EXTRA_ARGS}
 }
