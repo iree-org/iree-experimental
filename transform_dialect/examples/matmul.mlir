@@ -1,6 +1,6 @@
-!A_size = tensor<1024x2048xf32>
-!B_size = tensor<2048x4096xf32>
-!C_size = tensor<1024x4096xf32>
+!A_size = tensor<${M}x${K}xf32>
+!B_size = tensor<${K}x${N}xf32>
+!C_size = tensor<${M}x${N}xf32>
 
 func.func @matmul_static(
     %A : !A_size, %B : !B_size, %C : !C_size) -> !C_size {
