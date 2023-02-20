@@ -40,10 +40,10 @@ transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!pdl.operation) -> !pdl.operation
 
-  // Step 1. Tile to foreach_thread and sequential scf.for.
+  // Step 1. Tile to forall and sequential scf.for.
   // ======================================================
-  %foreach_thread_l1, %matmul_l1 =
-    transform.iree.tile_to_foreach_thread_and_workgroup_count_region %matmul tile_sizes [128, 128]
+  %forall_l1, %matmul_l1 =
+    transform.iree.tile_to_forall_and_workgroup_count_region %matmul tile_sizes [128, 128]
       ( mapping = [#gpu.block<y>, #gpu.block<x>] )
   %matmul_l2, %loops:3 = transform.structured.tile_to_scf_for %matmul_l1 [16, 16, 16]
 
@@ -67,5 +67,5 @@ transform.structured.canonicalized_sequence failures(propagate) {
 
   // Step 3. Post-bufferization mapping workgroup.
   // =============================================
-  transform.iree.foreach_thread_to_workgroup %func_m_3
+  transform.iree.forall_to_workgroup %func_m_3
 }

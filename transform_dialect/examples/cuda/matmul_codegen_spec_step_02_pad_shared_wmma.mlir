@@ -63,10 +63,10 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
     : (!pdl.operation) -> !pdl.operation
 
-  // Step 1. Tile to foreach_thread and sequential scf.for.
+  // Step 1. Tile to forall and sequential scf.for.
   // ======================================================
-  %foreach_thread_l1, %matmul_l1 =
-    transform.iree.tile_to_foreach_thread_and_workgroup_count_region %matmul tile_sizes [128, 128]
+  %forall_l1, %matmul_l1 =
+    transform.iree.tile_to_forall_and_workgroup_count_region %matmul tile_sizes [128, 128]
       ( mapping = [#gpu.block<y>, #gpu.block<x>] )
   %matmul_l2, %loops:3 = transform.structured.tile_to_scf_for %matmul_l1 [16, 16, 16]
 
@@ -84,7 +84,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
 
   // Step 3. Promote buffers.
   // TODO: This is not yet enough to expose linalg.copy on tensors and cannot yet
-  // be used to tile to scf.foreach_thread.
+  // be used to tile to scf.forall.
   // ==============================================================
   // %promoted_matmul_l2, %alloc_1_op , %alloc_2_op = transform.iree.promote_operands %matmul_padded_l2 [0, 1] 
   //   : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation)
@@ -104,11 +104,11 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // ===================================================
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
     : (!pdl.operation) -> !pdl.operation
-  transform.structured.tile_to_foreach_thread_op %fill num_threads [8, 4]
+  transform.structured.tile_to_forall_op %fill num_threads [8, 4]
       ( mapping = [#gpu.thread<y>, #gpu.thread<x>] )
   %copy = transform.structured.match ops{["linalg.copy"]} in %variant_op
     : (!pdl.operation) -> !pdl.operation
-  transform.structured.tile_to_foreach_thread_op %copy num_threads [8, 4]
+  transform.structured.tile_to_forall_op %copy num_threads [8, 4]
       ( mapping = [#gpu.thread<y>, #gpu.thread<x>] )
 
   // TODO: Contraction part must be mapped to threads with a **SIMD** programming model.
@@ -119,7 +119,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %func_v = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %func_v_2 = transform.iree.apply_patterns %func_v { rank_reducing_linalg, rank_reducing_vector }
   %func_v_3 = transform.structured.vectorize %func_v_2 { vectorize_padding }
-  %func_v_4 = transform.iree.apply_patterns %func_v_3 { unroll_vectors_gpu_mma }
+  %func_v_4 = transform.iree.apply_patterns %func_v_3 { unroll_vectors_gpu_wmma }
 
   // Step 6. Bufferize and drop HAL descriptor from memref ops.
   // ==========================================================
@@ -130,12 +130,12 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %func_m_2 = transform.iree.erase_hal_descriptor_type_from_memref %func_m
 
   // This must occur after bufferization because of the fancy CUDA types.
-  %func_m_3 = transform.iree.vector.vector_to_mma_conversion %func_m_2
+  %func_m_3 = transform.iree.vector.vector_to_mma_conversion %func_m_2 { use_wmma }
 
   // Step 7. Post-bufferization mapping blocks/workgroup and threads/subgroup.
   // =========================================================================
-  %func_m_4 = transform.iree.foreach_thread_to_workgroup %func_m_3
-  %func_m_5 = transform.iree.map_nested_foreach_thread_to_gpu_threads %func_m_4
+  %func_m_4 = transform.iree.forall_to_workgroup %func_m_3
+  %func_m_5 = transform.iree.map_nested_forall_to_gpu_threads %func_m_4
       { workgroup_size = [4, 8, 1] }
   %func_m_6 = transform.iree.apply_buffer_optimizations %func_m_5
 

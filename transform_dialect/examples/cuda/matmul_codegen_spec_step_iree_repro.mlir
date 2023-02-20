@@ -73,10 +73,10 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
     : (!pdl.operation) -> !pdl.operation
 
-  // Step 1. Tile to foreach_threads.
+  // Step 1. Tile to foralls.
   // ======================================================
-  %foreach_thread_l1, %matmul_l1 =
-    transform.iree.tile_to_foreach_thread_and_workgroup_count_region %matmul tile_sizes [32, 128]
+  %forall_l1, %matmul_l1 =
+    transform.iree.tile_to_forall_and_workgroup_count_region %matmul tile_sizes [32, 128]
       ( mapping = [#gpu.block<y>, #gpu.block<x>] )
 
   // Step 2. Tile reduction to scf.for to reduce local sizes.
@@ -90,10 +90,10 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %promoted_matmul_l2, %alloc_1 , %alloc_2 = transform.iree.promote_operands %matmul_l2 [0, 1] 
     : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation)
 
-  // Step 4. Tile to foreach_threads.
+  // Step 4. Tile to foralls.
   // ======================================================
-  %foreach_thread_l3, %matmul_l3 =
-    transform.structured.tile_to_foreach_thread_op %promoted_matmul_l2 num_threads [8, 32]
+  %forall_l3, %matmul_l3 =
+    transform.structured.tile_to_forall_op %promoted_matmul_l2 num_threads [8, 32]
       ( mapping = [#gpu.thread<y>, #gpu.thread<x>] )
 
   // TODO: further steps still need to be connected.
