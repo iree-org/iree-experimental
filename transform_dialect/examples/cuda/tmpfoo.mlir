@@ -7,12 +7,6 @@
 //   - connecting to wmma operations.
 //   - multi-buffering and creating pipelined async copies.
 //
-// At this time we are only missing a better mapping to SIMT / SIMD: in 
-// particular the contraction op is not yet mapped to warps (step 5).
-//
-// This is dependent on landing:
-//   https://github.com/nicolasvasilache/iree/commits/cuda-matmul-e2e
-//
 // ```
 //   export IREE_DIR=/usr/local/google/home/ntv/github/iree; \
 //   export IREE_SAMPLES_DIR=/usr/local/google/home/ntv/github/iree-samples; \
@@ -26,21 +20,21 @@
 //     --iree-hal-configuration-pipeline | \
 //   ${IREE_DIR}/build/tools/iree-opt \
 //      --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
-//      --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_codegen_spec_step_03_pad_shared_wmma_async_pipelined.mlir \
+//      --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_codegen_spec_step_04_pad_shared_wmma_async_pipelined_mapped.mlir \
 //      --iree-codegen-llvmgpu-enable-transform-dialect-jit=false | \
-//   FileCheck transform_dialect/examples/cuda/matmul_codegen_spec_step_03_pad_shared_wmma_async_pipelined.mlir
+//     FileCheck transform_dialect/examples/cuda/matmul_codegen_spec_step_04_pad_shared_wmma_async_pipelined_mapped.mlir
 // ```
 //
 // To produce PTX:
 // ```
-//    export IREE_DIR=/usr/local/google/home/ntv/github/iree; 
-//    export IREE_SAMPLES_DIR=/usr/local/google/home/ntv/github/iree-samples; 
-//    cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//    sed "s/\${M}/1024/g" | sed "s/\${K}/2048/g" | sed "s/\${N}/4096/g" | \
-//    ${IREE_DIR}/build/tools/iree-compile - \
-//      --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-//      --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_codegen_spec_step_03_pad_shared_wmma_async_pipelined.mlir \
-//      --iree-codegen-llvmgpu-enable-transform-dialect-jit=false 
+  //  export IREE_DIR=/usr/local/google/home/ntv/github/iree; 
+  //  export IREE_SAMPLES_DIR=/usr/local/google/home/ntv/github/iree-samples; 
+  //  cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
+  //  sed "s/\${M}/1024/g" | sed "s/\${K}/2048/g" | sed "s/\${N}/4096/g" | \
+  //  ${IREE_DIR}/build/tools/iree-compile - \
+  //    --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
+  //    --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_codegen_spec_step_04_pad_shared_wmma_async_pipelined_mapped.mlir \
+  //    --iree-codegen-llvmgpu-enable-transform-dialect-jit=false 
 // ```
 
 // CHECK: hal.interface.workgroup.id[1] : index
@@ -89,7 +83,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
     padding_dimensions = [0, 1, 2], 
     pack_paddings=[1, 1, 0]
     // hoist padding memory usage may blow up memory without splitK
-    // , hoist_paddings=[1, 1, 0]
+    // , hoist_paddings=[1, 1, 1]
   }
 
   // Step 3. Promote buffers.
@@ -110,7 +104,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %padded = transform.structured.rewrite_in_destination_passing_style %pad 
     : (!pdl.operation) -> !pdl.operation
   
-  // Step 4. Map to threads, **SIMT** programming model.
+  // Step 4. Map copies to threads, **SIMT** programming model.
   // Ensure we lower to 1-D vectors otherwise cp.async will not kick in.
   // ===================================================================
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
@@ -122,15 +116,20 @@ transform.structured.canonicalized_sequence failures(propagate) {
   transform.structured.tile_to_forall_op %copy num_threads [16, 4]
       ( mapping = [#gpu.thread<y>, #gpu.thread<x>] )
 
-  // Step 5. Rank-reduce and vectorize.
-  // TODO: Contraction part must be mapped to threads with a **SIMD** programming model.
+  // Step 5. Map contraction to warps, **SIMD** programming model.
+  // =============================================================
+  %forall_l3, %matmul_padded_l3 = 
+    transform.structured.tile_to_forall_op %matmul_padded_l2 num_threads [2, 0]
+      ( mapping = [#gpu.warp<x>] )
+
+  // Step 6. Rank-reduce and vectorize.
   // ===================================================================================
   %func_v = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %func_v_2 = transform.iree.apply_patterns %func_v { rank_reducing_linalg, rank_reducing_vector }
   %func_v_3 = transform.structured.vectorize %func_v_2 { vectorize_padding }
   %func_v_4 = transform.iree.apply_patterns %func_v_3 { unroll_vectors_gpu_wmma }
 
-  // Step 6. Bufferize and drop HAL descriptor from memref ops.
+  // Step 7. Bufferize and drop HAL descriptor from memref ops.
   // ==========================================================
   %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op_2
@@ -138,42 +137,48 @@ transform.structured.canonicalized_sequence failures(propagate) {
     : (!pdl.operation) -> !pdl.operation
   %func_m_2 = transform.iree.erase_hal_descriptor_type_from_memref %func_m
 
-  // This must occur after bufferization because of the fancy CUDA types.
-  %func_m_3 = transform.iree.vector.vector_to_mma_conversion %func_m_2 { use_wmma }
 
-  // Step 7. Post-bufferization mapping blocks/workgroup and threads/subgroup.
+  // Step 9. Post-bufferization mapping blocks/workgroup and threads/subgroup.
   // =========================================================================
-  %func_m_4 = transform.iree.forall_to_workgroup %func_m_3
+  %func_m_4 = transform.iree.forall_to_workgroup %func_m_2
   %func_m_5 = transform.iree.map_nested_forall_to_gpu_threads %func_m_4
       { workgroup_size = [4, 16, 1] }
   %func_m_6 = transform.iree.apply_buffer_optimizations %func_m_5
 
-  // Step 8. Multi-buffering, async copies and pipelining.
-  // =========================================================================
-  // We want to avoid blanket hoistings afer alloc hoisting, otherwise subviews
-  // get hoisted and multibuffering fails because its preconditions are too 
-  // fragile.
-  // So we wrap in a transform.sequence for the moment.
-  %func_m_7 = transform.cast %func_m_6 : !pdl.operation to !transform.op<"func.func">
-  transform.sequence %func_m_7 : !transform.op<"func.func"> failures(propagate) {
-  ^bb1(%func_arg: !transform.op<"func.func">):
-    %func_m_8 = transform.iree.hoist_static_alloc %func_arg
-      : (!transform.op<"func.func">) -> !transform.op<"func.func">
-    %allocs = transform.structured.match ops{["memref.alloc"]} in %variant_op_3
-      : (!pdl.operation) -> !transform.op<"memref.alloc">
-    %mb_allocs = transform.memref.multibuffer %allocs {factor = 2 : i64, skip_analysis} 
-      : (!transform.op<"memref.alloc">) -> !pdl.operation
-  }
-  // Rewrite as cp.async.
-  %func_a = transform.structured.match ops{["func.func"]} in %variant_op_3 
+  %func_m_7 = transform.structured.hoist_redundant_vector_transfers %func_m_6
     : (!pdl.operation) -> !pdl.operation
-  %func_a_2 = transform.iree.create_async_groups %func_a {use_mma_sync = false} 
-    : (!pdl.operation) -> (!pdl.operation)
-  // Pipelining (must match the amount of multi-buffering).
-  // TODO: Matching the loop by return type is fragile here.
-  %for = transform.structured.match ops{["scf.for"]} 
-    filter_result_type = !gpu.mma_matrix<16x16xf32, "COp"> in %variant_op_3 
-    : (!pdl.operation) -> !transform.op<"scf.for">
-  %2 = transform.iree.pipeline_shared_memory_copies %for { depth = 2 } 
-    : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
+
+  // Step 8. Rewrite vectors as wmma operations.
+  // ===========================================
+  // This must occur after bufferization because of the fancy CUDA types.
+  // %func_m_8 = transform.iree.vector.vector_to_mma_conversion %func_m_7 { use_wmma }
+
+  // // Step 10. Multi-buffering, async copies and pipelining.
+  // // =========================================================================
+  // // We want to avoid blanket hoistings afer alloc hoisting, otherwise subviews
+  // // get hoisted and multibuffering fails because its preconditions are too 
+  // // fragile.
+  // // So we wrap in a transform.sequence for the moment.
+  // %func_m_7 = transform.cast %func_m_6 : !pdl.operation to !transform.op<"func.func">
+  // transform.sequence %func_m_7 : !transform.op<"func.func"> failures(propagate) {
+  // ^bb1(%func_arg: !transform.op<"func.func">):
+  //   %func_m_8 = transform.iree.hoist_static_alloc %func_arg
+  //     : (!transform.op<"func.func">) -> !transform.op<"func.func">
+  //   %allocs = transform.structured.match ops{["memref.alloc"]} in %variant_op_3
+  //     : (!pdl.operation) -> !transform.op<"memref.alloc">
+  //   %mb_allocs = transform.memref.multibuffer %allocs {factor = 2 : i64, skip_analysis} 
+  //     : (!transform.op<"memref.alloc">) -> !pdl.operation
+  // }
+  // // Rewrite as cp.async.
+  // %func_a = transform.structured.match ops{["func.func"]} in %variant_op_3 
+  //   : (!pdl.operation) -> !pdl.operation
+  // %func_a_2 = transform.iree.create_async_groups %func_a {use_mma_sync = false} 
+  //   : (!pdl.operation) -> (!pdl.operation)
+  // // Pipelining (must match the amount of multi-buffering).
+  // // TODO: Matching the loop by return type is fragile here.
+  // %for = transform.structured.match ops{["scf.for"]} 
+  //   filter_result_type = !gpu.mma_matrix<16x16xf32, "COp"> in %variant_op_3 
+  //   : (!pdl.operation) -> !transform.op<"scf.for">
+  // %2 = transform.iree.pipeline_shared_memory_copies %for { depth = 2 } 
+  //   : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
 }
