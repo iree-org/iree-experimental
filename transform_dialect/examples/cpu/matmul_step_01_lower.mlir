@@ -74,4 +74,30 @@ transform.structured.canonicalized_sequence failures(propagate) {
     : (!pdl.operation) -> !pdl.operation
   %func_2 = transform.iree.erase_hal_descriptor_type_from_memref %func
   transform.iree.forall_to_workgroup %func_2
+
+  // ============================================================================
+  // Note: Ideally, we would only want the following 2 transforms for the most
+  // basic e2e connection
+  //
+  // IREE-specific bufferization and cleanup
+  // ============================================================================
+  // %variant_op_2 = transform.iree.bufferize %variant_op
+  // %func = transform.structured.match ops{["func.func"]} in %variant_op_2
+  //   : (!pdl.operation) -> !pdl.operation
+  // %func_2 = transform.iree.erase_hal_descriptor_type_from_memref %func
+  //
+  // Unfortunately, this is not possible because we end up with a conversion error
+  // very late in the IREE pass pipeline:
+  // ```
+  //   failed to materialize conversion for result #0 of operation 'arith.constant'
+  //   that remained live after conversion
+  // ```
+  //
+  // This error is due to the fact that the "workgroup_count" region does not get
+  // lowered and gives us problems.
+  // As a consequence, we pay the cost of an extra 
+  //   `transform.iree.tile_to_forall_and_workgroup_count_region` and 
+  //   `transform.iree.forall_to_workgroup %func_2` 
+  // to lower e2e without headaches.
+  // ============================================================================
 }
