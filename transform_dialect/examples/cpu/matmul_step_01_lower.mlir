@@ -57,7 +57,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // ============================================================================
   %forall, %matmul =
     transform.iree.tile_to_forall_and_workgroup_count_region %original_matmul 
-      tile_sizes [99999999]
+      num_threads [1]
       // TODO: IREE needs own workgroup mapping attribute independent of GPU.
       ( mapping = [#gpu.block<x>] )
 
