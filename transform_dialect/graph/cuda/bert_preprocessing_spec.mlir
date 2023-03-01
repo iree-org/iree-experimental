@@ -1,8 +1,8 @@
 // Instructions; TL;DR
 // ===================
 // ```
-//   export IREE_DIR=/usr/local/google/home/ntv/github/iree; \
-//   export IREE_SAMPLES_DIR=/usr/local/google/home/ntv/github/iree-samples; \
+//   export IREE_DIR=${HOME}/github/iree; \
+//   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   iree-opt ${IREE_DIR}/tests/e2e/models/bert_encoder_unrolled_fake_weights.mlir --iree-mhlo-to-mhlo-preprocessing --iree-mhlo-to-linalg-on-tensors | \
 //   iree-opt --pass-pipeline="builtin.module(func.func(iree-transform-dialect-interpreter{transform-file-name=${IREE_SAMPLES_DIR}/transform_dialect/graph/cuda/bert_preprocessing_spec.mlir}))" | \
 //   iree-compile - --iree-hal-target-backends=cuda | \
@@ -17,8 +17,8 @@
 //          mlir-opt --pass-pipeline="builtin.module(test-transform-dialect-interpreter{transform-file-name=...})"
 //    When/if IREE accepts a transform interpreter in the preprocessing step, the commands can get significantly simpler.
 // ```
-//   export IREE_DIR=/usr/local/google/home/ntv/github/iree; \
-//   export IREE_SAMPLES_DIR=/usr/local/google/home/ntv/github/iree-samples; \
+//   export IREE_DIR=${HOME}/github/iree; \
+//   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   iree-opt ${IREE_DIR}/tests/e2e/models/bert_encoder_unrolled_fake_weights.mlir --iree-mhlo-to-mhlo-preprocessing --iree-mhlo-to-linalg-on-tensors | \
 //   iree-opt --pass-pipeline="builtin.module(func.func(iree-transform-dialect-interpreter{transform-file-name=${IREE_SAMPLES_DIR}/transform_dialect/graph/cuda/bert_preprocessing_spec.mlir}))"
 // ```

@@ -10,8 +10,8 @@
 //   - IREE-specific cleanups and concrete lowering to connect to the runtime.
 //
 // ```
-//   export IREE_DIR=/usr/local/google/home/ntv/github/iree; \
-//   export IREE_SAMPLES_DIR=/usr/local/google/home/ntv/github/iree-samples; \
+//   export IREE_DIR=${HOME}/github/iree; \
+//   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
 //   sed "s/\${M}/11/g" | sed "s/\${K}/12/g" | sed "s/\${N}/13/g" | \
 //   ${IREE_DIR}/build/tools/iree-opt \
@@ -27,8 +27,8 @@
 //
 // To execute:
 // ```
-//   export IREE_DIR=/usr/local/google/home/ntv/github/iree; \
-//   export IREE_SAMPLES_DIR=/usr/local/google/home/ntv/github/iree-samples; \
+//   export IREE_DIR=${HOME}/github/iree; \
+//   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
 //   sed "s/\${M}/11/g" | sed "s/\${K}/12/g" | sed "s/\${N}/13/g" | \
 //   iree-compile - --iree-hal-target-backends=llvm-cpu \

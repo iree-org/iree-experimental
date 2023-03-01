@@ -7,8 +7,8 @@
 // thread/warp level mapping or shared memory.
 //
 // ```
-//    export IREE_DIR=/usr/local/google/home/ntv/github/iree; \
-//    export IREE_SAMPLES_DIR=/usr/local/google/home/ntv/github/iree-samples; \
+//    export IREE_DIR=${HOME}/github/iree; \
+//    export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //    cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/conv_2d_nchw_fchw.mlir |\
 //    sed "s/\${N}/16/g" | sed "s/\${C}/16/g" | sed "s/\${F}/64/g" | \
 //    sed "s/\${H}/132/g" | sed "s/\${W}/132/g" | \
