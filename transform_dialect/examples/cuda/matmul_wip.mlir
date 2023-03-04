@@ -79,7 +79,7 @@
 //
 // The above command simply prints `10372752` (i.e. 10.37 million nanoseconds).
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 // transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
 

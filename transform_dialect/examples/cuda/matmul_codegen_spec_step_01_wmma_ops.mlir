@@ -36,7 +36,7 @@
 // CHECK:       gpu.subgroup_mma_compute {{.*}} : !gpu.mma_matrix<16x8xf32, "AOp">, !gpu.mma_matrix<8x16xf32, "BOp"> -> !gpu.mma_matrix<16x16xf32, "COp">
 // CHECK:       scf.yield {{.*}} : !gpu.mma_matrix<16x16xf32, "COp">
 // CHECK:     gpu.subgroup_mma_store_matrix {{.*}} {leadDimension = 4096 : index} : !gpu.mma_matrix<16x16xf32, "COp">, memref<128x128xf32, strided<[4096, 1], offset: ?>>
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!pdl.operation) -> !pdl.operation
 

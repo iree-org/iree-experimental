@@ -79,7 +79,7 @@
 // CHECK:    memref.dealloc %{{.*}} : memref<16x16x1x1xf32, #gpu.address_space<workgroup>>
 // CHECK:    return
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %named_conv = transform.structured.match ops{["linalg.conv_2d_nchw_fchw"]} in %variant_op
     : (!pdl.operation) -> !pdl.operation

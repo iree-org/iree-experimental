@@ -46,8 +46,7 @@
 
 // Comment parts of the IR below starting from the bottom-up and rerun the command
 // to see the effects of step 1. ; step 1. + step 2.; etc..
-transform.structured.canonicalized_sequence failures(propagate) {
-// transform.sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %original_matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
     : (!pdl.operation) -> !pdl.operation
@@ -59,12 +58,14 @@ transform.structured.canonicalized_sequence failures(propagate) {
       num_threads [1]
       // TODO: IREE needs own workgroup mapping attribute independent of GPU.
       ( mapping = [#gpu.block<x>] )
-
+  // Post-tiling canonicalizations, in particular to ensure num_threads == 1 in 
+  // the IR and prepare for bufferization.
+  transform.iree.apply_patterns %variant_op 
+    {canonicalization, cse, licm, tiling_canonicalization}
 
   // IREE-specific bufferization.
   // ============================================================================
   %variant_op_2 = transform.iree.bufferize %variant_op
-
 
   // IREE-specific cleanup and connection to the runtime and threadpool, 
   // required to run e2e.
@@ -73,6 +74,12 @@ transform.structured.canonicalized_sequence failures(propagate) {
     : (!pdl.operation) -> !pdl.operation
   %func_2 = transform.iree.erase_hal_descriptor_type_from_memref %func
   transform.iree.forall_to_workgroup %func_2
+
+  // TODO: maybe control transform.lower_to_llvm from here.
+
+  // Late canonicalizations and cleanups.
+  transform.iree.apply_patterns %variant_op_2 
+    {canonicalization, cse, licm, tiling_canonicalization}
 
   // ============================================================================
   // Note: Ideally, we would only want the following 2 transforms for the most

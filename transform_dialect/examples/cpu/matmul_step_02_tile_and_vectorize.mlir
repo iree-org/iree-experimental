@@ -53,11 +53,11 @@
 //
 // CHECK-IR: scf.for {{.*}} -> (tensor<1024x4096xf32>) {
 // CHECK-IR:   scf.for {{.*}} -> (tensor<1024x4096xf32>) {
-// CHECK-IR:     tensor.extract_slice {{.*}} [128, 128] [1, 1] : tensor<1024x4096xf32> to tensor<128x128xf32>
-// CHECK-IR:     scf.for {{.*}} -> (tensor<128x128xf32>) {
-// CHECK-IR:       scf.for {{.*}} -> (tensor<128x128xf32>) {
-// CHECK-IR:         scf.for {{.*}} -> (tensor<128x128xf32>) {
-// CHECK-IR:           vector.transfer_read {{.*}} {in_bounds = [true, true]} : tensor<128x128xf32>, vector<16x8xf32>
+// CHECK-IR:     tensor.extract_slice {{.*}} [32, 128] [1, 1] : tensor<1024x4096xf32> to tensor<32x128xf32>
+// CHECK-IR:     scf.for {{.*}} -> (tensor<32x128xf32>) {
+// CHECK-IR:       scf.for {{.*}} -> (tensor<32x128xf32>) {
+// CHECK-IR:         scf.for {{.*}} -> (tensor<32x128xf32>) {
+// CHECK-IR:           vector.transfer_read {{.*}} {in_bounds = [true, true]} : tensor<32x128xf32>, vector<16x8xf32>
 // CHECK-IR:           scf.for {{.*}} -> (vector<16x8xf32>) {
 // CHECK-IR:             vector.transfer_read {{.*}} {in_bounds = [true, true]} : tensor<1024x2048xf32>, vector<16x1xf32>
 // CHECK-IR:             vector.transfer_read {{.*}} {in_bounds = [true, true]} : tensor<2048x4096xf32>, vector<1x8xf32>
@@ -65,22 +65,21 @@
 // CHECK-IR-SAME:          : vector<16x1xf32>, vector<1x8xf32> into vector<16x8xf32>
 // CHECK-IR:             scf.yield {{.*}} : vector<16x8xf32>
 // CHECK-IR:           }
-// CHECK-IR:           vector.transfer_write {{.*}} {in_bounds = [true, true]} : vector<16x8xf32>, tensor<128x128xf32>
-// CHECK-IR:           scf.yield {{.*}} : tensor<128x128xf32>
+// CHECK-IR:           vector.transfer_write {{.*}} {in_bounds = [true, true]} : vector<16x8xf32>, tensor<32x128xf32>
+// CHECK-IR:           scf.yield {{.*}} : tensor<32x128xf32>
 // CHECK-IR:         }
-// CHECK-IR:         scf.yield {{.*}} : tensor<128x128xf32>
+// CHECK-IR:         scf.yield {{.*}} : tensor<32x128xf32>
 // CHECK-IR:       }
-// CHECK-IR:       scf.yield {{.*}} : tensor<128x128xf32>
+// CHECK-IR:       scf.yield {{.*}} : tensor<32x128xf32>
 // CHECK-IR:     }
-// CHECK-IR:     tensor.insert_slice {{.*}} into {{.*}} [128, 128] [1, 1] : tensor<128x128xf32> into tensor<1024x4096xf32>
+// CHECK-IR:     tensor.insert_slice {{.*}} into {{.*}} [32, 128] [1, 1] : tensor<32x128xf32> into tensor<1024x4096xf32>
 // CHECK-IR:     scf.yield %inserted_slice : tensor<1024x4096xf32>
 // CHECK-IR:   }
 // CHECK-IR:   scf.yield {{.*}} : tensor<1024x4096xf32>
 
 // Comment parts of the IR below starting from the bottom-up and rerun the command
 // to see the effects of step 1. ; step 1. + step 2.; etc..
-transform.structured.canonicalized_sequence failures(propagate) {
-// transform.sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %original_matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
     : (!pdl.operation) -> !pdl.operation
@@ -92,24 +91,37 @@ transform.structured.canonicalized_sequence failures(propagate) {
       num_threads [1]
       // TODO: IREE needs own workgroup mapping attribute independent of GPU.
       ( mapping = [#gpu.block<x>] )
+  // Post-tiling canonicalizations, in particular to ensure num_threads == 1 in 
+  // the IR.
+  transform.iree.apply_patterns %variant_op 
+    {canonicalization, cse, licm, tiling_canonicalization}
 
   // Step 1. Tile to forall and sequential scf.for.
   // ======================================================
-  %matmul_l1, %loops_l1:3 = transform.structured.tile_to_scf_for %matmul [128, 128, 512]
+  %matmul_l1, %loops_l1:3 = transform.structured.tile_to_scf_for %matmul [32, 128, 512]
   
   // Step 2. Tile to forall and sequential scf.for.
   // ======================================================
   %matmul_l2, %loops_l2:3 = transform.structured.tile_to_scf_for %matmul_l1 [8, 16, 1]
+  %generic_l2 = transform.structured.generalize %matmul_l2
 
   // Step 3. Vectorize.
   // ======================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op
     : (!pdl.operation) -> !pdl.operation
-  transform.structured.vectorize %func
+  %func_2 = transform.structured.vectorize %func
+
+  // Post-vectorization canonicalizations and hoistings to avoid roundtripping 
+  // vectors in memory and prepare for bufferization.
+  transform.iree.apply_patterns %variant_op {canonicalization, cse, licm }
+  %func_3 = transform.structured.hoist_redundant_tensor_subsets %func_2
+    : (!pdl.operation) -> !pdl.operation
 
   // IREE-specific bufferization.
   // ============================================================================
   %variant_op_2 = transform.iree.bufferize %variant_op
+  // TODO: this ends up creating a small 128x128 allocation despite not having
+  // used tensor.pad. Figure out why.
 
   // IREE-specific cleanup and connection to the runtime and threadpool, required
   // to run e2e.
@@ -123,4 +135,10 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // that are close to the LLVM level-of abstraction.
   // ============================================================================
   %func_e_4 = transform.vector.lower_vectors %func_e_3
+
+  // TODO: maybe control transform.lower_to_llvm from here.
+
+  // Late canonicalizations and cleanups.
+  transform.iree.apply_patterns %variant_op_2 
+    {canonicalization, cse, licm, tiling_canonicalization}
 }
