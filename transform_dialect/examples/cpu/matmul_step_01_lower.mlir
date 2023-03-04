@@ -2,9 +2,8 @@
 // ===================
 //
 // This script shows a minimal example lowering through IREE with custom transforms:
-//   - one level of tiling with very large tile size (required to connect to IREE's
-//     threadpool and abstractions). Due to the large tile sie, this will only
-//     run on 1 thread.
+//   - one level of tiling with `num_threads = 1` (required to connect to IREE's
+//     threadpool and abstractions).
 //   - late bufferization (i.e. convert from SSA + subsets semantics to 
 //     side-effects semantics).
 //   - IREE-specific cleanups and concrete lowering to connect to the runtime.
