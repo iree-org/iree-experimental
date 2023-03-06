@@ -104,7 +104,7 @@ transform.sequence failures(propagate) {
   
   // Step 2. Tile to forall and sequential scf.for.
   // ======================================================
-  %matmul_l2, %loops_l2:3 = transform.structured.tile_to_scf_for %matmul_l1 [16, 32, 1]
+  %matmul_l2, %loops_l2:3 = transform.structured.tile_to_scf_for %matmul_l1 [16, 16, 1]
 
   // Step 3. Vectorize.
   // ======================================================
@@ -120,9 +120,9 @@ transform.sequence failures(propagate) {
 
   // IREE-specific bufferization.
   // ============================================================================
+  // Pre-buferization canonicalizations and cleanups help avoid extra copies.
+  transform.iree.apply_patterns %variant_op {canonicalization, cse, licm}
   %variant_op_2 = transform.iree.bufferize %variant_op
-  // TODO: this ends up creating a small 128x128 allocation despite not having
-  // used tensor.pad. Figure out why.
 
   // IREE-specific cleanup and connection to the runtime and threadpool, required
   // to run e2e.

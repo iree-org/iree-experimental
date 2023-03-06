@@ -119,9 +119,9 @@ transform.sequence failures(propagate) {
 
   // IREE-specific bufferization.
   // ============================================================================
+  // Pre-buferization canonicalizations and cleanups help avoid extra copies.
+  transform.iree.apply_patterns %variant_op {canonicalization, cse, licm}
   %variant_op_2 = transform.iree.bufferize %variant_op
-  // TODO: this ends up creating a small 128x128 allocation despite not having
-  // used tensor.pad. Figure out why.
 
   // IREE-specific cleanup and connection to the runtime and threadpool, required
   // to run e2e.
@@ -139,6 +139,5 @@ transform.sequence failures(propagate) {
   // TODO: maybe control transform.lower_to_llvm from here.
 
   // Late canonicalizations and cleanups.
-  transform.iree.apply_patterns %variant_op_2 
-    {canonicalization, cse, licm, tiling_canonicalization}
+  transform.iree.apply_patterns %variant_op_2 {canonicalization, cse, licm}
 }
