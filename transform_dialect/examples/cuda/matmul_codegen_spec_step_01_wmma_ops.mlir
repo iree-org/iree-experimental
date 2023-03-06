@@ -46,7 +46,9 @@ transform.sequence failures(propagate) {
     transform.iree.tile_to_forall_and_workgroup_count_region %matmul tile_sizes [128, 128]
       ( mapping = [#gpu.block<y>, #gpu.block<x>] )
   %matmul_l2, %loops:3 = transform.structured.tile_to_scf_for %matmul_l1 [16, 16, 16]
-
+  // Post-tiling canonicalizations and cleanups.
+  transform.iree.apply_patterns %variant_op 
+    {canonicalization, cse, licm, tiling_canonicalization}
   
   // Step 2. Rank-reduce and vectorize.
   // ==================================
@@ -54,6 +56,11 @@ transform.sequence failures(propagate) {
   %func_v_2 = transform.iree.apply_patterns %func_v { rank_reducing_linalg, rank_reducing_vector }
   %func_v_3 = transform.structured.vectorize %func_v_2
   %func_v_4 = transform.iree.apply_patterns %func_v_3 { unroll_vectors_gpu_wmma }
+  // Post-vectorization canonicalizations and hoistings to avoid roundtripping 
+  // vectors in memory and prepare for bufferization.
+  transform.iree.apply_patterns %variant_op {canonicalization, cse, licm }
+  %func_v_5 = transform.structured.hoist_redundant_tensor_subsets %func_v_4
+    : (!pdl.operation) -> !pdl.operation
 
   // Step 3. Bufferize and drop HAL descriptor from memref ops.
   // ==========================================================
@@ -62,10 +69,16 @@ transform.sequence failures(propagate) {
   %func_m = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   %func_m_2 = transform.iree.erase_hal_descriptor_type_from_memref %func_m
 
-  // This must occur after bufferization because of the fancy CUDA types.
-  %func_m_3 = transform.iree.vector.vector_to_mma_conversion %func_m_2 { use_wmma }
-
-  // Step 3. Post-bufferization mapping workgroup.
+  // Step 4. Post-bufferization mapping workgroup.
   // =============================================
-  transform.iree.forall_to_workgroup %func_m_3
+  %func_m_3 = transform.iree.forall_to_workgroup %func_m_2
+
+  // Step 4. Map to wmm ops.
+  // =======================
+  // This must occur after bufferization because of the fancy CUDA types.
+  %func_m_4 = transform.iree.vector.vector_to_mma_conversion %func_m_3 { use_wmma }
+
+  // Late canonicalizations and cleanups.
+  transform.iree.apply_patterns %func_m_4
+    {canonicalization, cse, licm, tiling_canonicalization}
 }
