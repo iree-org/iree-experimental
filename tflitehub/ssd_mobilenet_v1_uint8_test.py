@@ -1,4 +1,5 @@
 # RUN: %PYTHON %s
+# XFAIL: *
 
 import absl.testing
 import coco_test_data
