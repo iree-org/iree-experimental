@@ -1,10 +1,8 @@
 // Instructions; TL;DR
 // ===================
 //
-// This script shows a simple example of tiling for 2 levels and connecting to 
-// wmma operations.
-// This is purely for illustration purposes as this does not perform any 
-// thread/warp level mapping or shared memory.
+// This script shows a simple example of a convwith 1 dims that reduces to a 
+// matmul along with a vanilla tiling and vectorization strategy.
 //
 // ```
 //    export IREE_DIR=${HOME}/github/iree; \
