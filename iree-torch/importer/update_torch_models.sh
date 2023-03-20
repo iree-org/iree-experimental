@@ -1,6 +1,13 @@
 #!/bin/bash
 
-# Runs `torch_importer` and uploads generated artifacts to gcs.
+# Runs `torch_importer` on all registered PyTorch models and saves the imported mlir files to the directory `/tmp/torch_models_<torch-mlir-version>_<timestamp>`.
+# Once complete. please upload the output directory to `gs://iree-model-artifacts/pytorch`, preserving directory name.
+#
+# Usage:
+#     bash update_torch_models.sh
+#
+# Requires python-3.10 and above and python-venv.
+# Downloads and installs the latest `torch-mlir` and `torch` dev nightly.
 
 rm -rf torch-models.venv
 bash setup_venv.sh
@@ -14,6 +21,3 @@ mkdir ${OUTPUT_DIR}
 pip list > ${OUTPUT_DIR}/version_info.txt
 
 python3 torch_importer.py -o ${OUTPUT_DIR}
-
-GCS_DIR="gs://iree-model-artifacts/pytorch/${DIR_NAME}"
-gcloud storage cp "${OUTPUT_DIR}/**" "${GCS_DIR}/"
