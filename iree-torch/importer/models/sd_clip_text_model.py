@@ -10,20 +10,22 @@ _SEQUENCE_LENGTH = 77
 # Stable Diffusion pipeline.
 class SDClipTextModel(torch.nn.Module):
 
-  def __init__(self):
-    super().__init__()
-    self.model = CLIPTextModel.from_pretrained(
-        "CompVis/stable-diffusion-v1-4",
-        subfolder="text_encoder",
-    )
+    def __init__(self):
+        super().__init__()
+        self.model = CLIPTextModel.from_pretrained(
+            "CompVis/stable-diffusion-v1-4",
+            subfolder="text_encoder",
+        )
 
-  def generate_inputs(self):
-    tokenizer = AutoTokenizer.from_pretrained("openai/clip-vit-base-patch32")
-    inputs = tokenizer(text="a photo of a cat",
-                       padding="max_length",
-                       max_length=_SEQUENCE_LENGTH,
-                       return_tensors="pt")
-    return (inputs["input_ids"], inputs["attention_mask"])
+    def generate_inputs(self, batch_size=1):
+        tokenizer = AutoTokenizer.from_pretrained(
+            "openai/clip-vit-base-patch32")
+        input_text = ["a photo of a cat"] * batch_size
+        inputs = tokenizer(text=input_text,
+                           padding="max_length",
+                           max_length=_SEQUENCE_LENGTH,
+                           return_tensors="pt")
+        return (inputs["input_ids"], inputs["attention_mask"])
 
-  def forward(self, input_ids, attention_mask):
-    return self.model(input_ids, attention_mask)[0]
+    def forward(self, input_ids, attention_mask):
+        return self.model(input_ids, attention_mask)[0]
