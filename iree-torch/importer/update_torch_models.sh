@@ -20,4 +20,4 @@ mkdir ${OUTPUT_DIR}
 
 pip list > ${OUTPUT_DIR}/version_info.txt
 
-python3 torch_importer.py -o ${OUTPUT_DIR}
+python torch_importer.py -o ${OUTPUT_DIR}

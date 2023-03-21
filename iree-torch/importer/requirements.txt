@@ -1,2 +1,5 @@
 diffusers
 transformers
+requests
+pillow
+sentencepiece
