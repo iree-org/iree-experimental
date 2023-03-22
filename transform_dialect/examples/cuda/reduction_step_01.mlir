@@ -60,11 +60,15 @@ transform.sequence failures(propagate) {
 
   // TODO: warp shuffles.
 
+  // Step 4. Map to blocks and threads.
+  // ============================================================================
   %gpu_launch = transform.gpu.map_forall_to_blocks %func_3
     grid_dims = [1024] {generate_gpu_launch}
   transform.gpu.map_nested_forall_to_threads %gpu_launch 
     block_dims = [64, 1, 1]
 
+  // Step 5. Lower vectors.
+  // ============================================================================
   %func_e = transform.structured.match ops{["func.func"]} in %module_op 
     : (!pdl.operation) -> !pdl.operation
   transform.vector.lower_vectors %func_e multireduction_lowering = "innerreduction"
