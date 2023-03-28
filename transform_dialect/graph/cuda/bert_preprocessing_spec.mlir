@@ -1,5 +1,9 @@
 // Instructions; TL;DR
 // ===================
+//
+// Note: depends onf https://github.com/nicolasvasilache/iree/tree/fold-tensor-subset
+// which is currently blocked by IREE / LLVM integrate.
+//
 // ```
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
@@ -25,7 +29,11 @@
 //
 // 2. Optionally, pipe through the following command to get to a custom TD codegen file.
 // ```
-//   iree-opt --iree-import-public \
+//   export IREE_DIR=${HOME}/github/iree; \
+//   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
+//   iree-opt ${IREE_DIR}/tests/e2e/models/bert_encoder_unrolled_fake_weights.mlir --iree-mhlo-to-mhlo-preprocessing --iree-mhlo-to-linalg-on-tensors | \
+//   iree-opt --pass-pipeline="builtin.module(func.func(iree-transform-dialect-interpreter{transform-file-name=${IREE_SAMPLES_DIR}/transform_dialect/graph/cuda/bert_preprocessing_spec.mlir}))" | \
+//   iree-opt - --iree-import-public \
 //            --iree-mhlo-input-transformation-pipeline \
 //            --iree-tosa-input-transformation-pipeline \
 //            --iree-abi-transformation-pipeline \
@@ -76,67 +84,56 @@
 //   3. hook up pack/unpack propagation patterns upstream and just call here.
 //
 // When these 3 items are done, the script below should reduce to ~10 lines.
+
+
+// Step 1. Generic packing with reduction padding to the next multiple of 16.
+// ==========================================================================
 transform.sequence failures(propagate) {
 ^bb1(%module_op: !pdl.operation):
-  %matmul_384_128 = transform.structured.match ops{["linalg.matmul"]} filter_result_type = tensor<384x128xf32> in %module_op 
+  %matmul = transform.structured.match ops{["linalg.matmul"]} in %module_op 
     : (!pdl.operation) -> (!pdl.operation)
-  // TODO: pack_greedily with next_multiple_of to generalize across reduction sizes that are not captured by filter_result_type
-  // i.e. we should have something resembling gemm_packed_sizes = [16, 16, next_multiple_of(16)] for all linalg.matmul
-  transform.structured.pack_greedily %matmul_384_128
-      gemm_packed_sizes = [16, 16, 512] gemm_inner_dims_order = [0, 1, 2]
+  transform.structured.pack_greedily %matmul
+      matmul_packed_sizes = [0, 0, 0] 
+      matmul_padded_sizes_next_multiple_of = [16, 16, 64] 
+      matmul_inner_dims_order = [0, 1, 2]
     : (!pdl.operation) -> !transform.op<"linalg.generic">
 
-  %matmul_384_2 = transform.structured.match ops{["linalg.matmul"]} filter_result_type = tensor<384x2xf32> in %module_op 
+  %batch_matmul = transform.structured.match ops{["linalg.batch_matmul"]} in %module_op 
     : (!pdl.operation) -> (!pdl.operation)
-  // TODO: pack_greedily with next_multiple_of to generalize across reduction sizes that are not captured by filter_result_type
-  // i.e. we should have something resembling gemm_packed_sizes = [16, 16, next_multiple_of(16)] for all linalg.matmul
-  transform.structured.pack_greedily %matmul_384_2
-      gemm_packed_sizes = [16, 16, 512] gemm_inner_dims_order = [0, 1, 2]
+  transform.structured.pack_greedily %batch_matmul
+      matmul_packed_sizes = [0, 0, 0] 
+      matmul_padded_sizes_next_multiple_of = [16, 16, 64]
+      matmul_inner_dims_order = [0, 1, 2]
     : (!pdl.operation) -> !transform.op<"linalg.generic">
 
-  %matmul_384_512 = transform.structured.match ops{["linalg.matmul"]} filter_result_type = tensor<384x512xf32> in %module_op 
-    : (!pdl.operation) -> (!pdl.operation)
-  // TODO: pack_greedily with next_multiple_of to generalize across reduction sizes that are not captured by filter_result_type
-  // i.e. we should have something resembling gemm_packed_sizes = [16, 16, next_multiple_of(16)] for all linalg.matmul
-  transform.structured.pack_greedily %matmul_384_512
-      gemm_packed_sizes = [16, 16, 384] gemm_inner_dims_order = [0, 1, 2]
-    : (!pdl.operation) -> !transform.op<"linalg.generic">
-
-  %batch_matmul_4_384_384 = transform.structured.match ops{["linalg.batch_matmul"]} filter_result_type = tensor<4x384x384xf32> in %module_op 
-    : (!pdl.operation) -> (!pdl.operation)
-  // TODO: pack_greedily with next_multiple_of to generalize across reduction sizes that are not captured by filter_result_type
-  // i.e. we should have something resembling gemm_packed_sizes = [16, 16, next_multiple_of(16)] for all linalg.batch_matmul
-  transform.structured.pack_greedily %batch_matmul_4_384_384
-      gemm_packed_sizes = [16, 16, 32] gemm_inner_dims_order = [0, 1, 2]
-    : (!pdl.operation) -> !transform.op<"linalg.generic">
-
-  %batch_matmul_4_384_32 = transform.structured.match ops{["linalg.batch_matmul"]} filter_result_type = tensor<4x384x32xf32> in %module_op 
-    : (!pdl.operation) -> (!pdl.operation)
-  // TODO: pack_greedily with next_multiple_of to generalize across reduction sizes that are not captured by filter_result_type
-  // i.e. we should have something resembling gemm_packed_sizes = [16, 16, next_multiple_of(16)] for all linalg.batch_matmul
-  transform.structured.pack_greedily %batch_matmul_4_384_32
-      gemm_packed_sizes = [16, 16, 384] gemm_inner_dims_order = [0, 1, 2]
-    : (!pdl.operation) -> !transform.op<"linalg.generic">
-
-  // This is a rewrite of tensor.pack/tensor.unpack to linalg_ext.pack/linalg_ext.unpack
-  // that IREE currently understands.
-  // TODO: Remove once IREE adopts tensor.pack/unpack.
-  // TODO: Unfortunately, this does not go through and hangs in iree-compile so
-  // we need to fallback to other lowering to linalg.fill/linalg.transpose/etc below.
+  // Step 2. Pack / unpack propagation (TODO: activate when it works).
+  // =================================================================
+  // Pack / unpack propagation does not yet work properly and produces invalid IR.
+  // E.g.:
+  // <stdin>:17141:13: error: 'tensor.pack' op invalid tile factor provided. 
+  // Only full tiles are supported when padding_value is not set
+  // %6602 = linalg.generic {indexing_maps = [#map2, #map3], 
+  //                         iterator_types = ["parallel", "parallel"]} 
+  //         ins(%1114 : tensor<2xf32>) outs(%6601 : tensor<384x2xf32>) ...
   //
-  // %func = transform.structured.match ops{["func.func"]} in %module_op
+  // %func = transform.structured.match ops{["func.func"]} in %module_op 
   //   : (!pdl.operation) -> (!pdl.operation)
-  // transform.iree.apply_patterns %func { rewrite_pack_ops }
+  // transform.iree.apply_patterns %func { bubble_pack_un_pack }
+  //   : (!pdl.operation) -> ()
 
-  // IREE does not understand tensor.pack/unpack yet, so we have to lower them
-  // explicitly to a form IREE understands.
-  // This is only required to generate the PTX.
-  //
+  // Step 3. Special pack / unpack lowering (TODO: drop when possible).
+  // ==================================================================
+  // IREE fails lowering of tensor.pack/unpack ops with:
+  // <stdin>:23295:20: error: 'tensor.extract_slice' op unhandled operation when 
+  // converting to destination passing style
+  // %unpack_3675 = tensor.unpack %7830 inner_dims_pos = [0, 1] 
+  //                inner_tiles = [384, 16] into %7826 
+  //                : tensor<1x1x384x16xf32> -> tensor<384x2xf32>
+  // So instead we lower them ourselves.
   %pack = transform.structured.match ops{["tensor.pack"]} in %module_op
     : (!pdl.operation) -> !transform.op<"tensor.pack">
   transform.structured.lower_pack %pack : (!transform.op<"tensor.pack">) 
     -> (!transform.op<"tensor.pad">, !transform.op<"tensor.expand_shape">, !transform.op<"linalg.transpose">)
-
   %unpack = transform.structured.match ops{["tensor.unpack"]} in %module_op
     : (!pdl.operation) -> !transform.op<"tensor.unpack">
   transform.structured.lower_unpack %unpack : (!transform.op<"tensor.unpack">) 
@@ -144,5 +141,19 @@ transform.sequence failures(propagate) {
         !transform.op<"linalg.transpose">,
         !transform.op<"tensor.collapse_shape">,
         !transform.op<"tensor.extract_slice">)
+
+  // Step 4. Various patterns (TODO: drop when possible).
+  // ====================================================
+  %func = transform.structured.match ops{["func.func"]} in %module_op 
+    : (!pdl.operation) -> (!pdl.operation)
+  transform.iree.apply_patterns %func { rank_reducing_linalg_via_reshapes } : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func { canonicalization, cse } : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func { linalg_elementwise_greedy_fusion } : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func { bubble_expand } : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func { bubble_collapse } : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func { canonicalization, cse } : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func { fold_reassociative_reshape } : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func { linalg_elementwise_greedy_fusion } : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func { fold_tensor_empty_extract } : (!pdl.operation) -> ()
 }
 
