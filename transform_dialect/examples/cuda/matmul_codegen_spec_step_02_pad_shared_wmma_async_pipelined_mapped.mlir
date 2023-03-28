@@ -13,11 +13,27 @@
 // This still exhibits some phase-ordering issues that need to be better fixed
 // over time.
 //
+// Steps forward are:
+// 
+// 0. make things work with tensors to reduce phase ordering issues. This is 
+//    still ambiguous.
+// 1. propagate insert_strided_slice across loop and create more iter_args
+//    after unrolling which would allow insert/extract on vectors to fold away 
+//    and reenable wmma slice analysis
+// 2. fold memref, unroll then hoist seems to fail the bypass analysis (we are 
+//    on buffers). Maybe this only requires hoist subview ? Maybe Quentin's 
+//    transform will solve this.
+// 3. Disable premature folding of vector.transfer on tensors and replace by 
+//    opt-in patterns. https://reviews.llvm.org/D146624 starts to introduce these.
+//
+//
 // ```
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
 //   sed "s/\${M}/1024/g" | sed "s/\${K}/2048/g" | sed "s/\${N}/4096/g" | \
+//   sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
+//   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-opt \
 //     --iree-hal-target-backends=cuda \
 //     --iree-abi-transformation-pipeline \
@@ -36,6 +52,8 @@
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
 //   sed "s/\${M}/1024/g" | sed "s/\${K}/2048/g" | sed "s/\${N}/4096/g" | \
+//   sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
+//   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
 //     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped.mlir \
@@ -51,6 +69,8 @@
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
 //   sed "s/\${M}/1024/g" | sed "s/\${K}/2048/g" | sed "s/\${N}/4096/g" | \
+//   sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
+//   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
 //     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped.mlir \
@@ -58,12 +78,12 @@
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
-//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb --input=1024x2048xf32=1 --input=2048x4096xf32=1 --input=1024x4096xf32=1 2>&1" | \
-//   grep matmul_static_dispatch | awk '{print $6}'
+//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=fill_matmul_static --device=cuda --module=foo.vmfb --input=1024x2048xf32=1 --input=2048x4096xf32=1 --input=1024x4096xf32=1 2>&1" | \
+//   grep fill_matmul_static_dispatch | awk '{print $6}'
 //
 //   # The above prints the min across the 5 invocations.
 //   # Alternatively, grep a little more to see what happens in more detail.
-//   grep -3 matmul_static_dispatch
+//   grep -3 fill_matmul_static_dispatch
 // ```
 //
 // The above command simply prints `370944` (i.e. 0.371 million nanoseconds).
@@ -75,13 +95,15 @@
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
 //   sed "s/\${M}/1024/g" | sed "s/\${K}/2048/g" | sed "s/\${N}/4096/g" | \
+//   sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
+//   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
 //     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped.mlir \
 //     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
-//   ssh ${USER}@${A100_MACHINE_IP} "sudo /usr/local/cuda/bin/ncu -f --set full -o profile ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb \
+//   ssh ${USER}@${A100_MACHINE_IP} "sudo /usr/local/cuda/bin/ncu -f --set full -o profile ~/iree-run-module --function=fill_matmul_static --device=cuda --module=foo.vmfb \
 //     --input=1024x2048xf32=1 --input=2048x4096xf32=1 --input=1024x4096xf32=1"
 // ```
 //
@@ -148,6 +170,8 @@
 
 transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
+  %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
+    : (!pdl.operation) -> !pdl.operation
   %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
     : (!pdl.operation) -> !pdl.operation
 
@@ -156,6 +180,7 @@ transform.sequence failures(propagate) {
   %forall_l1, %matmul_l1 =
     transform.iree.tile_to_forall_and_workgroup_count_region %matmul tile_sizes [128, 128]
       ( mapping = [#gpu.block<y>, #gpu.block<x>] )
+  %fill_l1 = transform.structured.fuse_into_containing_op %fill into %forall_l1
   %matmul_l2, %loops:1 = transform.structured.tile_to_scf_for %matmul_l1 [0, 0, 16]
   // // Post-tiling canonicalizations and cleanups.
   // transform.iree.apply_patterns %variant_op 
@@ -198,6 +223,9 @@ transform.sequence failures(propagate) {
   %forall_l3, %matmul_padded_l3 = 
     transform.structured.tile_to_forall_op %matmul_padded_l2 num_threads [2, 2]
       ( mapping = [#gpu.warp<y>, #gpu.warp<x>] )
+  %forall_fill_l3, %fill_l3 = 
+    transform.structured.tile_to_forall_op %fill_l1 num_threads [2, 2]
+      ( mapping = [#gpu.warp<y>, #gpu.warp<x>] )
 
   // Step 6. Rank-reduce and vectorize.
   // ==================================
@@ -229,6 +257,9 @@ transform.sequence failures(propagate) {
 
   // Step 8. Post-bufferization mapping blocks/workgroup and threads/subgroup.
   // =========================================================================
+  transform.iree.apply_patterns %variant_op_3 
+    {canonicalization, cse, licm, tiling_canonicalization}
+    : (!pdl.operation) -> ()
   transform.iree.forall_to_workgroup %func_m : (!pdl.operation) -> ()
   transform.iree.map_nested_forall_to_gpu_threads %func_m
       workgroup_dims = [64, 2, 1] warp_dims = [2, 2, 1]
@@ -241,7 +272,8 @@ transform.sequence failures(propagate) {
   // folding behavior, force a fold_memref_aliases on them to enable redundant
   // vector transfer hoisting.
   // Unfortunately, fold_memref_aliases breaks vector_to_mma conversion across 
-  // scf.for after unrolling.
+  // scf.for after unrolling dur to insert_strided_slice / extract_strided_slice
+  // across iter_args boundaries.
   // transform.iree.apply_patterns %func_m {canonicalize, cse, fold_memref_aliases}
   //   : (!pdl.operation) -> ()
   transform.iree.apply_patterns %func_m {canonicalize, cse, licm}
@@ -260,6 +292,15 @@ transform.sequence failures(propagate) {
   // but this has other tradeoffs. Still needs some investigation.
   %func_m_8 = transform.structured.hoist_redundant_vector_transfers %func_m_2
     : (!pdl.operation) -> !pdl.operation
+
+  transform.iree.apply_patterns %func_m_8 
+    {canonicalization, cse, licm, tiling_canonicalization}
+    : (!pdl.operation) -> ()
+  // TODO: this currently fails to apply mem2reg due to asymmetrical 
+  // subview/subtensor folding. We are still missing an LLVM integrate before 
+  // this can occur. 
+  transform.iree.apply_buffer_optimizations %func_m_8 : (!pdl.operation) -> ()
+
   // This must occur after bufferization because of the fancy CUDA types.
   transform.iree.vector.vector_to_mma_conversion %func_m_8 { use_wmma }
     : (!pdl.operation) -> ()
@@ -282,9 +323,13 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   // Lower remaining vector ops to 1-D which will trigger the cp-async.
   // Alternatively we could explicitly unroll to 1-D innermost vectors if we 
-  // wanted a specific target shape. 
-  %func_m_9 = transform.vector.lower_vectors %func_m_8
+  // wanted a specific target shape.
+  %func_m_9 = transform.vector.transfer_to_scf %func_m_8
+    max_transfer_rank = 1 full_unroll = true
+      : (!pdl.operation) -> !pdl.operation
   transform.iree.create_async_groups %func_m_9 {use_mma_sync = false} 
+    : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func_m_9 {canonicalize, cse, fold_memref_aliases, licm}
     : (!pdl.operation) -> ()
 
   // Step 11. Pipeline shared memory copies.

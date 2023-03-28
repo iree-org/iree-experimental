@@ -13,6 +13,7 @@
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
 //   sed "s/\${M}/11/g" | sed "s/\${K}/12/g" | sed "s/\${N}/13/g" | \
+//   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${IREE_DIR}/build/tools/iree-opt \
 //     --iree-hal-target-backends=llvm-cpu \
 //     --iree-abi-transformation-pipeline \
@@ -30,6 +31,7 @@
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
 //   sed "s/\${M}/11/g" | sed "s/\${K}/12/g" | sed "s/\${N}/13/g" | \
+//   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   iree-compile - --iree-hal-target-backends=llvm-cpu \
 //     --iree-codegen-llvmcpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cpu/matmul_step_01_lower.mlir | \
 //   iree-run-module --function=matmul_static \
@@ -61,25 +63,29 @@ transform.sequence failures(propagate) {
   // Post-tiling canonicalizations, in particular to ensure num_threads == 1 in 
   // the IR and prepare for bufferization.
   transform.iree.apply_patterns %variant_op 
-    {canonicalization, cse, licm, tiling_canonicalization}
+    {canonicalization, cse, licm, tiling_canonicalization} : (!pdl.operation) -> ()
 
   // IREE-specific bufferization.
   // ============================================================================
   %variant_op_2 = transform.iree.bufferize %variant_op
+   : (!pdl.operation) -> (!pdl.operation)
 
   // IREE-specific cleanup and connection to the runtime and threadpool, 
   // required to run e2e.
   // ============================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op_2
     : (!pdl.operation) -> !pdl.operation
-  %func_2 = transform.iree.erase_hal_descriptor_type_from_memref %func
-  transform.iree.forall_to_workgroup %func_2
+  transform.iree.erase_hal_descriptor_type_from_memref %func
+    : (!pdl.operation) -> ()
+  transform.iree.forall_to_workgroup %func
+    : (!pdl.operation) -> ()
 
   // TODO: maybe control transform.lower_to_llvm from here.
 
   // Late canonicalizations and cleanups.
   transform.iree.apply_patterns %variant_op_2 
     {canonicalization, cse, licm, tiling_canonicalization}
+      : (!pdl.operation) -> ()
 
   // ============================================================================
   // Note: Ideally, we would only want the following 2 transforms for the most

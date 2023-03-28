@@ -11,6 +11,8 @@
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
 //   sed "s/\${M}/1024/g" | sed "s/\${N}/4096/g" | sed "s/\${K}/2048/g" | \
+//   sed "s/private @matmul_static(/@matmul_static(/g" | \
+//   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-opt \
 //     --iree-hal-target-backends=cuda \
 //     --iree-abi-transformation-pipeline \
@@ -38,7 +40,8 @@
 // CHECK:     gpu.subgroup_mma_store_matrix {{.*}} {leadDimension = 4096 : index} : !gpu.mma_matrix<16x16xf32, "COp">, memref<128x128xf32, strided<[4096, 1], offset: ?>>
 transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
-  %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+  %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
+    : (!pdl.operation) -> !pdl.operation
 
   // Step 1. Tile to forall and sequential scf.for.
   // ======================================================
@@ -49,36 +52,45 @@ transform.sequence failures(propagate) {
   // Post-tiling canonicalizations and cleanups.
   transform.iree.apply_patterns %variant_op 
     {canonicalization, cse, licm, tiling_canonicalization}
+      : (!pdl.operation) -> ()
   
   // Step 2. Rank-reduce and vectorize.
   // ==================================
   %func_v = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %func_v_2 = transform.iree.apply_patterns %func_v { rank_reducing_linalg, rank_reducing_vector }
-  %func_v_3 = transform.structured.vectorize %func_v_2
-  %func_v_4 = transform.iree.apply_patterns %func_v_3 { unroll_vectors_gpu_wmma }
+  transform.iree.apply_patterns %func_v { rank_reducing_linalg, rank_reducing_vector }
+    : (!pdl.operation) -> ()
+  %func_v_3 = transform.structured.vectorize %func_v
+  transform.iree.apply_patterns %func_v_3 { unroll_vectors_gpu_wmma }
+    : (!pdl.operation) -> ()
   // Post-vectorization canonicalizations and hoistings to avoid roundtripping 
   // vectors in memory and prepare for bufferization.
   transform.iree.apply_patterns %variant_op {canonicalization, cse, licm }
-  %func_v_5 = transform.structured.hoist_redundant_tensor_subsets %func_v_4
-    : (!pdl.operation) -> !pdl.operation
+    : (!pdl.operation) -> ()
+  %func_v_4 = transform.structured.hoist_redundant_tensor_subsets %func_v_3
+    : (!pdl.operation) -> (!pdl.operation)
 
   // Step 3. Bufferize and drop HAL descriptor from memref ops.
   // ==========================================================
-  %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
-  %variant_op_3 = transform.iree.bufferize %variant_op_2
+  transform.iree.eliminate_empty_tensors %variant_op
+    : (!pdl.operation) -> ()
+  %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op
+    : (!pdl.operation) -> !pdl.operation
   %func_m = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  %func_m_2 = transform.iree.erase_hal_descriptor_type_from_memref %func_m
+  transform.iree.erase_hal_descriptor_type_from_memref %func_m
+    : (!pdl.operation) -> ()
 
   // Step 4. Post-bufferization mapping workgroup.
   // =============================================
-  %func_m_3 = transform.iree.forall_to_workgroup %func_m_2
+  transform.iree.forall_to_workgroup %func_m: (!pdl.operation) -> ()
 
   // Step 4. Map to wmm ops.
   // =======================
   // This must occur after bufferization because of the fancy CUDA types.
-  %func_m_4 = transform.iree.vector.vector_to_mma_conversion %func_m_3 { use_wmma }
+  transform.iree.vector.vector_to_mma_conversion %func_m { use_wmma }
+    : (!pdl.operation) -> ()
 
   // Late canonicalizations and cleanups.
-  transform.iree.apply_patterns %func_m_4
+  transform.iree.apply_patterns %func_m
     {canonicalization, cse, licm, tiling_canonicalization}
+      : (!pdl.operation) -> ()
 }

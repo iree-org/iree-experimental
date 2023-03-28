@@ -52,15 +52,14 @@ transform.sequence failures(propagate) {
   
   %conv = transform.structured.generalize %named_conv
 
-  // Turns out the 1x1 ... conv is actually a matmul.
+  // Turns out the 1x1 ... conv is actually just a matmul.
   %func = transform.structured.match ops{["func.func"]} in %variant_op 
     : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %func { rank_reducing_linalg }
-  transform.iree.apply_patterns %variant_op {canonicalization, cse, tiling_canonicalization}
+    : (!pdl.operation) -> ()
 
   // TODO: Add a transform.structured.specialize that can match a few different ops
   // Then, this reduces to just a linalg.matmul and we can reuse existing strategies.
-
 
   // Step 1. Tile to forall and sequential scf.for.
   // ======================================================
@@ -68,22 +67,27 @@ transform.sequence failures(propagate) {
     transform.iree.tile_to_forall_and_workgroup_count_region %conv
       tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
-  transform.iree.apply_patterns %variant_op {canonicalization, cse, tiling_canonicalization}
 
   // Step 2. Tile to sequential scf.for.
   // ======================================================
   %matmul_l2, %loops_l1:3 = transform.structured.tile_to_scf_for %conv_l1 [1, 4, 4]
-  transform.iree.apply_patterns %variant_op {canonicalization, cse, licm }
-
+  transform.iree.apply_patterns %func { rank_reducing_linalg }
+    : (!pdl.operation) -> ()
+  
   // Step 3. Vectorize.
   // ======================================================
   %func_v = transform.structured.match ops{["func.func"]} in %variant_op
     : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %func_v { rank_reducing_linalg }
+    : (!pdl.operation) -> ()
   %func_v_2 = transform.structured.vectorize %func_v
   // Post-vectorization canonicalizations and hoistings to avoid roundtripping 
   // vectors in memory and prepare for bufferization.
-  transform.iree.apply_patterns %variant_op {canonicalization, cse, licm }
+  // TODO: some weirdness here with orderings, split in 2to better control for now.
+  transform.iree.apply_patterns %variant_op {canonicalization, cse}
+    : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %variant_op {fold_tensor_subsets}
+    : (!pdl.operation) -> ()
   transform.structured.hoist_redundant_tensor_subsets %func_v_2
     : (!pdl.operation) -> !pdl.operation
 
@@ -91,7 +95,9 @@ transform.sequence failures(propagate) {
   // ============================================================================
   // Pre-buferization canonicalizations and cleanups help avoid extra copies.
   transform.iree.apply_patterns %variant_op {canonicalization, cse, licm}
+    : (!pdl.operation) -> ()
   %variant_op_2 = transform.iree.bufferize %variant_op
+    : (!pdl.operation) -> !pdl.operation
   // This is to debug bufferization if needed.
   // %variant_op_2 = transform.iree.bufferize {test_analysis_only, print_conflicts} %variant_op
 
@@ -100,18 +106,22 @@ transform.sequence failures(propagate) {
   // ============================================================================
   %func_e = transform.structured.match ops{["func.func"]} in %variant_op_2
     : (!pdl.operation) -> !pdl.operation
-  %func_e_2 = transform.iree.erase_hal_descriptor_type_from_memref %func_e
-  %func_e_3 = transform.iree.forall_to_workgroup %func_e_2
+  transform.iree.erase_hal_descriptor_type_from_memref %func_e
+    : (!pdl.operation) -> ()
+  transform.iree.forall_to_workgroup %func_e
+    : (!pdl.operation) -> ()
   
   // Step 4. Late blanket/intrusive lowering of vector ops to vector abstractions
   // that are close to the LLVM level-of abstraction.
   // ============================================================================
   // TODO: some weirdness happening here that needs to be investigated.
-  %func_e_4 = transform.vector.lower_vectors %func_e_3
-    contraction_lowering = "outerproduct"
-    transpose_lowering = "shuffle"
+  // %func_e_4 = transform.vector.lower_vectors %func_e
+  //   contraction_lowering = "outerproduct"
+  //   transpose_lowering = "shuffle"
     // {unroll_vector_transfers = false}
+    // : (!pdl.operation) -> !pdl.operation
 
   // Late canonicalizations and cleanups.
   transform.iree.apply_patterns %variant_op_2 {canonicalization, cse, licm}
+    : (!pdl.operation) -> ()
 }
