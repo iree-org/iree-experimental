@@ -49,11 +49,11 @@ transform.sequence failures(propagate) {
 
   // Step 1. Generic packing with reduction padding to the next multiple of 64.
   // ==========================================================================
-  %generic = transform.structured.match ops{["linalg.matmul"]} in %module_op
+  %matmul = transform.structured.match ops{["linalg.matmul"]} in %module_op
     : (!pdl.operation) -> !pdl.operation
-  transform.structured.pack_greedily %generic
+  transform.structured.pack_greedily %matmul
       matmul_packed_sizes = [0, 0, 0] 
-      matmul_padded_sizes_next_multiple_of = [128, 128, 128] 
+      matmul_padded_sizes_next_multiple_of = [128, 128, 32]
       matmul_inner_dims_order = [0, 1, 2]
     : (!pdl.operation) -> !transform.op<"linalg.generic">
 
@@ -78,9 +78,12 @@ transform.sequence failures(propagate) {
         !transform.op<"tensor.collapse_shape">,
         !transform.op<"tensor.extract_slice">)
 
-  // TODO: need more stuff to cleanup the rank-reducing-reshape + transpose + 
-  // rank-reducing-insert/extract chains and trn those into exactly a pad.
-  transform.iree.apply_patterns %func { canonicalization, cse } : (!pdl.operation) -> ()
-  transform.iree.apply_patterns %func { rank_reducing_linalg } : (!pdl.operation) -> ()
+  // Without generalize, the linalg.transpose named op triggers bad fusion
+  // heuristics that result in very expensive tranpose kernels.
+  // With transform.structured.generalize, the overhead is "only" ~25%.
+  %generic = transform.structured.match interface{LinalgOp} in %module_op
+    : (!pdl.operation) -> !pdl.operation
+  transform.structured.generalize %generic
+
   transform.iree.apply_patterns %func { canonicalization, cse } : (!pdl.operation) -> ()
 }
