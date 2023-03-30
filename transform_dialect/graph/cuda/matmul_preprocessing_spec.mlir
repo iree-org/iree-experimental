@@ -35,6 +35,7 @@
 //   iree-opt --pass-pipeline="builtin.module(func.func(iree-transform-dialect-interpreter{transform-file-name=${IREE_SAMPLES_DIR}/transform_dialect/graph/cuda/matmul_preprocessing_spec.mlir}))" | \
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
+//     --iree-flow-fuse-multi-use -iree-codegen-llvmgpu-use-mma-sync \
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
