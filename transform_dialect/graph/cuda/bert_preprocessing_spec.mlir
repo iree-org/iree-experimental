@@ -1,9 +1,6 @@
 // Instructions; TL;DR
 // ===================
 //
-// Note: depends onf https://github.com/nicolasvasilache/iree/tree/fold-tensor-subset
-// which is currently blocked by IREE / LLVM integrate.
-//
 // ```
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
@@ -15,7 +12,7 @@
 
 // Instructions
 // ============
-// 1. Apply transforms as a preprocessing at the graph level and drop the schedule.
+// 1. Apply transforms as a preprocessing at the graph level.
 //    Note: iree-opt --pass-pipeline="builtin.module(func.func(iree-transform-dialect-interpreter....."
 //          could also be replaced by:
 //          mlir-opt --pass-pipeline="builtin.module(test-transform-dialect-interpreter{transform-file-name=...})"

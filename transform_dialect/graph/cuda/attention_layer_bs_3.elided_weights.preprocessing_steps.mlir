@@ -2,9 +2,7 @@
 // Instructions
 // ============
 //
-// Note: this depends on the integrate: https://github.com/openxla/iree/pull/12822
-//
-// Apply transforms as a preprocessing at the graph level and drop the schedule.
+// Apply transforms as a preprocessing at the graph level.
 //
 // ```
 //   export IREE_DIR=/usr/local/google/home/ntv/github/iree; \

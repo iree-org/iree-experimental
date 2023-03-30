@@ -1,9 +1,6 @@
 // Instructions; TL;DR
 // ===================
 //
-// Note: this is currently dependent on merging the branch:
-//  https://github.com/nicolasvasilache/iree/tree/tip-integrate-03-20-2023-plus-wip
-//
 // This script shows an example of tiling for 2 levels with:
 //   - padding with nofold to achieve shared memory mapping
 //   - linear thread mapping of the copies to shared memory
@@ -20,12 +17,6 @@
 // 1. propagate insert_strided_slice across loop and create more iter_args
 //    after unrolling which would allow insert/extract on vectors to fold away 
 //    and reenable wmma slice analysis
-// 2. fold memref, unroll then hoist seems to fail the bypass analysis (we are 
-//    on buffers). Maybe this only requires hoist subview ? Maybe Quentin's 
-//    transform will solve this.
-// 3. Disable premature folding of vector.transfer on tensors and replace by 
-//    opt-in patterns. https://reviews.llvm.org/D146624 starts to introduce these.
-//
 //
 // ```
 //   export IREE_DIR=${HOME}/github/iree; \
