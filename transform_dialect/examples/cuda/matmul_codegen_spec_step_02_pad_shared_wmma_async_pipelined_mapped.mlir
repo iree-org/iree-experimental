@@ -193,7 +193,7 @@ transform.sequence failures(propagate) {
   %matmul_padded_l2 = transform.structured.pad %matmul_l2 {
     padding_values = [0.0 : f32, 0.0 : f32, 0.0 : f32], 
     padding_dimensions = [0, 1, 2], 
-    pack_paddings=[1, 1, 0]
+    pack_paddings=[1, 1, 1]
   }
   // Post-padding canonicalizations and cleanups.
   transform.iree.apply_patterns %variant_op 
@@ -217,6 +217,11 @@ transform.sequence failures(propagate) {
      : (!pdl.operation) -> !pdl.operation
   transform.structured.tile_to_forall_op %copy_rhs num_threads [4, 32]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
+
+  // %copy_res = transform.get_producer_of_operand %matmul_padded_l2[2]
+  //    : (!pdl.operation) -> !pdl.operation
+  // transform.structured.tile_to_forall_op %copy_res num_threads [4, 32]
+  //     ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
 
   // Step 5. Contraction part mapped to threads with a **SIMD** programming model.
   // =============================================================================
@@ -274,49 +279,50 @@ transform.sequence failures(propagate) {
   // Unfortunately, fold_memref_aliases breaks vector_to_mma conversion across 
   // scf.for after unrolling dur to insert_strided_slice / extract_strided_slice
   // across iter_args boundaries.
-  // transform.iree.apply_patterns %func_m {canonicalize, cse, fold_memref_aliases}
+  // transform.iree.apply_patterns %func_m {canonicalization, cse, fold_memref_aliases}
   //   : (!pdl.operation) -> ()
-  transform.iree.apply_patterns %func_m {canonicalize, cse, licm}
+  transform.iree.apply_patterns %func_m {canonicalization, cse, licm}
+    : (!pdl.operation) -> ()
+  transform.iree.hoist_static_alloc %func_m : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func_m { fold_memref_aliases }
+    : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func_m { extract_address_computations }
+    : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func_m {canonicalization, cse, licm}
     : (!pdl.operation) -> ()
   transform.iree.apply_patterns %func_m { unroll_vectors_gpu_wmma }
     : (!pdl.operation) -> ()
-
-  // Blanket canonicalizations and folding interact weirdly with buferization
-  // and create linalg.copy ops that we want to vectorize.
-  // Things still connect but somewhat by luck.
-  %func_m_2 = transform.structured.vectorize %func_m { vectorize_padding }
-
+    
   // Hoist redundant vector transfers to allow vectorization to proceed.
   // We really don't want to do this after bufferization but we need to atm.
   // One way to work around this is to hoist the pad ops on the output earlier 
   // but this has other tradeoffs. Still needs some investigation.
-  %func_m_8 = transform.structured.hoist_redundant_vector_transfers %func_m_2
+  %func_m_2 = transform.structured.hoist_redundant_vector_transfers %func_m
     : (!pdl.operation) -> !pdl.operation
-
-  transform.iree.apply_patterns %func_m_8 
-    {canonicalization, cse, licm, tiling_canonicalization}
-    : (!pdl.operation) -> ()
-  // TODO: this currently fails to apply mem2reg due to asymmetrical 
-  // subview/subtensor folding. We are still missing an LLVM integrate before 
-  // this can occur. 
-  transform.iree.apply_buffer_optimizations %func_m_8 : (!pdl.operation) -> ()
+  transform.iree.apply_buffer_optimizations %func_m_2 : (!pdl.operation) -> ()
 
   // This must occur after bufferization because of the fancy CUDA types.
-  transform.iree.vector.vector_to_mma_conversion %func_m_8 { use_wmma }
+  transform.iree.apply_patterns %func_m_2 { fold_memref_aliases }
     : (!pdl.operation) -> ()
-  //===---------------------------------------------------------------------===//
-  // END - Annoying phase-ordered section
-  //===---------------------------------------------------------------------===//
+  transform.iree.apply_patterns %func_m_2 {canonicalization, cse, licm}
+    : (!pdl.operation) -> ()
+  transform.iree.vector.vector_to_mma_conversion %func_m_2 { use_wmma }
+    : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func_m_2 {canonicalization, cse, licm}
+    : (!pdl.operation) -> ()
+  // //===---------------------------------------------------------------------===//
+  // // END - Annoying phase-ordered section
+  // //===---------------------------------------------------------------------===//
 
   // Step 9. Multi-buffering.
   // =========================================================================
-  transform.iree.apply_patterns %func_m_8 {canonicalize, cse}
+  transform.iree.apply_patterns %func_m_2 {canonicalization, cse}
     : (!pdl.operation) -> ()
   // Hoist static allocs to allow multi-buffering to proceed.
-  transform.iree.hoist_static_alloc %func_m_8 : (!pdl.operation) -> ()
-  %allocs = transform.structured.match ops{["memref.alloc"]} in %func_m_8
+  transform.iree.hoist_static_alloc %func_m_2 : (!pdl.operation) -> ()
+  %allocs = transform.structured.match ops{["memref.alloc"]} in %func_m_2
     : (!pdl.operation) -> !transform.op<"memref.alloc">
-  %mb_allocs = transform.memref.multibuffer %allocs {factor = 5 : i64, skip_analysis } 
+  %mb_allocs = transform.memref.multibuffer %allocs {factor = 4 : i64, skip_analysis } 
     : (!transform.op<"memref.alloc">) -> !pdl.operation
 
   // Step 10. Cp-async.
@@ -324,12 +330,12 @@ transform.sequence failures(propagate) {
   // Lower remaining vector ops to 1-D which will trigger the cp-async.
   // Alternatively we could explicitly unroll to 1-D innermost vectors if we 
   // wanted a specific target shape.
-  %func_m_9 = transform.vector.transfer_to_scf %func_m_8
+  %func_m_9 = transform.vector.transfer_to_scf %func_m_2
     max_transfer_rank = 1 full_unroll = true
       : (!pdl.operation) -> !pdl.operation
   transform.iree.create_async_groups %func_m_9 {use_mma_sync = false} 
     : (!pdl.operation) -> ()
-  transform.iree.apply_patterns %func_m_9 {canonicalize, cse, fold_memref_aliases, licm}
+  transform.iree.apply_patterns %func_m_9 {canonicalization, cse, fold_memref_aliases, licm}
     : (!pdl.operation) -> ()
 
   // Step 11. Pipeline shared memory copies.
@@ -340,7 +346,7 @@ transform.sequence failures(propagate) {
   transform.iree.apply_patterns %func_m_9 {canonicalization, cse}
     : (!pdl.operation) -> ()
   %for = transform.loop.get_parent_for %mma_compute : (!pdl.operation) -> !transform.op<"scf.for">
-  %pipelined_for = transform.iree.pipeline_shared_memory_copies %for { depth = 5 } 
+  %pipelined_for = transform.iree.pipeline_shared_memory_copies %for { depth = 4 } 
     : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
 
   // Late canonicalizations and cleanups.
