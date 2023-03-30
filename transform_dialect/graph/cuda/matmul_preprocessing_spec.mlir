@@ -53,7 +53,7 @@ transform.sequence failures(propagate) {
     : (!pdl.operation) -> !pdl.operation
   transform.structured.pack_greedily %matmul
       matmul_packed_sizes = [0, 0, 0] 
-      matmul_padded_sizes_next_multiple_of = [128, 128, 32]
+      matmul_padded_sizes_next_multiple_of = [128, 256, 32]
       matmul_inner_dims_order = [0, 1, 2]
     : (!pdl.operation) -> !transform.op<"linalg.generic">
 
@@ -66,24 +66,24 @@ transform.sequence failures(propagate) {
   //                inner_tiles = [384, 16] into %7826 
   //                : tensor<1x1x384x16xf32> -> tensor<384x2xf32>
   // So instead we lower them ourselves.
-  %pack = transform.structured.match ops{["tensor.pack"]} in %module_op
-    : (!pdl.operation) -> !transform.op<"tensor.pack">
-  transform.structured.lower_pack %pack : (!transform.op<"tensor.pack">) 
-    -> (!transform.op<"tensor.pad">, !transform.op<"tensor.expand_shape">, !transform.op<"linalg.transpose">)
-  %unpack = transform.structured.match ops{["tensor.unpack"]} in %module_op
-    : (!pdl.operation) -> !transform.op<"tensor.unpack">
-  transform.structured.lower_unpack %unpack : (!transform.op<"tensor.unpack">) 
-    -> (!transform.op<"tensor.empty">, 
-        !transform.op<"linalg.transpose">,
-        !transform.op<"tensor.collapse_shape">,
-        !transform.op<"tensor.extract_slice">)
+  // %pack = transform.structured.match ops{["tensor.pack"]} in %module_op
+  //   : (!pdl.operation) -> !transform.op<"tensor.pack">
+  // transform.structured.lower_pack %pack : (!transform.op<"tensor.pack">) 
+  //   -> (!transform.op<"tensor.pad">, !transform.op<"tensor.expand_shape">, !transform.op<"linalg.transpose">)
+  // %unpack = transform.structured.match ops{["tensor.unpack"]} in %module_op
+  //   : (!pdl.operation) -> !transform.op<"tensor.unpack">
+  // transform.structured.lower_unpack %unpack : (!transform.op<"tensor.unpack">) 
+  //   -> (!transform.op<"tensor.empty">, 
+  //       !transform.op<"linalg.transpose">,
+  //       !transform.op<"tensor.collapse_shape">,
+  //       !transform.op<"tensor.extract_slice">)
 
-  // Without generalize, the linalg.transpose named op triggers bad fusion
-  // heuristics that result in very expensive tranpose kernels.
-  // With transform.structured.generalize, the overhead is "only" ~25%.
-  %generic = transform.structured.match interface{LinalgOp} in %module_op
-    : (!pdl.operation) -> !pdl.operation
-  transform.structured.generalize %generic
+  // // Without generalize, the linalg.transpose named op triggers bad fusion
+  // // heuristics that result in very expensive tranpose kernels.
+  // // With transform.structured.generalize, the overhead is "only" ~25%.
+  // %generic = transform.structured.match interface{LinalgOp} in %module_op
+  //   : (!pdl.operation) -> !pdl.operation
+  // transform.structured.generalize %generic
 
-  transform.iree.apply_patterns %func { canonicalization, cse } : (!pdl.operation) -> ()
+  // transform.iree.apply_patterns %func { canonicalization, cse } : (!pdl.operation) -> ()
 }
