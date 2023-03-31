@@ -1,0 +1,61 @@
+import argparse
+import numpy as np
+import os
+import tensorflow as tf
+
+from models import resnet50
+
+_MODEL_NAME_TO_MODEL_CONFIG = {
+    # Batch sizes taken from MLPerf A100 Configs: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/resnet50
+    "RESNET50": (resnet50.ResNet50, [1, 8, 64, 128, 256, 2048]),
+}
+
+if __name__ == "__main__":
+    argParser = argparse.ArgumentParser()
+    argParser.add_argument("-o",
+                           "--output_dir",
+                           default="/tmp",
+                           help="Path to save mlir files")
+    args = argParser.parse_args()
+
+    for model_name, model_config in _MODEL_NAME_TO_MODEL_CONFIG.items():
+        print(f"\n\n--- {model_name} -------------------------------------")
+        model_class = model_config[0]
+        batch_sizes = model_config[1]
+
+        model_dir = os.path.join(args.output_dir, model_name)
+        os.makedirs(model_dir, exist_ok=True)
+
+        for batch_size in batch_sizes:
+            save_dir = os.path.join(model_dir, f"batch_{batch_size}")
+            os.makedirs(save_dir, exist_ok=True)
+
+            try:
+                model = model_class()
+                inputs = model.generate_inputs(batch_size)
+
+                # Save inputs.
+                for idx, input in enumerate(inputs):
+                    input_path = os.path.join(save_dir, f"input_{idx}.npy")
+                    print(f"Saving input {idx} to {input_path}")
+                    np.save(input_path, input)
+
+                # Save output.
+                outputs = model.forward(*inputs)
+                output_path = os.path.join(save_dir, f"output_0.npy")
+                print(f"Saving output 0 to {output_path}")
+                np.save(output_path, outputs)
+
+                # Save saved model.
+                tensor_specs = []
+                for input in inputs:
+                    tensor_specs.append(tf.TensorSpec.from_tensor(input))
+                call_signature = model.forward.get_concrete_function(*tensor_specs)
+
+                saved_model_path = os.path.join(save_dir, "saved_model")
+                os.makedirs(saved_model_path, exist_ok=True)
+                print(f"Saving {saved_model_path}")
+                tf.saved_model.save(model, saved_model_path,
+                                    signatures={"serving_default": call_signature})
+            except Exception as e:
+                print(f"Failed to import model {model_name}. Exception: {e}")
