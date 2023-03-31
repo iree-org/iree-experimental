@@ -1,7 +1,16 @@
+import pathlib
+import sys
 import torch
 
+# Add data python dir to the search path.
+sys.path.insert(
+    0,
+    str(
+        pathlib.Path(__file__).parent.parent.parent.parent / "data" /
+        "python"))
+from input_data import imagenet_test_data
+
 from diffusers import AutoencoderKL
-from models.input_data import imagenet_test_data
 from torchvision import transforms
 
 
