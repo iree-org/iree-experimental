@@ -31,4 +31,4 @@ class ResNet50(tf.Module):
 
     @tf.function(jit_compile=True)
     def forward(self, inputs):
-        return self.model.call(inputs, training=False)
+        return self.model(inputs, training=False)
