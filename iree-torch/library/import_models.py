@@ -8,15 +8,17 @@ from import_utils import import_torch_module_with_fx
 from models import bert_large, sd_clip_text_model, sd_unet_model, sd_vae_model, resnet50, t5_large, efficientnet_b7, efficientnet_v2_s
 
 _MODEL_NAME_TO_MODEL_CONFIG = {
+    # Batch sizes based on MLPerf config: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/bert
     "BERT_LARGE":
-    (bert_large.BertLarge, [1, 8, 16, 32, 64, 128, 256, 512, 1024]),
+    (bert_large.BertLarge, [1, 16, 24, 32, 48, 64, 512, 1024, 1280]),
     "EFFICIENTNET_B7": (efficientnet_b7.EfficientNetB7, [
         1,
     ]),
     "EFFICIENTNET_V2_S": (efficientnet_v2_s.EfficientNetV2S, [
         1,
     ]),
-    "RESNET50": (resnet50.Resnet50, [1, 8, 16, 32, 64, 128, 256, 512, 1024]),
+    # Batch sizes based on MLPerf config: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/resnet50
+    "RESNET50": (resnet50.Resnet50, [1, 8, 64, 128, 256, 2048]),
     "SD_CLIP_TEXT_MODEL_SEQLEN64": (sd_clip_text_model.SDClipTextModel, [
         1,
     ]),
@@ -26,8 +28,7 @@ _MODEL_NAME_TO_MODEL_CONFIG = {
     "SD_UNET_MODEL": (sd_unet_model.SDUnetModel, [
         1,
     ]),
-
-    #"T5_LARGE": (t5_large.T5Large, [1, 8, 16, 32, 64, 128, 256, 512, 1024]),
+    "T5_LARGE": (t5_large.T5Large, [1,]),
 }
 
 
