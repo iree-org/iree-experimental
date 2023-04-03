@@ -148,13 +148,13 @@ transform.sequence failures(propagate) {
      : (!pdl.operation) -> !pdl.operation
   %fill_lhs = transform.get_producer_of_operand %extract_lhs[0] 
      : (!pdl.operation) -> !pdl.operation
-  transform.structured.tile_to_forall_op %fill_lhs num_threads [32, 4]
+  transform.structured.tile_to_forall_op %fill_lhs num_threads [8, 16]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %forall_copy_lhs, %tiled_copy_lhs = 
-    transform.structured.tile_to_forall_op %copy_lhs num_threads [32, 4]
+    transform.structured.tile_to_forall_op %copy_lhs num_threads [8, 16]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %tiled_copy_lhs_generic = transform.structured.generalize %tiled_copy_lhs
-  transform.structured.masked_vectorize %tiled_copy_lhs_generic vector_sizes [4, 4]
+  transform.structured.masked_vectorize %tiled_copy_lhs_generic vector_sizes [16, 1]
 
   //
   // From now on we can't apply canonicalizations before we lower the masks away.
@@ -170,13 +170,13 @@ transform.sequence failures(propagate) {
      : (!pdl.operation) -> !pdl.operation
   %fill_rhs = transform.get_producer_of_operand %extract_rhs[0] 
      : (!pdl.operation) -> !pdl.operation
-  transform.structured.tile_to_forall_op %fill_rhs num_threads [4, 32]
+  transform.structured.tile_to_forall_op %fill_rhs num_threads [1, 128]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %forall_copy_rhs, %tiled_copy_rhs = 
-    transform.structured.tile_to_forall_op %copy_rhs num_threads [4, 32]
+    transform.structured.tile_to_forall_op %copy_rhs num_threads [1, 128]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %tiled_copy_rhs_generic = transform.structured.generalize %tiled_copy_rhs
-  transform.structured.masked_vectorize %tiled_copy_rhs_generic vector_sizes [4, 4]
+  transform.structured.masked_vectorize %tiled_copy_rhs_generic vector_sizes [16, 1]
 
   //
   // From now on we can't apply canonicalizations before we lower the masks away.
@@ -191,13 +191,13 @@ transform.sequence failures(propagate) {
      : (!pdl.operation) -> !pdl.operation
   %fill_res = transform.get_producer_of_operand %extract_res[0] 
      : (!pdl.operation) -> !pdl.operation
-  transform.structured.tile_to_forall_op %fill_res num_threads [4, 32]
+  transform.structured.tile_to_forall_op %fill_res num_threads [1, 128]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %forall_copy_res, %tiled_copy_res = 
-    transform.structured.tile_to_forall_op %copy_res num_threads [4, 32]
+    transform.structured.tile_to_forall_op %copy_res num_threads [1, 128]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %tiled_copy_res_generic = transform.structured.generalize %tiled_copy_res
-  transform.structured.masked_vectorize %tiled_copy_res_generic vector_sizes [32, 4]
+  transform.structured.masked_vectorize %tiled_copy_res_generic vector_sizes [128, 1]
 
   //
   // From now on we can't apply canonicalizations before we lower the masks away.
@@ -248,9 +248,9 @@ transform.sequence failures(propagate) {
     transform.structured.match ops{["linalg.generic"]} in %variant_op_3
       : (!pdl.operation) -> !pdl.operation
   %forall_mapped_copy_back, %tiled_mapped_copy_back = 
-    transform.structured.tile_to_forall_op %mapped_copy_back num_threads [4, 32]
+    transform.structured.tile_to_forall_op %mapped_copy_back num_threads [1, 128]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
-  transform.structured.masked_vectorize %tiled_mapped_copy_back vector_sizes [32, 4]
+  transform.structured.masked_vectorize %tiled_mapped_copy_back vector_sizes [128, 1]
   // Lower vector + canonicalize / licm again.
   %func_m_x = transform.vector.lower_mask %func_m
     : (!pdl.operation) -> !pdl.operation
