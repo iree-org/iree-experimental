@@ -6,6 +6,8 @@
 
 cmake_minimum_required(VERSION 3.21...3.24)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 project(OPENXLA_NVGPU)
 
 # TODO: Fix this once the project is slotted into place.
@@ -22,5 +24,22 @@ option(IREE_TARGET_BACKEND_DEFAULTS "Disables target backend" OFF)
 option(IREE_TARGET_BACKEND_CUDA "Enables CUDA target backend" ON)
 option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables shared libraries in the compiler by default" ON)
 
+# TODO: `llvm-cpu` compiler backend and `local-sync` HAL driver are enabled only
+# for running tests. Diable them once we'll use proper CUDA target and driver.
+option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ON)
+option(IREE_TARGET_BACKEND_LLVM_CPU "Enables the 'llvm-cpu' target backend" ON)
+
 set(IREE_COMPILER_PLUGIN_PATHS "${CMAKE_CURRENT_SOURCE_DIR}" CACHE STRING "OpenXLA nvgpu plugins")
 add_subdirectory("${IREE_ROOT_DIR}" "iree_core")
+
+#-------------------------------------------------------------------------------
+# OpenXLA NVGPU Runtime.
+#
+# Integration of NVIDIA libraries with IREE runtime via custom VM modules.
+#-------------------------------------------------------------------------------
+
+# TODO: Use same compiler flags for building runtime targets as the IREE core.
+set(IREE_CXX_STANDARD 17)
+
+add_subdirectory(runtime)
+add_subdirectory(tools)
