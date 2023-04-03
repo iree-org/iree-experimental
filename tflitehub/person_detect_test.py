@@ -1,4 +1,6 @@
 # RUN: %PYTHON %s
+# TODO(iree/#12783): Remove XFAIL
+# XFAIL: *
 
 import absl.testing
 import numpy

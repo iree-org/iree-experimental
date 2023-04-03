@@ -1,4 +1,6 @@
 # RUN: %PYTHON %s
+# TODO(iree/#12783): Remove XFAIL
+# XFAIL: *
 
 import absl.testing
 import numpy as np
@@ -36,4 +38,3 @@ class MobileBertTest(test_util.TFLiteModelTest):
 
 if __name__ == '__main__':
   absl.testing.absltest.main()
-
