@@ -3,14 +3,14 @@ import numpy as np
 import os
 import tensorflow as tf
 
-from models import resnet50, bert_large
+from models import resnet50, bert_large, t5_large
 
 _MODEL_NAME_TO_MODEL_CONFIG = {
     # Batch sizes taken from MLPerf A100 Configs: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/resnet50
     "RESNET50": (resnet50.ResNet50, [1, 8, 64, 128, 256, 2048]),
     # Batch sizes based on MLPerf config: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/bert
-    "BERT_LARGE":
-    (bert_large.BertLarge, [1, 16, 24, 32, 48, 64, 512, 1024, 1280]),
+    "BERT_LARGE": (bert_large.BertLarge, [1, 16, 24, 32, 48, 64, 512, 1024, 1280]),
+    "T5_LARGE": (t5_large.T5Large, [1,]),
 }
 
 if __name__ == "__main__":
