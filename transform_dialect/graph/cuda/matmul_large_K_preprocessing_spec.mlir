@@ -49,24 +49,28 @@ transform.sequence failures(propagate) {
   %func = transform.structured.match ops{["func.func"]} in %module_op 
     : (!pdl.operation) -> (!pdl.operation)
 
-  // Step 1. Generic packing with reduction padding to 55296 (i.e. 108 * 512).
-  // =========================================================================
+  // Step 1. Generic packing with reduction padding to next multiple of 3456 (i.e. 108 * 32).
+  // ========================================================================================
   %matmul = transform.structured.match ops{["linalg.matmul"]} in %module_op
     : (!pdl.operation) -> !pdl.operation
   %packed_matmul = transform.structured.pack_greedily %matmul 
-      matmul_packed_sizes = [0, 0, 55296] 
-      matmul_padded_sizes_next_multiple_of = [128, 256, 0]
-      matmul_inner_dims_order = [0, 1, 2]
+      matmul_packed_sizes = [0, 0, 0] 
+      matmul_padded_sizes_next_multiple_of = [128, 256, 3456] // 3456 = 108 * 32
+      // We want [0, 2, 1] to get back to a mn, mk, kn ordering.
+      // Otherwise we'd get mn, mk, nk.
+      matmul_inner_dims_order = [0, 2, 1]
     : (!pdl.operation) -> !transform.op<"linalg.generic">
 
   // Need to apply rank-reducing patterns so that split_reduction only sees a single
-  // reduction dimension. Otherwise the transformation chokes atm.
+  // reduction dimension. Otherwise, split_reduction has multiple options and chokes atm.
+  // The upstream fix is simple, add a parameter to specify which of the reductions
+  // should be split and use the most minor one as the default.
   transform.iree.apply_patterns %module_op {rank_reducing_linalg} : (!pdl.operation) -> ()
 
   %packed_matmul_cast = 
     transform.cast %packed_matmul : !transform.op<"linalg.generic"> to !pdl.operation
   %1:4 = transform.structured.split_reduction %packed_matmul_cast 
-    { split_factor = 54 }
+    { split_factor = 54, insert_split_dimension = 0 }
 
   // Step 2. Special pack / unpack lowering (TODO: drop when possible).
   // ==================================================================
