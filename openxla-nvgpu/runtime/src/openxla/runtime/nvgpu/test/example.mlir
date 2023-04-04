@@ -1,4 +1,4 @@
-// RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu | openxla-runner - example.main | FileCheck %s
+// RUN: iree-compile %s --iree-hal-target-backends=cuda | openxla-runner - example.main | FileCheck %s
 
 module @example {
 

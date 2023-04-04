@@ -38,10 +38,10 @@ int main(int argc, char** argv) {
   IREE_CHECK_OK(iree_runtime_instance_create(&instance_options, host_allocator,
                                              &instance));
 
-  // Try to create the device - it should always succeed as it's a CPU device.
+  // Try to create the CUDA device.
   iree_hal_device_t* device = NULL;
   IREE_CHECK_OK(iree_runtime_instance_try_create_default_device(
-      instance, iree_make_cstring_view("local-sync"), &device));
+      instance, iree_make_cstring_view("cuda"), &device));
 
   // Create one session per loaded module to hold the module state.
   iree_runtime_session_options_t session_options;
