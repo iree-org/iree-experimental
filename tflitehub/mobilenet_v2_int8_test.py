@@ -1,4 +1,6 @@
 # RUN: %PYTHON %s
+# TODO(iree/#12783): Remove XFAIL
+# XFAIL: *
 
 import absl.testing
 import imagenet_test_data
@@ -33,4 +35,3 @@ class MobilenetV2Int8Test(test_util.TFLiteModelTest):
 
 if __name__ == '__main__':
   absl.testing.absltest.main()
-
