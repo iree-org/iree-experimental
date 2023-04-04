@@ -33,15 +33,13 @@
 //   iree-opt --pass-pipeline="builtin.module(func.func(iree-transform-dialect-interpreter{transform-file-name=${IREE_SAMPLES_DIR}/transform_dialect/graph/cuda/matmul_large_K_preprocessing_spec.mlir}))" | \
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-//     # mma-sync actually reduces perf here
-//     # --iree-flow-fuse-multi-use -iree-codegen-llvmgpu-use-mma-sync \
 //     --iree-flow-fuse-multi-use \
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
 //   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=fill_matmul_static --device=cuda --module=foo.vmfb --input=123x59999xf32=1 --input=59999x456xf32=1 --input=123x456xf32=1 2>&1" | \
 //   grep fill_matmul_static_dispatch | awk '{print $6}'
-
+// ```
 
 transform.sequence failures(propagate) {
 ^bb1(%module_op: !pdl.operation):
@@ -57,6 +55,10 @@ transform.sequence failures(propagate) {
       matmul_padded_sizes_next_multiple_of = [128, 256, 1024]
       matmul_inner_dims_order = [0, 1, 2]
     : (!pdl.operation) -> !transform.op<"linalg.generic">
+
+  // Need to apply rank-reducing patterns so that split_reduction only sees a single
+  // reduction dimension. Otherwise the transformation chokes atm.
+  transform.iree.apply_patterns %module_op {rank_reducing_linalg} : (!pdl.operation) -> ()
 
   %packed_matmul_cast = 
     transform.cast %packed_matmul : !transform.op<"linalg.generic"> to !pdl.operation
