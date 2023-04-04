@@ -8,15 +8,15 @@
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
-//   sed "s/\${M}/123/g" | sed "s/\${N}/456/g" | sed "s/\${K}/59999/g" | \
+//   sed "s/\${M}/123/g" | sed "s/\${N}/456/g" | sed "s/\${K}/51234/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce | \
 //   iree-opt --pass-pipeline="builtin.module(func.func(iree-transform-dialect-interpreter{transform-file-name=${IREE_SAMPLES_DIR}/transform_dialect/graph/cuda/matmul_large_K_preprocessing_spec.mlir}))" | \
 //   iree-compile - --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=5 | \
-//   nsys profile --stats=true  iree-run-module --function=matmul_static --device=cuda --input=123x59999xf32=1 --input=59999x456xf32=1 --input=123x456xf32=1
+//   nsys profile --stats=true  iree-run-module --function=matmul_static --device=cuda --input=123x51234xf32=1 --input=51234x456xf32=1 --input=123x456xf32=1
 //
 // # Alternatively:
-// # nsys nvprof --print-gpu-trace  iree-run-module --function=forward --device=cuda --input=123x59999xf32=1 --input=59999x456xf32=1 --input=123x456xf32=1
+// # nsys nvprof --print-gpu-trace  iree-run-module --function=forward --device=cuda --input=123x51234xf32=1 --input=51234x456xf32=1 --input=123x456xf32=1
 // ```
 //
 // To run e2e on a remote machine (${A100_MACHINE_IP}) with an A100 GPU:
@@ -27,7 +27,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/123/g" | sed "s/\${K}/59999/g" | sed "s/\${N}/456/g" | \
+//   sed "s/\${M}/123/g" | sed "s/\${K}/51234/g" | sed "s/\${N}/456/g" | \
 //   sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   iree-opt --pass-pipeline="builtin.module(func.func(iree-transform-dialect-interpreter{transform-file-name=${IREE_SAMPLES_DIR}/transform_dialect/graph/cuda/matmul_large_K_preprocessing_spec.mlir}))" | \
@@ -37,8 +37,11 @@
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
-//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=fill_matmul_static --device=cuda --module=foo.vmfb --input=123x59999xf32=1 --input=59999x456xf32=1 --input=123x456xf32=1 2>&1" | \
+//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=fill_matmul_static --device=cuda --module=foo.vmfb --input=123x51234xf32=1 --input=51234x456xf32=1 --input=123x456xf32=1 2>&1" | \
 //   grep fill_matmul_static_dispatch | awk '{print $6}'
+//
+// Extra iree-compile commands: (mma-sync actually reduces perf here)
+//   -iree-codegen-llvmgpu-use-mma-sync \
 // ```
 
 transform.sequence failures(propagate) {
@@ -46,13 +49,13 @@ transform.sequence failures(propagate) {
   %func = transform.structured.match ops{["func.func"]} in %module_op 
     : (!pdl.operation) -> (!pdl.operation)
 
-  // Step 1. Generic packing with reduction padding to the next multiple of 64.
-  // ==========================================================================
+  // Step 1. Generic packing with reduction padding to 55296 (i.e. 108 * 512).
+  // =========================================================================
   %matmul = transform.structured.match ops{["linalg.matmul"]} in %module_op
     : (!pdl.operation) -> !pdl.operation
   %packed_matmul = transform.structured.pack_greedily %matmul 
-      matmul_packed_sizes = [0, 0, 0] 
-      matmul_padded_sizes_next_multiple_of = [128, 256, 1024]
+      matmul_packed_sizes = [0, 0, 55296] 
+      matmul_padded_sizes_next_multiple_of = [128, 256, 0]
       matmul_inner_dims_order = [0, 1, 2]
     : (!pdl.operation) -> !transform.op<"linalg.generic">
 
@@ -63,7 +66,7 @@ transform.sequence failures(propagate) {
   %packed_matmul_cast = 
     transform.cast %packed_matmul : !transform.op<"linalg.generic"> to !pdl.operation
   %1:4 = transform.structured.split_reduction %packed_matmul_cast 
-    { split_factor = 59 }
+    { split_factor = 54 }
 
   // Step 2. Special pack / unpack lowering (TODO: drop when possible).
   // ==================================================================
@@ -88,7 +91,7 @@ transform.sequence failures(propagate) {
 
   // Without generalize, the linalg.transpose named op triggers bad fusion
   // heuristics that result in very expensive tranpose kernels.
-  // With transform.structured.generalize, the overhead is "only" ~25%.
+  // With transform.structured.generalize, the overhead is more manageable.
   %generic = transform.structured.match interface{LinalgOp} in %module_op
     : (!pdl.operation) -> !pdl.operation
   transform.structured.generalize %generic
