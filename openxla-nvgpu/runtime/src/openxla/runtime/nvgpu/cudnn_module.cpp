@@ -38,6 +38,9 @@ class CuDNNModuleState {
   }
 
  private:
+  CuDNNModuleState(const CuDNNModuleState&) = delete;
+  CuDNNModuleState& operator=(const CuDNNModuleState&) = delete;
+
   openxla_cudnn_dynamic_symbols_t syms_;
 
   // IREE custom module state must be thread-compatible, and access to the same
@@ -101,6 +104,9 @@ StatusOr<std::unique_ptr<CuDNNModuleState>> CuDNNModule::CreateState(
 
   // Create a cuDNN handle for the new state object.
   cudnnHandle_t handle;
+  // TODO: We must guarantee that `cuda_ctx_` is current when we create cuDNN
+  // handle. Currently we rely on implicit guarantee that module is loaded
+  // immediately after device is created, however it might not always be true?
   CUDNN_RETURN_IF_ERROR(&syms, cudnnCreate(&handle), "cudnnCreate");
 
   return std::make_unique<CuDNNModuleState>(syms, handle);

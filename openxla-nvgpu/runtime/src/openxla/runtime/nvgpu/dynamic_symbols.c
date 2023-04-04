@@ -14,7 +14,7 @@
 
 static const char* kCuDNNLoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_WINDOWS)
-    "nvcudnn.dll",
+    "cudnn.dll",
 #else
     "libcudnn.so",
 #endif  // IREE_PLATFORM_WINDOWS
@@ -22,18 +22,13 @@ static const char* kCuDNNLoaderSearchNames[] = {
 
 #define concat(A, B) A B
 
-// Load CUDA entry points, prefer _v2 version if it exists.
 static iree_status_t openxla_cudnn_dynamic_symbols_resolve_all(
     openxla_cudnn_dynamic_symbols_t* syms) {
-#define CUDNN_PFN_DECL(cuDNNSymbolName, ...)                                  \
-  {                                                                           \
-    static const char* kName = #cuDNNSymbolName;                              \
-    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(                  \
-        syms->cudnn_library, kName, (void**)&syms->cuDNNSymbolName));         \
-    static const char* kNameV2 = concat(#cuDNNSymbolName, "_v2");             \
-    void* funV2;                                                              \
-    iree_dynamic_library_lookup_symbol(syms->cudnn_library, kNameV2, &funV2); \
-    if (funV2) syms->cuDNNSymbolName = funV2;                                 \
+#define CUDNN_PFN_DECL(cuDNNSymbolName, ...)                          \
+  {                                                                   \
+    static const char* kName = #cuDNNSymbolName;                      \
+    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(          \
+        syms->cudnn_library, kName, (void**)&syms->cuDNNSymbolName)); \
   }
 
 #include "openxla/runtime/nvgpu/dynamic_symbol_tables.h"  // IWYU pragma: export
