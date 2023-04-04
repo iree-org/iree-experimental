@@ -4,11 +4,14 @@
 // Note: this is currently dependent on WIP in the branch:
 //   https://github.com/nicolasvasilache/iree/tree/matmul-unaligned
 //
+// Note: this is currently using vector 4 so it only works if all tensors have
+// sizes divisible by 4 in the f32 case.
+//
 // ```
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
-//   sed "s/\${M}/1020/g" | sed "s/\${K}/2044/g" | sed "s/\${N}/4092/g" | \
+//   sed "s/\${M}/1000/g" | sed "s/\${K}/2000/g" | sed "s/\${N}/4000/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-opt \
@@ -28,7 +31,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/1020/g" | sed "s/\${K}/2044/g" | sed "s/\${N}/4092/g" | \
+//   sed "s/\${M}/1000/g" | sed "s/\${K}/2000/g" | sed "s/\${N}/4000/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -45,7 +48,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/1020/g" | sed "s/\${K}/2044/g" | sed "s/\${N}/4092/g" | \
+//   sed "s/\${M}/1000/g" | sed "s/\${K}/2000/g" | sed "s/\${N}/4000/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -55,7 +58,7 @@
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
-//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb --input=1020x2044xf32=1 --input=2044x4092xf32=1 --input=1020x4092xf32=1 2>&1" | \
+//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb --input=1000x2000xf32=1 --input=2000x4000xf32=1 --input=1000x4000xf32=1 2>&1" | \
 //   grep matmul_static_dispatch | awk '{print $6}'
 //
 //   # The above prints the min across the 5 invocations.
@@ -71,7 +74,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/1020/g" | sed "s/\${K}/2044/g" | sed "s/\${N}/4092/g" | \
+//   sed "s/\${M}/1000/g" | sed "s/\${K}/2000/g" | sed "s/\${N}/4000/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -81,7 +84,7 @@
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
 //   ssh ${USER}@${A100_MACHINE_IP} "sudo /usr/local/cuda/bin/ncu -f --set full -o profile ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb \
-//     --input=1020x2044xf32=1 --input=2044x4092xf32=1 --input=1020x4092xf32=1"
+//     --input=1000x2000xf32=1 --input=2000x4000xf32=1 --input=1000x4000xf32=1"
 // ```
 //
 transform.sequence failures(propagate) {
@@ -148,13 +151,13 @@ transform.sequence failures(propagate) {
      : (!pdl.operation) -> !pdl.operation
   %fill_lhs = transform.get_producer_of_operand %extract_lhs[0] 
      : (!pdl.operation) -> !pdl.operation
-  transform.structured.tile_to_forall_op %fill_lhs num_threads [8, 16]
+  transform.structured.tile_to_forall_op %fill_lhs num_threads [32, 4]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %forall_copy_lhs, %tiled_copy_lhs = 
-    transform.structured.tile_to_forall_op %copy_lhs num_threads [8, 16]
+    transform.structured.tile_to_forall_op %copy_lhs num_threads [32, 4]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %tiled_copy_lhs_generic = transform.structured.generalize %tiled_copy_lhs
-  transform.structured.masked_vectorize %tiled_copy_lhs_generic vector_sizes [16, 1]
+  transform.structured.masked_vectorize %tiled_copy_lhs_generic vector_sizes [4, 4]
 
   //
   // From now on we can't apply canonicalizations before we lower the masks away.
@@ -170,13 +173,13 @@ transform.sequence failures(propagate) {
      : (!pdl.operation) -> !pdl.operation
   %fill_rhs = transform.get_producer_of_operand %extract_rhs[0] 
      : (!pdl.operation) -> !pdl.operation
-  transform.structured.tile_to_forall_op %fill_rhs num_threads [1, 128]
+  transform.structured.tile_to_forall_op %fill_rhs num_threads [4, 32]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %forall_copy_rhs, %tiled_copy_rhs = 
-    transform.structured.tile_to_forall_op %copy_rhs num_threads [1, 128]
+    transform.structured.tile_to_forall_op %copy_rhs num_threads [4, 32]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %tiled_copy_rhs_generic = transform.structured.generalize %tiled_copy_rhs
-  transform.structured.masked_vectorize %tiled_copy_rhs_generic vector_sizes [16, 1]
+  transform.structured.masked_vectorize %tiled_copy_rhs_generic vector_sizes [4, 4]
 
   //
   // From now on we can't apply canonicalizations before we lower the masks away.
@@ -191,13 +194,13 @@ transform.sequence failures(propagate) {
      : (!pdl.operation) -> !pdl.operation
   %fill_res = transform.get_producer_of_operand %extract_res[0] 
      : (!pdl.operation) -> !pdl.operation
-  transform.structured.tile_to_forall_op %fill_res num_threads [1, 128]
+  transform.structured.tile_to_forall_op %fill_res num_threads [4, 32]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %forall_copy_res, %tiled_copy_res = 
-    transform.structured.tile_to_forall_op %copy_res num_threads [1, 128]
+    transform.structured.tile_to_forall_op %copy_res num_threads [4, 32]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %tiled_copy_res_generic = transform.structured.generalize %tiled_copy_res
-  transform.structured.masked_vectorize %tiled_copy_res_generic vector_sizes [128, 1]
+  transform.structured.masked_vectorize %tiled_copy_res_generic vector_sizes [32, 4]
 
   //
   // From now on we can't apply canonicalizations before we lower the masks away.
@@ -230,8 +233,8 @@ transform.sequence failures(propagate) {
   // Step 7. Bufferize and drop HAL descriptor from memref ops.
   // ==========================================================
   // Pre-bufferization canonicalizations and cleanups help avoid extra copies.
-  transform.iree.apply_patterns %func_v_3 {canonicalization, cse, licm}
-    : (!pdl.operation) -> ()
+  // transform.iree.apply_patterns %variant_op {canonicalization, cse, licm}
+  //   : (!pdl.operation) -> ()
   transform.iree.eliminate_empty_tensors %variant_op : (!pdl.operation) -> ()
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op
     : (!pdl.operation) -> (!pdl.operation)
@@ -248,9 +251,9 @@ transform.sequence failures(propagate) {
     transform.structured.match ops{["linalg.generic"]} in %variant_op_3
       : (!pdl.operation) -> !pdl.operation
   %forall_mapped_copy_back, %tiled_mapped_copy_back = 
-    transform.structured.tile_to_forall_op %mapped_copy_back num_threads [1, 128]
+    transform.structured.tile_to_forall_op %mapped_copy_back num_threads [4, 32]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
-  transform.structured.masked_vectorize %tiled_mapped_copy_back vector_sizes [128, 1]
+  transform.structured.masked_vectorize %tiled_mapped_copy_back vector_sizes [32, 4]
   // Lower vector + canonicalize / licm again.
   %func_m_x = transform.vector.lower_mask %func_m
     : (!pdl.operation) -> !pdl.operation
@@ -296,8 +299,7 @@ transform.sequence failures(propagate) {
   %func_m_8 = transform.structured.hoist_redundant_vector_transfers %func_m_x
     : (!pdl.operation) -> !pdl.operation
 
-  transform.iree.apply_patterns %func_m_8 
-    {canonicalization, cse, licm, tiling_canonicalization}
+  transform.iree.apply_patterns %func_m_8 {canonicalization, cse, licm}
     : (!pdl.operation) -> ()
   transform.iree.apply_buffer_optimizations %func_m_8 : (!pdl.operation) -> ()
 
@@ -309,16 +311,14 @@ transform.sequence failures(propagate) {
   // END - Annoying phase-ordered section
   //===---------------------------------------------------------------------===//
 
-  // Lower vector.transfer to 1-D early to try and avoid steps 9-11.
-  // Unfortunately this does currently not lower to LLVM due to unrealized 
-  // conversion casts around vector.create_mask.
+  // Lower vector.transfer to 1-D early so we can optionally avoid steps 9-11 
+  // and ensure proper execution in a simpler case.
+  // Lowering to 1-D vector is necessary anyway for cp.async to be generated.
   %func_m_9 = transform.vector.transfer_to_scf %func_m_8
     max_transfer_rank = 1 full_unroll = true
       : (!pdl.operation) -> !pdl.operation
-  // Unfortunately this does not help with LLVM lowering ..
   %func_m_10 = transform.vector.lower_mask %func_m_9
       : (!pdl.operation) -> !pdl.operation
-
 
   //===---------------------------------------------------------------------===//
   // The steps below work enough to emit PTX but that results in unaligned memory 
@@ -331,13 +331,18 @@ transform.sequence failures(propagate) {
   // =========================================================================
   transform.iree.apply_patterns %func_m_10 {canonicalize, cse}
     : (!pdl.operation) -> ()
-  // Hoist static allocs to allow multi-buffering to proceed.
-  transform.iree.hoist_static_alloc %func_m_10 : (!pdl.operation) -> ()
+  // Fold memref aliases to allow multi-buffering to proceed.
+  transform.iree.apply_patterns %func_m_10 { fold_memref_aliases }
+    : (!pdl.operation) -> ()
   %allocs = transform.structured.match ops{["memref.alloc"]} in %func_m_10
     : (!pdl.operation) -> !transform.op<"memref.alloc">
-  %mb_allocs = transform.memref.multibuffer %allocs {factor = 5 : i64, skip_analysis } 
+  %mb_allocs = transform.memref.multibuffer %allocs {factor = 3 : i64, skip_analysis } 
     : (!transform.op<"memref.alloc">) -> !pdl.operation
 
+  // TODO: cp-async currently creates errors such as:
+  // Misaligned Shared or Local Address
+  // =========     at 0x00001120 in matmul_static_dispatch_0_matmul_1000x4000x2000 
+  
   // Step 10. Cp-async.
   // ===========================================================================
   // Lower remaining vector ops to 1-D which will trigger the cp-async.
@@ -356,11 +361,11 @@ transform.sequence failures(propagate) {
   transform.iree.apply_patterns %func_m_10 {canonicalization, cse}
     : (!pdl.operation) -> ()
   %for = transform.loop.get_parent_for %mma_compute : (!pdl.operation) -> !transform.op<"scf.for">
-  %pipelined_for = transform.iree.pipeline_shared_memory_copies %for { depth = 5 } 
+  %pipelined_for = transform.iree.pipeline_shared_memory_copies %for { depth = 3 } 
     : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
 
   // Late canonicalizations and cleanups.
-  transform.iree.apply_patterns %variant_op_3 
+  transform.iree.apply_patterns %variant_op_3
     {canonicalization, cse, licm, tiling_canonicalization}
     : (!pdl.operation) -> ()
 }
