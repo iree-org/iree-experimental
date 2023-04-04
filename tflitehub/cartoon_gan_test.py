@@ -1,4 +1,4 @@
-# RUN: %PYTHON %s
+# RUN: %PYTHON %s %config_flag
 # REQUIRES: hugetest
 
 import absl.testing
@@ -15,5 +15,3 @@ class CartoonGanTest(test_util.TFLiteModelTest):
 
 if __name__ == '__main__':
   absl.testing.absltest.main()
-
-

@@ -1,4 +1,4 @@
-# RUN: %PYTHON %s
+# RUN: %PYTHON %s %config_flag
 # XFAIL: *
 
 import absl.testing
@@ -29,4 +29,3 @@ class MobilenetV2Uint8Test(test_util.TFLiteModelTest):
 
 if __name__ == '__main__':
   absl.testing.absltest.main()
-

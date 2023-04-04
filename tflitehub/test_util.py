@@ -20,11 +20,13 @@ import urllib.request
 
 targets = {
   'local-task' : 'llvm-cpu',
+  'vmvx': 'vmvx',
   'vulkan' : 'vulkan-spirv',
 }
 
 configs = {
   'local-task' : 'local-task',
+  'vmvx': 'local-task',
   'vulkan' : 'vulkan',
 }
 

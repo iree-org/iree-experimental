@@ -1,4 +1,4 @@
-# RUN: %PYTHON %s
+# RUN: %PYTHON %s %config_flag
 # TODO(iree/#12783): Remove XFAIL
 # XFAIL: *
 

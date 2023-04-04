@@ -1,4 +1,4 @@
-# RUN: %PYTHON %s
+# RUN: %PYTHON %s %config_flag
 # XFAIL: *
 
 import absl.testing
