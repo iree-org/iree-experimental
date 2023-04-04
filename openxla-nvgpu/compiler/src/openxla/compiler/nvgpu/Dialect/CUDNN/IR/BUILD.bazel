@@ -1,0 +1,101 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("@iree_core//build_tools/bazel:build_defs.oss.bzl", "iree_cc_library", "iree_gentbl_cc_library", "iree_tablegen_doc", "iree_td_library")
+load("@iree_core//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "CUDNNDialect.td",
+            "CUDNNOps.td",
+            "CUDNNTypes.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
+cc_library(
+    name = "IR",
+    srcs = [
+        "CUDNNDialect.cpp",
+        "CUDNNOps.cpp",
+        "CUDNNTypes.cpp",
+    ],
+    hdrs = [
+        "CUDNNDialect.h",
+        "CUDNNOps.h",
+        "CUDNNTypes.h",
+    ],
+    textual_hdrs = [
+        "CUDNNOpsDialect.h.inc",
+        "CUDNNOpsDialect.cpp.inc",
+        "CUDNNOps.h.inc",
+        "CUDNNOps.cpp.inc",
+        "CUDNNTypes.h.inc",
+        "CUDNNTypes.cpp.inc",
+    ],
+    deps = [
+        ":CUDNNOpsGen",
+        ":CUDNNTypesGen",
+        "//compiler/src/openxla/compiler/nvgpu:defs",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "CUDNNOpsGen",
+    tbl_outs = [
+        (
+            ["--gen-dialect-decls"],
+            "CUDNNOpsDialect.h.inc",
+        ),
+        (
+            ["--gen-dialect-defs"],
+            "CUDNNOpsDialect.cpp.inc",
+        ),
+        (
+            ["--gen-op-decls"],
+            "CUDNNOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "CUDNNOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "CUDNNOps.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "CUDNNTypesGen",
+    tbl_outs = [
+        (
+            ["--gen-typedef-decls"],
+            "CUDNNTypes.h.inc",
+        ),
+        (
+            ["--gen-typedef-defs"],
+            "CUDNNTypes.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "CUDNNTypes.td",
+    deps = [":td_files"],
+)
