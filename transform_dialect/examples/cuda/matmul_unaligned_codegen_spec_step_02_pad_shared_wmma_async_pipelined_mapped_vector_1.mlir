@@ -326,24 +326,25 @@ transform.sequence failures(propagate) {
     : (!pdl.operation) -> ()
   %allocs = transform.structured.match ops{["memref.alloc"]} in %func_m_10
     : (!pdl.operation) -> !transform.op<"memref.alloc">
-  %mb_allocs = transform.memref.multibuffer %allocs {factor = 2 : i64, skip_analysis } 
+  %mb_allocs = transform.memref.multibuffer %allocs {factor = 3 : i64, skip_analysis } 
     : (!transform.op<"memref.alloc">) -> !pdl.operation
+
+  // Step 10. Cp-async.
+  // ===========================================================================
+  // Lower remaining vector ops to 1-D which will trigger the cp-async.
+  // Alternatively we could explicitly unroll to 1-D innermost vectors if we 
+  // wanted a specific target shape.
+  transform.iree.create_async_groups %func_m_10 {use_mma_sync = false} 
+    : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func_m_10 {canonicalize, cse, fold_memref_aliases, licm}
+    : (!pdl.operation) -> ()
+
 
   // =========================================================================== //
   // We run correctly up to here.
   // =========================================================================== //
-  
-  // TODO: cp-async currently creates invalid PTX: 'CUDA_ERROR_INVALID_PTX'.
-  
-  // // Step 10. Cp-async.
-  // // ===========================================================================
-  // // Lower remaining vector ops to 1-D which will trigger the cp-async.
-  // // Alternatively we could explicitly unroll to 1-D innermost vectors if we 
-  // // wanted a specific target shape.
-  // transform.iree.create_async_groups %func_m_10 {use_mma_sync = false} 
-  //   : (!pdl.operation) -> ()
-  // transform.iree.apply_patterns %func_m_10 {canonicalize, cse, fold_memref_aliases, licm}
-  //   : (!pdl.operation) -> ()
+    
+  // TODO: pipelining currently creates 'CUDA_ERROR_ILLEGAL_ADDRESS'.
 
   // // Step 11. Pipeline shared memory copies.
   // // ===========================================================================
@@ -353,7 +354,7 @@ transform.sequence failures(propagate) {
   // transform.iree.apply_patterns %func_m_10 {canonicalization, cse}
   //   : (!pdl.operation) -> ()
   // %for = transform.loop.get_parent_for %mma_compute : (!pdl.operation) -> !transform.op<"scf.for">
-  // %pipelined_for = transform.iree.pipeline_shared_memory_copies %for { depth = 2 } 
+  // %pipelined_for = transform.iree.pipeline_shared_memory_copies %for { depth = 3 } 
   //   : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
 
   // Late canonicalizations and cleanups.
