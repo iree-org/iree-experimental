@@ -19,6 +19,21 @@
 !in_tensor_reduction_2d_static_t = tensor<${SZ1}x${SZ2}x${ELEMENTAL_TYPE}>
 !out_tensor_reduction_2d_static_t = tensor<${SZ1}x${ELEMENTAL_TYPE}>
 
+func.func private @reduction_no_fill_2d_static(%input : !in_tensor_reduction_2d_static_t,
+  %out : !out_tensor_reduction_2d_static_t)
+     -> (!out_tensor_reduction_2d_static_t) {
+
+  %res = linalg.generic #trait_reduction_2d
+    ins(%input : !in_tensor_reduction_2d_static_t)
+   outs(%out : !out_tensor_reduction_2d_static_t) {
+      ^bb0(%a: ${ELEMENTAL_TYPE}, %b: ${ELEMENTAL_TYPE}):
+        %3 = ${ADD_OP} %a, %b : ${ELEMENTAL_TYPE}
+        linalg.yield %3 : ${ELEMENTAL_TYPE}
+      } -> !out_tensor_reduction_2d_static_t
+
+  return %res : !out_tensor_reduction_2d_static_t
+}
+
 func.func private @reduction_2d_static(%input : !in_tensor_reduction_2d_static_t)
      -> (!out_tensor_reduction_2d_static_t) {
   %c0 = arith.constant 0 : index
@@ -167,6 +182,21 @@ func.func private @reduction_3d_trailing_elementwise_static(%input : !in_tensor_
 
 !in_tensor_reduction_2d_dynamic_t = tensor<?x?x${ELEMENTAL_TYPE}>
 !out_tensor_reduction_2d_dynamic_t = tensor<?x${ELEMENTAL_TYPE}>
+
+func.func private @reduction_no_fill_2d_dynamic(%input : !in_tensor_reduction_2d_dynamic_t,
+    %out: !out_tensor_reduction_2d_dynamic_t)
+      -> (!out_tensor_reduction_2d_dynamic_t) {
+
+  %res = linalg.generic #trait_reduction_2d
+    ins(%input : !in_tensor_reduction_2d_dynamic_t)
+   outs(%out : !out_tensor_reduction_2d_dynamic_t) {
+      ^bb0(%a: ${ELEMENTAL_TYPE}, %b: ${ELEMENTAL_TYPE}):
+        %3 = ${ADD_OP} %a, %b : ${ELEMENTAL_TYPE}
+        linalg.yield %3 : ${ELEMENTAL_TYPE}
+      } -> !out_tensor_reduction_2d_dynamic_t
+
+  return %res : !out_tensor_reduction_2d_dynamic_t
+}
 
 func.func private @reduction_2d_dynamic(%input : !in_tensor_reduction_2d_dynamic_t) 
     -> (!out_tensor_reduction_2d_dynamic_t) {
