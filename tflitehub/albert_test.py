@@ -1,4 +1,5 @@
 # RUN: %PYTHON %s %config_flag
+# UNSUPPORTED: vmvx
 
 import absl.testing
 import numpy
