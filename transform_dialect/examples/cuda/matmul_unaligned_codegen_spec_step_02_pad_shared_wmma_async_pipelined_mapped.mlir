@@ -11,7 +11,7 @@
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
-//   sed "s/\${M}/1000/g" | sed "s/\${K}/2000/g" | sed "s/\${N}/4000/g" | \
+//   sed "s/\${M}/1004/g" | sed "s/\${K}/2004/g" | sed "s/\${N}/4004/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-opt \
@@ -31,7 +31,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/1000/g" | sed "s/\${K}/2000/g" | sed "s/\${N}/4000/g" | \
+//   sed "s/\${M}/1004/g" | sed "s/\${K}/2004/g" | sed "s/\${N}/4004/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -48,7 +48,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/1000/g" | sed "s/\${K}/2000/g" | sed "s/\${N}/4000/g" | \
+//   sed "s/\${M}/1004/g" | sed "s/\${K}/2004/g" | sed "s/\${N}/4004/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -58,7 +58,7 @@
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
-//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb --input=1000x2000xf32=1 --input=2000x4000xf32=1 --input=1000x4000xf32=1 2>&1" | \
+//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb --input=1004x2004xf32=1 --input=2004x4004xf32=1 --input=1004x4004xf32=1 2>&1" | \
 //   grep matmul_static_dispatch | awk '{print $6}'
 //
 //   # The above prints the min across the 5 invocations.
@@ -74,7 +74,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/1000/g" | sed "s/\${K}/2000/g" | sed "s/\${N}/4000/g" | \
+//   sed "s/\${M}/1004/g" | sed "s/\${K}/2004/g" | sed "s/\${N}/4004/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -84,7 +84,7 @@
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
 //   ssh ${USER}@${A100_MACHINE_IP} "sudo /usr/local/cuda/bin/ncu -f --set full -o profile ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb \
-//     --input=1000x2000xf32=1 --input=2000x4000xf32=1 --input=1000x4000xf32=1"
+//     --input=1004x2004xf32=1 --input=2004x4004xf32=1 --input=1004x4004xf32=1"
 // ```
 //
 transform.sequence failures(propagate) {
@@ -320,12 +320,6 @@ transform.sequence failures(propagate) {
   %func_m_10 = transform.vector.lower_mask %func_m_9
       : (!pdl.operation) -> !pdl.operation
 
-  //===---------------------------------------------------------------------===//
-  // The steps below work enough to emit PTX but that results in unaligned memory 
-  // accesses. There is a suspicion that this is due to the vector<4> and 
-  // cp-async.
-  // This needs investigation.
-  //===---------------------------------------------------------------------===//
 
   // Step 9. Multi-buffering.
   // =========================================================================
@@ -336,33 +330,37 @@ transform.sequence failures(propagate) {
     : (!pdl.operation) -> ()
   %allocs = transform.structured.match ops{["memref.alloc"]} in %func_m_10
     : (!pdl.operation) -> !transform.op<"memref.alloc">
-  %mb_allocs = transform.memref.multibuffer %allocs {factor = 3 : i64, skip_analysis } 
+  %mb_allocs = transform.memref.multibuffer %allocs {factor = 2 : i64, skip_analysis } 
     : (!transform.op<"memref.alloc">) -> !pdl.operation
+
+  // =========================================================================== //
+  // We run correctly up to here.
+  // =========================================================================== //
 
   // TODO: cp-async currently creates errors such as:
   // Misaligned Shared or Local Address
-  // =========     at 0x00001120 in matmul_static_dispatch_0_matmul_1000x4000x2000 
+  // =========     at 0x00001120 in matmul_static_dispatch_0_matmul_1004x4004x2004 
   
-  // Step 10. Cp-async.
-  // ===========================================================================
-  // Lower remaining vector ops to 1-D which will trigger the cp-async.
-  // Alternatively we could explicitly unroll to 1-D innermost vectors if we 
-  // wanted a specific target shape.
-  transform.iree.create_async_groups %func_m_10 {use_mma_sync = false} 
-    : (!pdl.operation) -> ()
-  transform.iree.apply_patterns %func_m_10 {canonicalize, cse, fold_memref_aliases, licm}
-    : (!pdl.operation) -> ()
+  // // Step 10. Cp-async.
+  // // ===========================================================================
+  // // Lower remaining vector ops to 1-D which will trigger the cp-async.
+  // // Alternatively we could explicitly unroll to 1-D innermost vectors if we 
+  // // wanted a specific target shape.
+  // transform.iree.create_async_groups %func_m_10 {use_mma_sync = false} 
+  //   : (!pdl.operation) -> ()
+  // transform.iree.apply_patterns %func_m_10 {canonicalize, cse, fold_memref_aliases, licm}
+  //   : (!pdl.operation) -> ()
 
-  // Step 11. Pipeline shared memory copies.
-  // ===========================================================================
-  %mma_compute = transform.structured.match ops{["gpu.subgroup_mma_compute"]} in %variant_op_3
-    : (!pdl.operation) -> !pdl.operation
-  // Pre pipelining cleanups.
-  transform.iree.apply_patterns %func_m_10 {canonicalization, cse}
-    : (!pdl.operation) -> ()
-  %for = transform.loop.get_parent_for %mma_compute : (!pdl.operation) -> !transform.op<"scf.for">
-  %pipelined_for = transform.iree.pipeline_shared_memory_copies %for { depth = 3 } 
-    : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
+  // // Step 11. Pipeline shared memory copies.
+  // // ===========================================================================
+  // %mma_compute = transform.structured.match ops{["gpu.subgroup_mma_compute"]} in %variant_op_3
+  //   : (!pdl.operation) -> !pdl.operation
+  // // Pre pipelining cleanups.
+  // transform.iree.apply_patterns %func_m_10 {canonicalization, cse}
+  //   : (!pdl.operation) -> ()
+  // %for = transform.loop.get_parent_for %mma_compute : (!pdl.operation) -> !transform.op<"scf.for">
+  // %pipelined_for = transform.iree.pipeline_shared_memory_copies %for { depth = 2 } 
+  //   : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
 
   // Late canonicalizations and cleanups.
   transform.iree.apply_patterns %variant_op_3

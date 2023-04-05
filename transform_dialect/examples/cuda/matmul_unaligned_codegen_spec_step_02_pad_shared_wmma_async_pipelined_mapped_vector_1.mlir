@@ -4,11 +4,6 @@
 // Note: this is currently dependent on WIP in the branch:
 //   https://github.com/nicolasvasilache/iree/tree/matmul-unaligned
 //
-// This is an example that should pass but atm fails with:
-// ```
-// Invalid __global__ read of size 4
-// ```
-//
 // ```
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
@@ -322,31 +317,23 @@ transform.sequence failures(propagate) {
   %func_m_10 = transform.vector.lower_mask %func_m_9
       : (!pdl.operation) -> !pdl.operation
 
-  //===---------------------------------------------------------------------===//
-  // DSmeom out of bounds memory access here. This needs investigation.
-  // ========= Invalid __global__ read of size 4
-  // =========     at 0x00001f30 in matmul_static_dispatch_0_matmul_1000x4000x2000
-  // =========     by thread (63,1,0) in block (31,2,0)
-  // =========     Address 0x7f8153e84800 is out of bounds
-  // =========     Saved host backtrace up to driver entry point at kernel launch time
-  // =========     Host Frame:/lib/x86_64-linux-gnu/libcuda.so [0x2e9441]
-  //===---------------------------------------------------------------------===//
+  // Step 9. Multi-buffering.
+  // =========================================================================
+  transform.iree.apply_patterns %func_m_10 {canonicalize, cse}
+    : (!pdl.operation) -> ()
+  // Fold memref aliases to allow multi-buffering to proceed.
+  transform.iree.apply_patterns %func_m_10 { fold_memref_aliases }
+    : (!pdl.operation) -> ()
+  %allocs = transform.structured.match ops{["memref.alloc"]} in %func_m_10
+    : (!pdl.operation) -> !transform.op<"memref.alloc">
+  %mb_allocs = transform.memref.multibuffer %allocs {factor = 2 : i64, skip_analysis } 
+    : (!transform.op<"memref.alloc">) -> !pdl.operation
 
-  // // Step 9. Multi-buffering.
-  // // =========================================================================
-  // transform.iree.apply_patterns %func_m_10 {canonicalize, cse}
-  //   : (!pdl.operation) -> ()
-  // // Fold memref aliases to allow multi-buffering to proceed.
-  // transform.iree.apply_patterns %func_m_10 { fold_memref_aliases }
-  //   : (!pdl.operation) -> ()
-  // %allocs = transform.structured.match ops{["memref.alloc"]} in %func_m_10
-  //   : (!pdl.operation) -> !transform.op<"memref.alloc">
-  // %mb_allocs = transform.memref.multibuffer %allocs {factor = 3 : i64, skip_analysis } 
-  //   : (!transform.op<"memref.alloc">) -> !pdl.operation
-
-  // // TODO: cp-async currently creates errors such as:
-  // // Misaligned Shared or Local Address
-  // // =========     at 0x00001120 in matmul_static_dispatch_0_matmul_999x3999x1999 
+  // =========================================================================== //
+  // We run correctly up to here.
+  // =========================================================================== //
+  
+  // TODO: cp-async currently creates invalid PTX: 'CUDA_ERROR_INVALID_PTX'.
   
   // // Step 10. Cp-async.
   // // ===========================================================================
@@ -366,7 +353,7 @@ transform.sequence failures(propagate) {
   // transform.iree.apply_patterns %func_m_10 {canonicalization, cse}
   //   : (!pdl.operation) -> ()
   // %for = transform.loop.get_parent_for %mma_compute : (!pdl.operation) -> !transform.op<"scf.for">
-  // %pipelined_for = transform.iree.pipeline_shared_memory_copies %for { depth = 3 } 
+  // %pipelined_for = transform.iree.pipeline_shared_memory_copies %for { depth = 2 } 
   //   : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
 
   // Late canonicalizations and cleanups.
