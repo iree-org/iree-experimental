@@ -17,13 +17,15 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
   SRCS
-    "Sample.cpp"
-  DEPS
-    ::PassesIncGen
-    MLIRIR
+        "ConvertMHLOToCUDNN.cpp"
+        DEPS
+        ::PassesIncGen
+        MhloDialect
+        MLIRIR
     MLIRPass
-    openxla::compiler::nvgpu::defs
-  PUBLIC
+        openxla::compiler::nvgpu::defs
+        openxla::compiler::nvgpu::Dialect::CUDNN::IR::IR
+        PUBLIC
 )
 
 iree_tablegen_library(

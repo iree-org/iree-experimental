@@ -9,11 +9,14 @@ include "mlir/Pass/PassBase.td"
 #ifndef OPENXLA_NVGPU_TRANSFORMS_PASSES_TD_
 #define OPENXLA_NVGPU_TRANSFORMS_PASSES_TD_
 
-def Sample : Pass<"openxla-nvgpu-sample", "mlir::ModuleOp"> {
-  let summary = "Sample pass";
+def ConvertMHLOToCUDNN : Pass<"openxla-nvgpu-convert-mhlo-to-cudnn", "mlir::ModuleOp"> {
+  let summary = "Converts mhlo ops to cudnn ops";
   let constructor = [{
-    ::openxla::compiler::nvgpu::createSamplePass()
+    ::openxla::compiler::nvgpu::createConvertMHLOToCUDNNPass()
   }];
+  let dependentDialects = [
+    "::openxla::compiler::nvgpu::cudnn::CUDNNDialect",
+      ];
 }
 
 #endif // OPENXLA_NVGPU_TRANSFORMS_PASSES_TD_
