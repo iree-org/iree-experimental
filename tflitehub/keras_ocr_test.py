@@ -1,4 +1,4 @@
-# RUN: %PYTHON %s
+# RUN: %PYTHON %s %config_flag
 # XFAIL: *
 
 import absl.testing
@@ -15,4 +15,3 @@ class KerasOCRTest(test_util.TFLiteModelTest):
 
 if __name__ == '__main__':
   absl.testing.absltest.main()
-

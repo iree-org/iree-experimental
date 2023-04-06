@@ -44,3 +44,11 @@ project_root = os.path.dirname(os.path.dirname(__file__))
 features_param = lit_config.params.get('FEATURES')
 if features_param:
   config.available_features.update(features_param.split(','))
+
+# Assign target backend based on the features
+if "vulkan" in config.available_features:
+  config.substitutions.append(('%config_flag', '--config=vulkan'))
+elif "vmvx" in config.available_features:
+  config.substitutions.append(('%config_flag', '--config=vmvx'))
+else:
+  config.substitutions.append(('%config_flag', '--config=local-task'))

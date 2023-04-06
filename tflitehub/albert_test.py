@@ -1,4 +1,5 @@
-# RUN: %PYTHON %s
+# RUN: %PYTHON %s %config_flag
+# UNSUPPORTED: vmvx
 
 import absl.testing
 import numpy
@@ -31,4 +32,3 @@ class AlbertTest(test_util.TFLiteModelTest):
 
 if __name__ == '__main__':
   absl.testing.absltest.main()
-

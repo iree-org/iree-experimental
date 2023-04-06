@@ -1,4 +1,4 @@
-# RUN: %PYTHON %s
+# RUN: %PYTHON %s %config_flag
 # REQUIRES: hugetest
 # XFAIL: *
 
@@ -22,4 +22,3 @@ class MirnetTest(test_util.TFLiteModelTest):
 
 if __name__ == '__main__':
   absl.testing.absltest.main()
-
