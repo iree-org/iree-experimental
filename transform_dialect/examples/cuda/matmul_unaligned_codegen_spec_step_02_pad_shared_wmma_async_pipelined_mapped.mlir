@@ -11,7 +11,7 @@
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
-//   sed "s/\${M}/1004/g" | sed "s/\${K}/2004/g" | sed "s/\${N}/4004/g" | \
+//   sed "s/\${M}/3452/g" | sed "s/\${N}/1020/g" | sed "s/\${K}/2044/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-opt \
@@ -31,7 +31,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/1004/g" | sed "s/\${K}/2004/g" | sed "s/\${N}/4004/g" | \
+//   sed "s/\${M}/3452/g" | sed "s/\${N}/1020/g" | sed "s/\${K}/2044/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -48,7 +48,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/1004/g" | sed "s/\${K}/2004/g" | sed "s/\${N}/4004/g" | \
+//   sed "s/\${M}/3452/g" | sed "s/\${N}/1020/g" | sed "s/\${K}/2044/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -58,7 +58,7 @@
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
-//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb --input=1004x2004xf32=1 --input=2004x4004xf32=1 --input=1004x4004xf32=1 2>&1" | \
+//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb --input=3452x2044xf32=1 --input=2044x1020xf32=1 --input=3452x1020xf32=1 2>&1" | \
 //   grep matmul_static_dispatch | awk '{print $6}'
 //
 //   # The above prints the min across the 5 invocations.
@@ -66,15 +66,13 @@
 //   grep -3 matmul_static_dispatch
 // ```
 //
-// The above command simply prints `370944` (i.e. 0.371 million nanoseconds).
-//
 //
 // Alternatively, run with the profiler:
 // ```
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/1004/g" | sed "s/\${K}/2004/g" | sed "s/\${N}/4004/g" | \
+//   sed "s/\${M}/3452/g" | sed "s/\${N}/1020/g" | sed "s/\${K}/2044/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -84,7 +82,7 @@
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
 //   ssh ${USER}@${A100_MACHINE_IP} "sudo /usr/local/cuda/bin/ncu -f --set full -o profile ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb \
-//     --input=1004x2004xf32=1 --input=2004x4004xf32=1 --input=1004x4004xf32=1"
+//     --input=3452x2044xf32=1 --input=2044x1020xf32=1 --input=3452x1020xf32=1
 // ```
 //
 transform.sequence failures(propagate) {
@@ -291,6 +289,10 @@ transform.sequence failures(propagate) {
   // TODO: This currently crashes without Thomas' hack.
   transform.iree.apply_patterns %func_m_x { unroll_vectors_gpu_wmma }
     : (!pdl.operation) -> ()
+  // TODO: This currently fails to lower in the backend, with some unrealized 
+  // conversion cast.
+  // transform.iree.apply_patterns %func_m_x { unroll_vectors_gpu_mma_sync }
+  //   : (!pdl.operation) -> ()
 
   // Hoist redundant vector transfers to allow vectorization to proceed.
   // We really don't want to do this after bufferization but we need to atm.
@@ -305,8 +307,14 @@ transform.sequence failures(propagate) {
 
   // This must occur after bufferization, unrolling and hoisting because of the
   // fancy CUDA types.
+  // TODO: unrolling/hoisting/conversion through vector.insert/extract_slice.
   transform.iree.vector.vector_to_mma_conversion %func_m_8 { use_wmma }
     : (!pdl.operation) -> ()
+  // TODO: This currently fails to lower in the backend, with some unrealized 
+  // conversion cast.
+  // transform.iree.vector.vector_to_mma_conversion %func_m_8 { use_mma_sync }
+  //   : (!pdl.operation) -> ()
+
   //===---------------------------------------------------------------------===//
   // END - Annoying phase-ordered section
   //===---------------------------------------------------------------------===//
@@ -320,18 +328,22 @@ transform.sequence failures(propagate) {
   %func_m_10 = transform.vector.lower_mask %func_m_9
       : (!pdl.operation) -> !pdl.operation
 
-
-  // Step 9. Multi-buffering.
-  // =========================================================================
-  transform.iree.apply_patterns %func_m_10 {canonicalize, cse}
-    : (!pdl.operation) -> ()
-  // Fold memref aliases to allow multi-buffering to proceed.
-  transform.iree.apply_patterns %func_m_10 { fold_memref_aliases }
-    : (!pdl.operation) -> ()
-  %allocs = transform.structured.match ops{["memref.alloc"]} in %func_m_10
-    : (!pdl.operation) -> !transform.op<"memref.alloc">
-  %mb_allocs = transform.memref.multibuffer %allocs {factor = 2 : i64, skip_analysis } 
-    : (!transform.op<"memref.alloc">) -> !pdl.operation
+  // // =========================================================================== //
+  // // Since cp.async is broken, multi-buffering is pure overhead.
+  // // We run reasonably efficiently up to here.
+  // // =========================================================================== //    
+  
+  // // Step 9. Multi-buffering.
+  // // =========================================================================
+  // transform.iree.apply_patterns %func_m_10 {canonicalize, cse}
+  //   : (!pdl.operation) -> ()
+  // // Fold memref aliases to allow multi-buffering to proceed.
+  // transform.iree.apply_patterns %func_m_10 { fold_memref_aliases }
+  //   : (!pdl.operation) -> ()
+  // %allocs = transform.structured.match ops{["memref.alloc"]} in %func_m_10
+  //   : (!pdl.operation) -> !transform.op<"memref.alloc">
+  // %mb_allocs = transform.memref.multibuffer %allocs {factor = 2 : i64, skip_analysis } 
+  //   : (!transform.op<"memref.alloc">) -> !pdl.operation
 
   // =========================================================================== //
   // We run correctly up to here.
@@ -339,7 +351,7 @@ transform.sequence failures(propagate) {
 
   // TODO: cp-async currently creates errors such as:
   // Misaligned Shared or Local Address
-  // =========     at 0x00001120 in matmul_static_dispatch_0_matmul_1004x4004x2004 
+  // =========     at 0x00001120 in matmul_static_dispatch_0 ...
   
   // // Step 10. Cp-async.
   // // ===========================================================================

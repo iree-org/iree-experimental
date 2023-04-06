@@ -4,11 +4,14 @@
 // Note: this is currently dependent on WIP in the branch:
 //   https://github.com/nicolasvasilache/iree/tree/matmul-unaligned
 //
+// Note: this is currently using vector 1 so it works more generally on static 
+// and dynamic sizes.
+//
 // ```
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
-//   sed "s/\${M}/999/g" | sed "s/\${K}/1999/g" | sed "s/\${N}/3999/g" | \
+//   sed "s/\${M}/3455/g" | sed "s/\${N}/1023/g" | sed "s/\${K}/2047/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-opt \
@@ -28,7 +31,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/999/g" | sed "s/\${K}/1999/g" | sed "s/\${N}/3999/g" | \
+//   sed "s/\${M}/3455/g" | sed "s/\${K}/1023/g" | sed "s/\${N}/2047/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -45,7 +48,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/999/g" | sed "s/\${K}/1999/g" | sed "s/\${N}/3999/g" | \
+//   sed "s/\${M}/3455/g" | sed "s/\${K}/1023/g" | sed "s/\${N}/2047/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -55,7 +58,7 @@
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
-//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb --input=999x1999xf32=1 --input=1999x3999xf32=1 --input=999x3999xf32=1 2>&1" | \
+//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb --input=3455x1023xf32=1 --input=1023x2047xf32=1 --input=3455x2047xf32=1 2>&1" | \
 //   grep matmul_static_dispatch | awk '{print $6}'
 //
 //   # The above prints the min across the 5 invocations.
@@ -63,15 +66,12 @@
 //   grep -3 matmul_static_dispatch
 // ```
 //
-// The above command simply prints `370944` (i.e. 0.371 million nanoseconds).
-//
-//
 // Alternatively, run with the profiler:
 // ```
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/999/g" | sed "s/\${K}/1999/g" | sed "s/\${N}/3999/g" | \
+//   sed "s/\${M}/3455/g" | sed "s/\${K}/1023/g" | sed "s/\${N}/2047/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -81,7 +81,7 @@
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
 //   ssh ${USER}@${A100_MACHINE_IP} "sudo /usr/local/cuda/bin/ncu -f --set full -o profile ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb \
-//     --input=999x1999xf32=1 --input=1999x3999xf32=1 --input=999x3999xf32=1"
+//     --input=3455x1023xf32=1 --input=1023x2047xf32=1 --input=3455x2047xf32=1"
 // ```
 //
 transform.sequence failures(propagate) {
@@ -317,27 +317,33 @@ transform.sequence failures(propagate) {
   %func_m_10 = transform.vector.lower_mask %func_m_9
       : (!pdl.operation) -> !pdl.operation
 
-  // Step 9. Multi-buffering.
-  // =========================================================================
-  transform.iree.apply_patterns %func_m_10 {canonicalize, cse}
-    : (!pdl.operation) -> ()
-  // Fold memref aliases to allow multi-buffering to proceed.
-  transform.iree.apply_patterns %func_m_10 { fold_memref_aliases }
-    : (!pdl.operation) -> ()
-  %allocs = transform.structured.match ops{["memref.alloc"]} in %func_m_10
-    : (!pdl.operation) -> !transform.op<"memref.alloc">
-  %mb_allocs = transform.memref.multibuffer %allocs {factor = 3 : i64, skip_analysis } 
-    : (!transform.op<"memref.alloc">) -> !pdl.operation
 
-  // Step 10. Cp-async.
-  // ===========================================================================
-  // Lower remaining vector ops to 1-D which will trigger the cp-async.
-  // Alternatively we could explicitly unroll to 1-D innermost vectors if we 
-  // wanted a specific target shape.
-  transform.iree.create_async_groups %func_m_10 {use_mma_sync = false} 
-    : (!pdl.operation) -> ()
-  transform.iree.apply_patterns %func_m_10 {canonicalize, cse, fold_memref_aliases, licm}
-    : (!pdl.operation) -> ()
+  // // =========================================================================== //
+  // // Since cp.async is broken, multi-buffering is pure overhead.
+  // // We run reasonably efficiently up to here.
+  // // =========================================================================== //    
+
+  // // Step 9. Multi-buffering.
+  // // =========================================================================
+  // transform.iree.apply_patterns %func_m_10 {canonicalize, cse}
+  //   : (!pdl.operation) -> ()
+  // // Fold memref aliases to allow multi-buffering to proceed.
+  // transform.iree.apply_patterns %func_m_10 { fold_memref_aliases }
+  //   : (!pdl.operation) -> ()
+  // %allocs = transform.structured.match ops{["memref.alloc"]} in %func_m_10
+  //   : (!pdl.operation) -> !transform.op<"memref.alloc">
+  // %mb_allocs = transform.memref.multibuffer %allocs {factor = 3 : i64, skip_analysis } 
+  //   : (!transform.op<"memref.alloc">) -> !pdl.operation
+
+  // // Step 10. Cp-async.
+  // // ===========================================================================
+  // // Lower remaining vector ops to 1-D which will trigger the cp-async.
+  // // Alternatively we could explicitly unroll to 1-D innermost vectors if we 
+  // // wanted a specific target shape.
+  // transform.iree.create_async_groups %func_m_10 {use_mma_sync = false} 
+  //   : (!pdl.operation) -> ()
+  // transform.iree.apply_patterns %func_m_10 {canonicalize, cse, fold_memref_aliases, licm}
+  //   : (!pdl.operation) -> ()
 
 
   // =========================================================================== //

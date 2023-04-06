@@ -58,7 +58,7 @@
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
-//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_dynamic --device=cuda --module=foo.vmfb --input=999x1999xf32=1 --input=1999x3999xf32=1 --input=999x3999xf32=1 2>&1" | \
+//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_dynamic --device=cuda --module=foo.vmfb --input=3455x1023xf32=1 --input=1023x2047xf32=1 --input=3455x2047xf32=1 2>&1" | \
 //   grep matmul_dynamic_dispatch | awk '{print $6}'
 //
 //   # The above prints the min across the 5 invocations.
@@ -81,7 +81,7 @@
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
 //   ssh ${USER}@${A100_MACHINE_IP} "sudo /usr/local/cuda/bin/ncu -f --set full -o profile ~/iree-run-module --function=matmul_dynamic --device=cuda --module=foo.vmfb \
-//     --input=999x1999xf32=1 --input=1999x3999xf32=1 --input=999x3999xf32=1"
+//     --input=3455x1023xf32=1 --input=1023x2047xf32=1 --input=3455x2047xf32=1"
 // ```
 //
 transform.sequence failures(propagate) {
