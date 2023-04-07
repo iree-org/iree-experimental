@@ -68,7 +68,7 @@ static const vm::NativeFunction<CuDNNModuleState> kCuDNNModuleFunctions[] = {
 class CuDNNModule final : public vm::NativeModule<CuDNNModuleState> {
  public:
   CuDNNModule(iree_vm_instance_t* instance, iree_hal_device_t* device,
-              iree_allocator_t host_allocator);
+              iree_allocator_t host_allocator, CUcontext cuda_ctx);
 
   StatusOr<std::unique_ptr<CuDNNModuleState>> CreateState(
       iree_allocator_t host_allocator) override;
@@ -82,17 +82,17 @@ class CuDNNModule final : public vm::NativeModule<CuDNNModuleState> {
   // alive for the duration of cuDNN module lifetime.
   vm::ref<iree_hal_device_t> device_;
 
-  // Underlying CUDA device behind the `device_` instance.
-  iree_hal_cuda_context_wrapper_t* cuda_ctx_ = nullptr;
+  // CUDA context bound to the instance of a HAL CUDA device.
+  CUcontext cuda_ctx_;
 };
 
 CuDNNModule::CuDNNModule(iree_vm_instance_t* instance,
                          iree_hal_device_t* device,
-                         iree_allocator_t host_allocator)
+                         iree_allocator_t host_allocator, CUcontext cuda_ctx)
     : NativeModule("cudnn", CuDNNModule::kVersion, instance, host_allocator,
                    {kCuDNNModuleFunctions}),
       device_(vm::retain_ref(device)),
-      cuda_ctx_(iree_hal_cuda_device_context_wrapper(device)) {}
+      cuda_ctx_(cuda_ctx) {}
 
 StatusOr<std::unique_ptr<CuDNNModuleState>> CuDNNModule::CreateState(
     iree_allocator_t host_allocator) {
@@ -125,12 +125,11 @@ extern "C" iree_status_t iree_custom_module_cudnn_create(
     iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(out_module);
 
-  if (!iree_hal_is_cuda_device(device)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "cuDNN module requires HAL CUDA device");
-  }
+  CUcontext cuda_ctx;
+  IREE_RETURN_IF_ERROR(iree_hal_cuda_device_get_context(device, &cuda_ctx));
 
-  auto module = std::make_unique<CuDNNModule>(instance, device, host_allocator);
+  auto module = std::make_unique<openxla::runtime::nvgpu::CuDNNModule>(
+      instance, device, host_allocator, cuda_ctx);
   *out_module = module.release()->interface();
 
   return iree_ok_status();
