@@ -38,6 +38,10 @@ int main(int argc, char** argv) {
   IREE_CHECK_OK(iree_runtime_instance_create(&instance_options, host_allocator,
                                              &instance));
 
+  // Register custom types define by cuDNN module.
+  IREE_CHECK_OK(iree_custom_module_cudnn_register_types(
+      iree_runtime_instance_vm_instance(instance)));
+
   // Try to create the CUDA device.
   iree_hal_device_t* device = NULL;
   IREE_CHECK_OK(iree_runtime_instance_try_create_default_device(
@@ -70,9 +74,8 @@ int main(int argc, char** argv) {
   }
 
   iree_string_view_t entry_point = iree_make_cstring_view(argv[2]);
-  fprintf(stdout, "INVOKE BEGIN %.*s\n", (int)entry_point.size,
+  fprintf(stderr, "INVOKE BEGIN %.*s\n", (int)entry_point.size,
           entry_point.data);
-  fflush(stdout);
 
   iree_vm_list_t* inputs = NULL;
   IREE_CHECK_OK(iree_vm_list_create(NULL, 1, host_allocator, &inputs));
@@ -83,8 +86,7 @@ int main(int argc, char** argv) {
   IREE_CHECK_OK(
       iree_runtime_session_call_by_name(session, entry_point, inputs, outputs));
 
-  fprintf(stdout, "INVOKE END %.*s\n", (int)entry_point.size, entry_point.data);
-  fflush(stdout);
+  fprintf(stderr, "INVOKE END %.*s\n", (int)entry_point.size, entry_point.data);
 
   iree_vm_list_release(inputs);
   iree_vm_list_release(outputs);

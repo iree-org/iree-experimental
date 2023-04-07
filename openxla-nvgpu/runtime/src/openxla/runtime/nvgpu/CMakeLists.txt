@@ -25,7 +25,24 @@ iree_cc_library(
   DEPS
     ::defs
     ::dynamic_symbols
+    ::cudnn_tensor
     iree::runtime
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    cudnn_tensor
+  HDRS
+    "cudnn_tensor.h"
+  SRCS
+    "cudnn_tensor.cpp"
+  DEPS
+    ::defs
+    ::dynamic_symbols
+    ::cudnn_stub
+    cudnn_frontend
+    iree::vm
   PUBLIC
 )
 
@@ -50,5 +67,20 @@ iree_cc_library(
     # TODO: We rely on the fact that cuDNN headers are located in the same
     # directory as CUDA headers. Fix this.
     iree_cuda::headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    cudnn_stub
+  HDRS
+    "cudnn_stub.h"
+  TEXTUAL_HDRS
+    "cudnn_stub.h.inc"
+  SRCS
+    "cudnn_stub.cpp"
+  DEPS
+    ::defs
+    ::dynamic_symbols
   PUBLIC
 )

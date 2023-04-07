@@ -31,9 +31,17 @@ static iree_status_t openxla_cudnn_dynamic_symbols_resolve_all(
         syms->cudnn_library, kName, (void**)&syms->cuDNNSymbolName)); \
   }
 
+#define CUDNN_PFN_DECL_STR_RETURN(cuDNNSymbolName, ...)                          \
+  {                                                                   \
+    static const char* kName = #cuDNNSymbolName;                      \
+    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(          \
+        syms->cudnn_library, kName, (void**)&syms->cuDNNSymbolName)); \
+  }  
+
 #include "openxla/runtime/nvgpu/dynamic_symbol_tables.h"  // IWYU pragma: export
 
 #undef CUDNN_PFN_DECL
+#undef CUDNN_PFN_DECL_STR_RETURN
   return iree_ok_status();
 }
 

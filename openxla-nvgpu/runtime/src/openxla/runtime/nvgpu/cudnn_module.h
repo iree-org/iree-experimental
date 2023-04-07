@@ -20,6 +20,9 @@ iree_status_t iree_custom_module_cudnn_create(iree_vm_instance_t* instance,
                                               iree_allocator_t host_allocator,
                                               iree_vm_module_t** out_module);
 
+iree_status_t iree_custom_module_cudnn_register_types(
+    iree_vm_instance_t* instance);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

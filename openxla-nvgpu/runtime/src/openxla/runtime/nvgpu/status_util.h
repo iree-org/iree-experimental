@@ -19,7 +19,14 @@ extern "C" {
 // Converts a cudnnStatus_t to an iree_status_t.
 //
 // Usage:
-//   iree_status_t status = CUDNN_STATUS_TO_STATUS(cuDnnDoThing(...));
+//   iree_status_t status = CUDNN_CONVERT_STATUS(syms, cudnn_status);
+#define CUDNN_CONVERT_STATUS(syms, expr, ...) \
+  openxla_cudnn_status_to_status((syms), (expr), __FILE__, __LINE__)
+
+// Converts a cudnnStatus_t to an iree_status_t.
+//
+// Usage:
+//   iree_status_t status = CUDNN_STATUS_TO_STATUS(syms, cuDnnDoThing(...));
 #define CUDNN_STATUS_TO_STATUS(syms, expr, ...) \
   openxla_cudnn_status_to_status((syms), ((syms)->expr), __FILE__, __LINE__)
 
@@ -27,7 +34,7 @@ extern "C" {
 // to a iree_status_t.
 //
 // Usage:
-//   CUDNN_RETURN_IF_ERROR(cuDnnDoThing(...));
+//   CUDNN_RETURN_IF_ERROR(syms, cuDnnDoThing(...));
 #define CUDNN_RETURN_IF_ERROR(syms, expr, ...)                                \
   IREE_RETURN_IF_ERROR(openxla_cudnn_status_to_status((syms), ((syms)->expr), \
                                                       __FILE__, __LINE__),    \
@@ -37,7 +44,7 @@ extern "C" {
 // iree_status_t.
 //
 // Usage:
-//   CUDNN_STATUS_CHECK_OK(cuDnnDoThing(...));
+//   CUDNN_STATUS_CHECK_OK(syms, cuDnnDoThing(...));
 #define CUDNN_STATUS_CHECK_OK(syms, expr, ...)                         \
   IREE_CHECK_OK(openxla_cudnn_status_to_status((syms), ((syms)->expr), \
                                                __FILE__, __LINE__))

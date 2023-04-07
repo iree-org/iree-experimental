@@ -12,6 +12,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_STANDARD 17)
 
+set(OPENXLA_NVGPU_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
 # TODO: Fix this once the project is slotted into place.
 if(NOT IREE_ROOT_DIR)
   set(IREE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../iree")
@@ -43,3 +45,9 @@ iree_setup_toolchain()
 
 add_subdirectory(runtime)
 add_subdirectory(tools)
+
+#-------------------------------------------------------------------------------
+# NVIDIA dependencies
+#-------------------------------------------------------------------------------
+
+add_subdirectory(build_tools/third_party/cudnn-frontend EXCLUDE_FROM_ALL)

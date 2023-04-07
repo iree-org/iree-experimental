@@ -31,6 +31,7 @@ typedef struct openxla_cudnn_dynamic_symbols_t {
 #include "openxla/runtime/nvgpu/dynamic_symbol_tables.h"  // IWYU pragma: export
 
 #undef CUDNN_PFN_DECL
+#undef CUDNN_PFN_DECL_STR_RETURN
 } openxla_cudnn_dynamic_symbols_t;
 
 // Initializes |out_syms| in-place with dynamically loaded cuDNN symbols.
