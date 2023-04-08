@@ -6,6 +6,10 @@ module @example {
     %dtype: i64, %dims: !util.list<i64>, %uid: i64, %alignment: i64
   ) -> !cudnn.tensor
 
+  func.func private @cudnn.pointwise_relu(
+    %input: !cudnn.tensor, %lower: f32, %upper: f32, %uid: i64, %alignment: i64
+  ) -> !cudnn.tensor
+
   func.func private @cudnn.tensor.debug(%arg0: !cudnn.tensor)
 
   func.func @main() {
@@ -17,6 +21,10 @@ module @example {
     %c3 = arith.constant 3 : index
     
     %c128 = arith.constant 128 : i64
+
+    // Tensor UIDs
+    %uid0 = arith.constant 0 : i64
+    %uid1 = arith.constant 1 : i64
     
     // [128, 128, 128, 128]
     %dims = util.list.create %rank : !util.list<i64>
@@ -29,15 +37,18 @@ module @example {
     // CUDNN_DATA_FLOAT
     %dtype = arith.constant 0 : i64
 
-    // Tensor UID
-    %uid = arith.constant 123 : i64
-
     // Tensor alignment
     %alignment = arith.constant 32 : i64
 
     // Create !cudnn.tensor<128x128x128x128xf32>
-    %0 = call @cudnn.tensor.arg(%dtype, %dims, %uid, %alignment)
+    %0 = call @cudnn.tensor.arg(%dtype, %dims, %uid0, %alignment)
            : (i64, !util.list<i64>, i64, i64) -> !cudnn.tensor
+
+    // Create pointwise relu operation
+    %lower = arith.constant 0.0 : f32
+    %upper = arith.constant 9.0 : f32
+    %1 = call @cudnn.pointwise_relu(%0, %lower, %upper, %uid1, %alignment)
+           : (!cudnn.tensor, f32, f32, i64, i64) -> !cudnn.tensor
 
     // CHECK: CUDNN_BACKEND_TENSOR_DESCRIPTOR : Datatype: CUDNN_DATA_FLOAT
     // CHECK: Id: 123
@@ -51,6 +62,7 @@ module @example {
     // CHECK: isByValue: 0
     // CHECK: reorder_type: CUDNN_TENSOR_REORDERING_NONE
     call @cudnn.tensor.debug(%0) : (!cudnn.tensor) -> ()
+    call @cudnn.tensor.debug(%1) : (!cudnn.tensor) -> ()
 
     return
   }

@@ -23,3 +23,5 @@ CUDNN_PFN_DECL(cudnnBackendSetAttribute, cudnnBackendDescriptor_t,
 CUDNN_PFN_DECL(cudnnBackendCreateDescriptor, cudnnBackendDescriptorType_t,
                cudnnBackendDescriptor_t *)
 CUDNN_PFN_DECL(cudnnBackendDestroyDescriptor, cudnnBackendDescriptor_t)
+
+CUDNN_PFN_DECL_SIZE_RETURN(cudnnGetVersion);

@@ -27,10 +27,8 @@ namespace openxla::runtime::nvgpu {
 class CuDNNTensor : public iree::vm::RefObject<CuDNNTensor> {
  public:
   virtual ~CuDNNTensor() = default;
+  virtual const cudnn_frontend::Tensor& tensor() const = 0;
 };
-
-// TODO: We need a custom RTTI support for vm::ref data types to be able to
-// conveniently cast and dyn_cast to various tensor types.
 
 //===----------------------------------------------------------------------===//
 // Tensor corresponding to the cuDNN graph arguments.
@@ -38,18 +36,13 @@ class CuDNNTensor : public iree::vm::RefObject<CuDNNTensor> {
 
 class CuDNNArgTensor final : public CuDNNTensor {
  public:
-  static iree::StatusOr<iree::vm::ref<CuDNNTensor>> Create(
-      openxla_cudnn_dynamic_symbols_t* syms, iree::span<const int64_t> dims,
-      iree::span<const int64_t> strides, int64_t uid, cudnnDataType_t dtype,
-      int64_t alignment);
-
-  const cudnn_frontend::Tensor& tensor();
-
- private:
   CuDNNArgTensor(openxla_cudnn_dynamic_symbols_t* syms,
                  cudnn_frontend::Tensor tensor);
   ~CuDNNArgTensor() override;
 
+  const cudnn_frontend::Tensor& tensor() const override;
+
+ private:
   openxla_cudnn_dynamic_symbols_t* syms_;
   std::optional<cudnn_frontend::Tensor> tensor_;
 };
@@ -58,9 +51,35 @@ class CuDNNArgTensor final : public CuDNNTensor {
 // Tensor corresponding to the cuDNN operation result.
 //===----------------------------------------------------------------------===//
 
-// TODO: Tensor can be a result of cuDNN operation (think of MLIR BlockArgument
-// vs Value). CuDNNOpResultTensor has to carry tensor itself, and the operation
-// that produced it.
+class CuDNNOpResultTensor final : public CuDNNTensor {
+ public:
+  CuDNNOpResultTensor(openxla_cudnn_dynamic_symbols_t* syms,
+                      cudnn_frontend::Operation operation,
+                      cudnn_frontend::Tensor tensor);
+  ~CuDNNOpResultTensor() override;
+
+  const cudnn_frontend::Tensor& tensor() const override;
+
+ private:
+  openxla_cudnn_dynamic_symbols_t* syms_;
+  std::optional<cudnn_frontend::Operation> operation_;
+  std::optional<cudnn_frontend::Tensor> tensor_;
+};
+
+//===----------------------------------------------------------------------===//
+// Wrappers around cuDNN APIs export from a cuDNN module to the user.
+//===----------------------------------------------------------------------===//
+
+// Creates a tensor placeholder for cuDNN graph argument.
+iree::StatusOr<iree::vm::ref<CuDNNTensor>> CreateArgument(
+    openxla_cudnn_dynamic_symbols_t* syms, iree::span<const int64_t> dims,
+    iree::span<const int64_t> strides, int64_t uid, cudnnDataType_t dtype,
+    int64_t alignment);
+
+// Creates a pointwise relu operation.
+iree::StatusOr<iree::vm::ref<CuDNNTensor>> CreatePointwiseRelu(
+    openxla_cudnn_dynamic_symbols_t* syms, const CuDNNTensor& input,
+    double lower_clip, double upper_clip, int64_t uid, int64_t alignment);
 
 }  // namespace openxla::runtime::nvgpu
 

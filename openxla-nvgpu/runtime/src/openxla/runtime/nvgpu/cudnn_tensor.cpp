@@ -30,10 +30,49 @@ using iree::vm::ref;
 // CuDNNArgTensor.
 //===----------------------------------------------------------------------===//
 
-StatusOr<ref<CuDNNTensor>> CuDNNArgTensor::Create(
-    openxla_cudnn_dynamic_symbols_t* syms, span<const int64_t> dims,
-    span<const int64_t> strides, int64_t uid, cudnnDataType_t dtype,
-    int64_t alignment) {
+CuDNNArgTensor::CuDNNArgTensor(openxla_cudnn_dynamic_symbols_t* syms,
+                               cudnn_frontend::Tensor tensor)
+    : syms_(syms), tensor_(std::move(tensor)) {}
+
+CuDNNArgTensor::~CuDNNArgTensor() {
+  ScopedCuDNNStubs stubs(syms_);
+  tensor_.reset();
+}
+
+const cudnn_frontend::Tensor& CuDNNArgTensor::tensor() const {
+  return *tensor_;
+}
+
+//===----------------------------------------------------------------------===//
+// CuDNNOpResultTensor.
+//===----------------------------------------------------------------------===//
+
+CuDNNOpResultTensor::CuDNNOpResultTensor(openxla_cudnn_dynamic_symbols_t* syms,
+                                         cudnn_frontend::Operation operation,
+                                         cudnn_frontend::Tensor tensor)
+    : syms_(syms),
+      operation_(std::move(operation)),
+      tensor_(std::move(tensor)) {}
+
+CuDNNOpResultTensor::~CuDNNOpResultTensor() {
+  ScopedCuDNNStubs stubs(syms_);
+  operation_.reset();
+  tensor_.reset();
+}
+
+const cudnn_frontend::Tensor& CuDNNOpResultTensor::tensor() const {
+  return *tensor_;
+}
+
+//===----------------------------------------------------------------------===//
+// Wrappers around cuDNN APIs export from a cuDNN module to the user.
+//===----------------------------------------------------------------------===//
+
+StatusOr<ref<CuDNNTensor>> CreateArgument(openxla_cudnn_dynamic_symbols_t* syms,
+                                          span<const int64_t> dims,
+                                          span<const int64_t> strides,
+                                          int64_t uid, cudnnDataType_t dtype,
+                                          int64_t alignment) {
   ScopedCuDNNStubs stubs(syms);
   cudnn_frontend::Tensor tensor = cudnn_frontend::TensorBuilder()
                                       .setDim(dims.size(), dims.data())
@@ -46,16 +85,39 @@ StatusOr<ref<CuDNNTensor>> CuDNNArgTensor::Create(
   return ref<CuDNNTensor>(new CuDNNArgTensor(syms, std::move(tensor)));
 }
 
-CuDNNArgTensor::CuDNNArgTensor(openxla_cudnn_dynamic_symbols_t* syms,
-                               cudnn_frontend::Tensor tensor)
-    : syms_(syms), tensor_(std::move(tensor)) {}
+StatusOr<ref<CuDNNTensor>> CreatePointwiseRelu(
+    openxla_cudnn_dynamic_symbols_t* syms, const CuDNNTensor& input,
+    double lower_clip, double upper_clip, int64_t uid, int64_t alignment) {
+  ScopedCuDNNStubs stubs(syms);
 
-CuDNNArgTensor::~CuDNNArgTensor() {
-  ScopedCuDNNStubs stubs(syms_);
-  tensor_.reset();
+  // Prepare tensor descriptor for activation output.
+  cudnn_frontend::Tensor tensor = cudnn_frontend::TensorBuilder()
+                                      .cloneFrom(input.tensor(), uid)
+                                      .setAlignment(alignment)
+                                      .build();
+  IREE_RETURN_IF_ERROR(CUDNN_CONVERT_STATUS(syms, tensor.get_status()));
+
+  // Prepare activation descriptor.
+  cudnn_frontend::PointWiseDesc activation =
+      cudnn_frontend::PointWiseDescBuilder()
+          .setMode(CUDNN_POINTWISE_RELU_FWD)
+          .setClipping(lower_clip, upper_clip)
+          .build();
+  IREE_RETURN_IF_ERROR(CUDNN_CONVERT_STATUS(syms, activation.get_status()));
+
+  // Create operation.
+  cudnn_frontend::Operation operation =
+      cudnn_frontend::OperationBuilder(
+          CUDNN_BACKEND_OPERATION_POINTWISE_DESCRIPTOR)
+          .setxDesc(input.tensor())
+          .setyDesc(tensor)
+          .setpwDesc(activation)
+          .build();
+  IREE_RETURN_IF_ERROR(CUDNN_CONVERT_STATUS(syms, operation.get_status()));
+
+  return ref<CuDNNTensor>(
+      new CuDNNOpResultTensor(syms, std::move(operation), std::move(tensor)));
 }
-
-const cudnn_frontend::Tensor& CuDNNArgTensor::tensor() { return *tensor_; }
 
 }  // namespace openxla::runtime::nvgpu
 

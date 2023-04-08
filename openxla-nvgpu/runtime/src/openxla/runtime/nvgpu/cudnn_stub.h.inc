@@ -47,6 +47,12 @@ cudnnBackendFinalize(cudnnBackendDescriptor_t descriptor) {
   return syms->cudnnBackendFinalize(descriptor);
 }
 
+size_t CUDNNWINAPI cudnnGetVersion() {
+  auto* syms = openxla::runtime::nvgpu::ScopedCuDNNStubs::syms();
+  IREE_ASSERT(syms);
+  return syms->cudnnGetVersion();
+}
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

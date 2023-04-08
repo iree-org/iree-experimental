@@ -27,11 +27,14 @@ typedef struct openxla_cudnn_dynamic_symbols_t {
   cudnnStatus_t (*cuDNNSymbolName)(__VA_ARGS__);
 #define CUDNN_PFN_DECL_STR_RETURN(cuDNNSymbolName, ...) \
   const char* (*cuDNNSymbolName)(__VA_ARGS__);
+#define CUDNN_PFN_DECL_SIZE_RETURN(cuDNNSymbolName, ...) \
+  size_t (*cuDNNSymbolName)(__VA_ARGS__);
 
 #include "openxla/runtime/nvgpu/dynamic_symbol_tables.h"  // IWYU pragma: export
 
 #undef CUDNN_PFN_DECL
 #undef CUDNN_PFN_DECL_STR_RETURN
+#undef CUDNN_PFN_DECL_SIZE_RETURN
 } openxla_cudnn_dynamic_symbols_t;
 
 // Initializes |out_syms| in-place with dynamically loaded cuDNN symbols.

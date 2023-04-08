@@ -37,9 +37,15 @@ class CuDNNModuleState {
   ~CuDNNModuleState();
 
   // Creates a new tensor for cuDNN graph argument.
-  StatusOr<vm::ref<CuDNNTensor>> CreateTensorArg(
-      int64_t dtype, const vm::ref<iree_vm_list_t> dims, int64_t uid,
-      int64_t alignment);
+  StatusOr<vm::ref<CuDNNTensor>> Argument(int64_t dtype,
+                                          const vm::ref<iree_vm_list_t> dims,
+                                          int64_t uid, int64_t alignment);
+
+  // Creates a pointwise relu operation and returns result tensor.
+  StatusOr<vm::ref<CuDNNTensor>> PointwiseRelu(const vm::ref<CuDNNTensor> input,
+                                               float lower_clip,
+                                               float upper_clip, int64_t uid,
+                                               int64_t alignment);
 
   // Prints tensor debug information to stderr.
   Status PrintTensorDebug(const vm::ref<CuDNNTensor> tensor);
@@ -88,27 +94,32 @@ static std::vector<int64_t> GetRowMajorStrides(span<const int64_t> dims) {
   return strides;
 }
 
-StatusOr<vm::ref<CuDNNTensor>> CuDNNModuleState::CreateTensorArg(
+StatusOr<vm::ref<CuDNNTensor>> CuDNNModuleState::Argument(
     int64_t dtype, const vm::ref<iree_vm_list_t> dims, int64_t uid,
     int64_t alignment) {
   IREE_ASSIGN_OR_RETURN(cudnnDataType_t data_type, ToCudnnDataType(dtype));
   IREE_ASSIGN_OR_RETURN(std::vector<int64_t> dimensions, LoadI64Vec(&*dims));
   std::vector<int64_t> strides = GetRowMajorStrides(dimensions);
-  return CuDNNArgTensor::Create(&syms_, dimensions, strides, uid, data_type,
-                                alignment);
+  return CreateArgument(&syms_, dimensions, strides, uid, data_type, alignment);
 }
 
-Status CuDNNModuleState::PrintTensorDebug(vm::ref<CuDNNTensor> tensor) {
-  // TODO: Add RTTI for CuDNN tensor types.
-  auto* arg = static_cast<CuDNNArgTensor*>(tensor.get());
-  std::string desc = arg->tensor().describe();
-  fprintf(stderr, "CuDNNArgTensor: %s\n", desc.c_str());
+Status CuDNNModuleState::PrintTensorDebug(const vm::ref<CuDNNTensor> tensor) {
+  std::string desc = tensor->tensor().describe();
+  fprintf(stderr, "Tensor: %s\n", desc.c_str());
   return OkStatus();
 }
 
+StatusOr<vm::ref<CuDNNTensor>> CuDNNModuleState::PointwiseRelu(
+    const vm::ref<CuDNNTensor> input, float lower_clip, float upper_clip,
+    int64_t uid, int64_t alignment) {
+  return CreatePointwiseRelu(&syms_, *input, lower_clip, upper_clip, uid,
+                             alignment);
+}
+
 static const vm::NativeFunction<CuDNNModuleState> kCuDNNModuleFunctions[] = {
-    vm::MakeNativeFunction("tensor.arg", &CuDNNModuleState::CreateTensorArg),
+    vm::MakeNativeFunction("tensor.arg", &CuDNNModuleState::Argument),
     vm::MakeNativeFunction("tensor.debug", &CuDNNModuleState::PrintTensorDebug),
+    vm::MakeNativeFunction("pointwise_relu", &CuDNNModuleState::PointwiseRelu),
 };
 
 //===----------------------------------------------------------------------===//
