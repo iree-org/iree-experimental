@@ -26,15 +26,6 @@ using cudnn_frontend::TensorBuilder;
 #include "openxla/runtime/nvgpu/cudnn_stub.h.inc"
 // clang-format on
 
-// TODO(ezhulenev): Add LLVM style RTTI and casting to IREE base? Currently this
-// is a primitive casting helpfer with a LLVM-like API.
-template <typename To, typename From>
-static To dyn_cast(From* from) {
-  static_assert(std::is_pointer_v<To>, "To must be a pointer type");
-  if (std::remove_pointer_t<To>::classof(from)) return static_cast<To>(from);
-  return nullptr;
-}
-
 //===----------------------------------------------------------------------===//
 // CuDNNArgTensor.
 //===----------------------------------------------------------------------===//
@@ -172,6 +163,11 @@ StatusOr<vm::ref<CuDNNTensor>> CreatePointwiseRelu(
 // CreateOperationGraph.
 //===----------------------------------------------------------------------===//
 
+template <typename To>
+static To* DynCast(CuDNNTensor* tensor) {
+  return To::classof(tensor) ? static_cast<To*>(tensor) : nullptr;
+}
+
 StatusOr<vm::ref<CuDNNOperationGraph>> CreateOperationGraph(
     openxla_cudnn_dynamic_symbols_t* syms, cudnnHandle_t handle,
     span<CuDNNTensor* const> results) {
@@ -189,7 +185,7 @@ StatusOr<vm::ref<CuDNNOperationGraph>> CreateOperationGraph(
     worklist.pop_back();
 
     // Add cudnn_frontend operation and follow inputs.
-    if (auto* op_result = dyn_cast<CuDNNOpResultTensor*>(tensor)) {
+    if (auto* op_result = DynCast<CuDNNOpResultTensor>(tensor)) {
       ops.push_back(op_result->operation());
       std::vector<CuDNNTensor*> inputs = op_result->inputs();
       worklist.insert(worklist.end(), inputs.begin(), inputs.end());
