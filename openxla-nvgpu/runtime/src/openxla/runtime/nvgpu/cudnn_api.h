@@ -7,8 +7,6 @@
 #ifndef OPENXLA_RUNTIME_NVGPU_CUDNN_API_H_
 #define OPENXLA_RUNTIME_NVGPU_CUDNN_API_H_
 
-#include <cudnn_frontend_Operation.h>
-#include <cudnn_frontend_OperationGraph.h>
 #define NV_CUDNN_DISABLE_EXCEPTION
 
 #include <cudnn_frontend.h>
