@@ -25,18 +25,18 @@ iree_cc_library(
   DEPS
     ::defs
     ::dynamic_symbols
-    ::cudnn_tensor
+    ::cudnn_api
     iree::runtime
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    cudnn_tensor
+    cudnn_api
   HDRS
-    "cudnn_tensor.h"
+    "cudnn_api.h"
   SRCS
-    "cudnn_tensor.cpp"
+    "cudnn_api.cpp"
   DEPS
     ::defs
     ::dynamic_symbols

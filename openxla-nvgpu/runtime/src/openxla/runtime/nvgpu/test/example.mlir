@@ -2,6 +2,10 @@
 
 module @example {
 
+  //===--------------------------------------------------------------------===//
+  // Import functions from the cuDNN module.
+  //===--------------------------------------------------------------------===//
+
   func.func private @cudnn.tensor.arg(
     %dtype: i64, %dims: !util.list<i64>, %uid: i64, %alignment: i64
   ) -> !cudnn.tensor
@@ -10,7 +14,21 @@ module @example {
     %input: !cudnn.tensor, %lower: f32, %upper: f32, %uid: i64, %alignment: i64
   ) -> !cudnn.tensor
 
-  func.func private @cudnn.tensor.debug(%arg0: !cudnn.tensor)
+  func.func private @cudnn.build.graph(
+    %tensor: !cudnn.tensor
+  ) -> !cudnn.operation_graph
+
+  func.func private @cudnn.debug.tensor(
+    %tensor: !cudnn.tensor
+  )
+
+  func.func private @cudnn.debug.graph(
+    %graph: !cudnn.operation_graph
+  )
+
+  //===--------------------------------------------------------------------===//
+  // Build and execute cuDNN graph.
+  //===--------------------------------------------------------------------===//
 
   func.func @main() {
     %rank = arith.constant 4 : index
@@ -61,8 +79,15 @@ module @example {
     // CHECK: isVirtual: 0
     // CHECK: isByValue: 0
     // CHECK: reorder_type: CUDNN_TENSOR_REORDERING_NONE
-    call @cudnn.tensor.debug(%0) : (!cudnn.tensor) -> ()
-    call @cudnn.tensor.debug(%1) : (!cudnn.tensor) -> ()
+    call @cudnn.debug.tensor(%0) : (!cudnn.tensor) -> ()
+    call @cudnn.debug.tensor(%1) : (!cudnn.tensor) -> ()
+
+    // Build an operation graph computing pointwise relu.
+    %2 = call @cudnn.build.graph(%1) : (!cudnn.tensor) -> !cudnn.operation_graph
+
+    // CHECK: Graph: CUDNN_BACKEND_OPERATIONGRAPH_DESCRIPTOR has 1operations
+    // CHECK: Tag: ReluFwd_
+    call @cudnn.debug.graph(%2) : (!cudnn.operation_graph) -> ()
 
     return
   }
