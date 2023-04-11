@@ -4,7 +4,7 @@ import tensorflow as tf
 from transformers import AutoTokenizer, TFT5Model
 
 # We use a maximum sequence length of 512 since this is the default used in the T5 config.
-T5_MAX_SEQUENCE_LENGTH = 512
+_SEQUENCE_LENGTH = 512
 
 
 class T5Large(tf.Module):
@@ -16,7 +16,7 @@ class T5Large(tf.Module):
     def generate_inputs(self, batch_size=1):
         tokenizer = AutoTokenizer.from_pretrained("t5-large")
         tokenization_kwargs = {
-            "pad_to_multiple_of": T5_MAX_SEQUENCE_LENGTH,
+            "pad_to_multiple_of": _SEQUENCE_LENGTH,
             "padding": True,
             "return_tensors": "tf",
         }
@@ -31,7 +31,7 @@ class T5Large(tf.Module):
         decoder_input_ids = self.model._shift_right(decoder_input_ids)
 
         return (encoded_input_ids, decoder_input_ids)
-   
+
     @tf.function(jit_compile=True)
     def forward(self, input_ids, decoder_input_ids):
         return self.model(input_ids, decoder_input_ids=decoder_input_ids)[0]
