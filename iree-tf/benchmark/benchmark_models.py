@@ -16,9 +16,8 @@ _MODEL_NAME_TO_MODEL_CONFIG = {
     # Batch sizes based on MLPerf config: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/bert
     "BERT_LARGE":
     (bert_large.BertLarge, [1, 16, 24, 32, 48, 64, 512, 1024, 1280]),
-    "T5_LARGE": (t5_large.T5Large, [
-        1,
-    ]),
+    # Uses the same batch sizes as Bert-Large
+    "T5_LARGE": (t5_large.T5Large, [1, 16, 24, 32, 48, 64, 512, 1024, 1280]),
 }
 
 
