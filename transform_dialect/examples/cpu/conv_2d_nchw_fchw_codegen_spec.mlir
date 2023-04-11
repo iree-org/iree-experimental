@@ -1,8 +1,8 @@
 // Instructions; TL;DR
 // ===================
 //
-// This script shows a simple example of a convwith 1 dims that reduces to a 
-// matmul along with a vanilla tiling and vectorization strategy.
+// This script shows a simple example of a conv_2d_nchw_fchw that reduces to a 
+// conv_1d_ncw_fcw along with a tiling, padding and vectorization strategy.
 //
 // ```
 //    export IREE_DIR=${HOME}/github/iree; \
@@ -61,14 +61,14 @@ transform.sequence failures(propagate) {
   // ======================================================
   %conv_l2, %loops_l2:7 = transform.structured.tile_to_scf_for %conv_l1 
   //           N,  F, OH, OW,  C, KH, KW
-              [4,  8,  6,  6,  8,  3,  3]
+              [4,  4,  4,  6,  8,  3,  3]
     { interchange = [1, 5, 6, 0, 4, 2, 3] }
 
   // Decompose needs both OH/KH or OW/KW to be tiled to 1.
   // This is required to further enable vectorization.
   %conv_l3, %loops_l3:7 = transform.structured.tile_to_scf_for %conv_l2 
       //          N,  F, OH, OW,  C, KH, KW
-                 [1,  1,  1,  6,  4,  1,  3]
+                 [1,  4,  1,  6,  1,  1,  3]
 
   // Step 3. Force padding of all dimensions and hoist the lhs/rhs pad ops.
   // ======================================================================
