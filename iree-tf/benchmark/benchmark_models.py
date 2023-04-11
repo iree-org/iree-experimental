@@ -39,7 +39,7 @@ def run_benchmark(model_name, model_class, batch_size, warmup_iterations,
         for i in range(warmup_iterations):
             start = time.perf_counter()
             model.forward(*inputs)
-            latency = time.perf_counter() - start
+            latency = 1000 * (time.perf_counter() - start)
             warmup_latencies.append(latency)
 
         # Run benchmark.
@@ -47,7 +47,7 @@ def run_benchmark(model_name, model_class, batch_size, warmup_iterations,
         for i in range(benchmark_iterations):
             start = time.perf_counter()
             model.forward(*inputs)
-            latency = time.perf_counter() - start
+            latency = 1000 * (time.perf_counter() - start)
             latencies.append(latency)
 
         # Save results.
@@ -74,7 +74,7 @@ if __name__ == "__main__":
                            help="The number of iterations to benchmark.")
     args = argParser.parse_args()
 
-    csv_header = "model,batch_size,warmup_min,warmup_max,warmup_mean,warmup_median,warmup_stddev,latency_min,latency_max,latency_mean,latency_median,latency_stddev"
+    csv_header = "model,batch_size,warmup_min_ms,warmup_max_ms,warmup_mean_ms,warmup_median_ms,warmup_stddev_ms,latency_min_ms,latency_max_ms,latency_mean_ms,latency_median_ms,latency_stddev_ms"
     write_line(args.output_path, csv_header, append=False)
 
     for model_name, model_config in _MODEL_NAME_TO_MODEL_CONFIG.items():
