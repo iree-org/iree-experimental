@@ -9,14 +9,14 @@
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
 //   sed "s/\${M}/999/g" | sed "s/\${N}/3999/g" | sed "s/\${K}/1999/g" | \
-//   sed "s/private @matmul_static(/@matmul_static(/g" | \
+//   sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce | \
 //   iree-opt --pass-pipeline="builtin.module(func.func(iree-transform-dialect-interpreter{transform-file-name=${IREE_SAMPLES_DIR}/transform_dialect/graph/cuda/matmul_preprocessing_spec.mlir}))" | \
 //   iree-compile - --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=5 | \
-//   nsys profile --stats=true  iree-run-module --function=matmul_static --device=cuda --input=999x1999xf32=1 --input=1999x3999xf32=1 --input=999x3999xf32=1
+//   nsys profile --stats=true  iree-run-module --function=fill_matmul_static --device=cuda --input=999x1999xf32=1 --input=1999x3999xf32=1 --input=999x3999xf32=1
 //
 // # Alternatively:
-// # nsys nvprof --print-gpu-trace  iree-run-module --function=forward --device=cuda --input=999x1999xf32=1 --input=1999x3999xf32=1 --input=999x3999xf32=1
+// # nsys nvprof --print-gpu-trace  iree-run-module --function=fill_matmul_static --device=cuda --input=999x1999xf32=1 --input=1999x3999xf32=1 --input=999x3999xf32=1
 // ```
 //
 // To run e2e on a remote machine (${A100_MACHINE_IP}) with an A100 GPU:
