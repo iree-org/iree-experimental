@@ -5,13 +5,13 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 iree_lit_test_suite(
-        NAME
-        lit
-        SRCS
-        "example.mlir"
-        TOOLS
-        FileCheck
-        iree-compile
-        LABELS
-        "hostonly"
+  NAME
+    lit
+  SRCS
+    "example.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+  LABELS
+    "hostonly"
 )

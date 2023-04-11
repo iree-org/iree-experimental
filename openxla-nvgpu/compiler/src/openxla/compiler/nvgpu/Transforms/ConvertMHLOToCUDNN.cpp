@@ -4,14 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <numeric>
 #include <algorithm>
+#include <numeric>
 
 #include "mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "openxla/compiler/nvgpu/Dialect/CUDNN/IR/CUDNNDialect.h"
 #include "openxla/compiler/nvgpu/Dialect/CUDNN/IR/CUDNNOps.h"
@@ -23,15 +24,6 @@
 using namespace mlir;
 
 namespace openxla::compiler::nvgpu {
-
-static std::optional<APFloat> getFloatSplatValue(Value value) {
-  auto op = value.getDefiningOp<mhlo::ConstantOp>();
-  if (!op) return std::nullopt;
-  ElementsAttr attr = op.getValue();
-  if (!attr.isSplat()) return std::nullopt;
-  if (!attr.getElementType().isa<FloatType>()) return std::nullopt;
-  return attr.getSplatValue<APFloat>();
-}
 
 static SmallVector<int64_t> getRowMajorStrides(ArrayRef<int64_t> shape) {
   SmallVector<int64_t> strides(shape.size(), 1);
@@ -58,17 +50,22 @@ struct ConvertClamp : public OpRewritePattern<mhlo::ClampOp> {
 
   LogicalResult matchAndRewrite(mhlo::ClampOp op,
                                 PatternRewriter& rewriter) const override {
-    auto min = getFloatSplatValue(op.getMin());
-    auto max = getFloatSplatValue(op.getMax());
-    if (!min || !max || !max->isNaN())
-      return rewriter.notifyMatchFailure(op, "unexpected bounds");
+    llvm::APFloat min;
+    if (!matchPattern(op.getMin().getDefiningOp(), m_ConstantFloat(&min))) {
+      return rewriter.notifyMatchFailure(op, "expected constant min");
+    }
+    llvm::APFloat max;
+    if (!matchPattern(op.getMax().getDefiningOp(), m_ConstantFloat(&max)) ||
+        !max->isNan()) {
+      return rewriter.notifyMatchFailure(op, "expected NaN max");
+    }
     TensorType tensor_type = op.getOperand().getType();
     cudnn::TensorDescType tensor_desc_type = getTensorDescType(tensor_type);
     Value input = rewriter.create<UnrealizedConversionCastOp>(
         op.getLoc(), tensor_desc_type, op.getOperand()).getResult(0);
     Value result = rewriter.create<cudnn::PointWiseReluOp>(
         op.getLoc(), tensor_desc_type, input, tensor_type.getElementType(),
-        APFloat(min->convertToDouble()));
+        APFloat(min.convertToDouble()));
     rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
         op, tensor_type, result);
     return success();

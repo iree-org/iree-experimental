@@ -25,7 +25,7 @@ iree_td_library(
 cc_library(
     name = "Transforms",
     srcs = [
-        "Sample.cpp",
+        "ConvertMHLOToCUDNN.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -34,8 +34,10 @@ cc_library(
     deps = [
         ":PassesIncGen",
         "//compiler/src/openxla/compiler/nvgpu:defs",
+        "//compiler/src/openxla/compiler/nvgpu/Dialect/CUDNN/IR",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+        "@mlir-hlo//:mlir_hlo",
     ],
 )
 
