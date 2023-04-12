@@ -24,7 +24,7 @@
 //     --iree-hal-configuration-pipeline | \
 //   ${IREE_DIR}/build/tools/iree-opt \
 //      --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
-//      --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped_vector_1.mlir \
+//      --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped_vector_1_single_warp.mlir \
 //      --iree-codegen-llvmgpu-enable-transform-dialect-jit=false
 // ```
 //
@@ -38,7 +38,7 @@
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped_vector_1.mlir \
+//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped_vector_1_single_warp.mlir \
 //     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false 
 // ```
 //
@@ -55,7 +55,7 @@
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped_vector_1.mlir \
+//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped_vector_1_single_warp.mlir \
 //     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb; \
@@ -116,7 +116,7 @@ transform.sequence failures(propagate) {
   %matmul_padded_l2 = transform.structured.pad %matmul_l2 {
     padding_values = [0.0 : f32, 0.0 : f32, 0.0 : f32], 
     padding_dimensions = [0, 1, 2], 
-    pack_paddings=[1, 1, 1]
+    pack_paddings=[0, 0, 0]
   }
   // %fill_padded_l1 = transform.structured.pad %fill_l1 {
   //   padding_values = [0.0 : f32, 0.0 : f32], 
@@ -129,80 +129,58 @@ transform.sequence failures(propagate) {
   %pad_res = transform.get_producer_of_operand %matmul_padded_l2[2] 
      : (!pdl.operation) -> !pdl.operation
   %pad_res_2 = transform.cast %pad_res : !pdl.operation to !transform.op<"tensor.pad">
-  transform.structured.hoist_pad %pad_res_2 by 1 loops
+  %pad_res_hoisted = transform.structured.hoist_pad %pad_res_2 by 1 loops
      : (!transform.op<"tensor.pad">) -> !pdl.operation
 
-  // Step 3. Rewrite tensor.pad in DPS, this creates linalg.copy ops.
-  // ================================================================
-  %pad = transform.structured.match ops{["tensor.pad"]} in %variant_op 
-    : (!pdl.operation) -> !pdl.operation
-  %padded = transform.structured.rewrite_in_destination_passing_style %pad 
-    : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %variant_op 
-    {canonicalization} : (!pdl.operation) -> ()
+  // // Step 3. Rewrite tensor.pad in DPS, this creates linalg.copy ops.
+  // // ================================================================
+  // %pad = transform.structured.match ops{["tensor.pad"]} in %variant_op 
+  //   : (!pdl.operation) -> !pdl.operation
+  // %padded = transform.structured.rewrite_in_destination_passing_style %pad 
+  //   : (!pdl.operation) -> !pdl.operation
+  // transform.iree.apply_patterns %variant_op 
+  //   {canonicalization} : (!pdl.operation) -> ()
 
   // Step 4. Map to threads, **SIMT** programming model.
   // ===================================================
   // Play catch me if you can with producing fill and copy ...
   // Need to track better through pad rewrite to DPS.
-  %insert_lhs = transform.get_producer_of_operand %matmul_padded_l2[0] 
+  %pad_lhs = transform.get_producer_of_operand %matmul_padded_l2[0] 
      : (!pdl.operation) -> !pdl.operation
-  %copy_lhs = transform.get_producer_of_operand %insert_lhs[0] 
-     : (!pdl.operation) -> !pdl.operation
-  %extract_lhs = transform.get_producer_of_operand %copy_lhs[1] 
-     : (!pdl.operation) -> !pdl.operation
-  %fill_lhs = transform.get_producer_of_operand %extract_lhs[0] 
-     : (!pdl.operation) -> !pdl.operation
-  transform.structured.tile_to_forall_op %fill_lhs num_threads [4, 8]
+  %forall_pad_lhs, %tiled_pad_lhs = 
+    transform.structured.tile_to_forall_op %pad_lhs num_threads [4, 8]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
-  %forall_copy_lhs, %tiled_copy_lhs = 
-    transform.structured.tile_to_forall_op %copy_lhs num_threads [4, 8]
-      ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
-  %tiled_copy_lhs_generic = transform.structured.generalize %tiled_copy_lhs
-  transform.structured.masked_vectorize %tiled_copy_lhs_generic vector_sizes [4, 1]
-
-  //
-  // From now on we can't apply canonicalizations before we lower the masks away.
-  //
-
-  // Play catch me if you can with producing fill and copy ...
-  // Need to track better through pad rewrite to DPS.
-  %insert_rhs = transform.get_producer_of_operand %matmul_padded_l2[1] 
-     : (!pdl.operation) -> !pdl.operation
-  %copy_rhs = transform.get_producer_of_operand %insert_rhs[0] 
-     : (!pdl.operation) -> !pdl.operation
-  %extract_rhs = transform.get_producer_of_operand %copy_rhs[1] 
-     : (!pdl.operation) -> !pdl.operation
-  %fill_rhs = transform.get_producer_of_operand %extract_rhs[0] 
-     : (!pdl.operation) -> !pdl.operation
-  transform.structured.tile_to_forall_op %fill_rhs num_threads [2, 16]
-      ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
-  %forall_copy_rhs, %tiled_copy_rhs = 
-    transform.structured.tile_to_forall_op %copy_rhs num_threads [2, 16]
-      ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
-  %tiled_copy_rhs_generic = transform.structured.generalize %tiled_copy_rhs
-  transform.structured.masked_vectorize %tiled_copy_rhs_generic vector_sizes [4, 1]
-
-  //
-  // From now on we can't apply canonicalizations before we lower the masks away.
-  //
-
-  // Play catch me if you can with producing fill and copy ... This one is even 
-  // nastier because it goes through bbargs -> just rematch.
-  // Need to track better through pad rewrite to DPS.
-  %copy_res = transform.structured.match ops{["linalg.copy"]} in %variant_op 
+  %insert_slice_lhs = transform.structured.rewrite_in_destination_passing_style %tiled_pad_lhs 
     : (!pdl.operation) -> !pdl.operation
-  %extract_res = transform.get_producer_of_operand %copy_res[1] 
+  %copy_lhs = transform.get_producer_of_operand %insert_slice_lhs[0]
      : (!pdl.operation) -> !pdl.operation
-  %fill_res = transform.get_producer_of_operand %extract_res[0] 
+  transform.structured.masked_vectorize %copy_lhs vector_sizes [4, 1]
+  transform.iree.apply_patterns %variant_op {cse}
+    : (!pdl.operation) -> ()
+
+  %pad_rhs = transform.get_producer_of_operand %matmul_padded_l2[1]
      : (!pdl.operation) -> !pdl.operation
-  transform.structured.tile_to_forall_op %fill_res num_threads [2, 16]
+  %forall_pad_rhs, %tiled_pad_rhs = 
+    transform.structured.tile_to_forall_op %pad_rhs num_threads [2, 16]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
-  %forall_copy_res, %tiled_copy_res = 
-    transform.structured.tile_to_forall_op %copy_res num_threads [2, 16]
+  %insert_slice_rhs = transform.structured.rewrite_in_destination_passing_style %tiled_pad_rhs 
+    : (!pdl.operation) -> !pdl.operation
+  %copy_rhs = transform.get_producer_of_operand %insert_slice_rhs[0]
+     : (!pdl.operation) -> !pdl.operation
+  transform.structured.masked_vectorize %copy_rhs vector_sizes [4, 1]
+  transform.iree.apply_patterns %variant_op {cse}
+    : (!pdl.operation) -> ()
+
+  %forall_pad_res, %tiled_pad_res = 
+    transform.structured.tile_to_forall_op %pad_res_hoisted num_threads [2, 16]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
-  %tiled_copy_res_generic = transform.structured.generalize %tiled_copy_res
-  transform.structured.masked_vectorize %tiled_copy_res_generic vector_sizes [8, 1]
+  %insert_slice_res = transform.structured.rewrite_in_destination_passing_style %tiled_pad_res 
+    : (!pdl.operation) -> !pdl.operation
+  %copy_res = transform.get_producer_of_operand %insert_slice_res[0]
+     : (!pdl.operation) -> !pdl.operation
+  transform.structured.masked_vectorize %copy_res vector_sizes [8, 1]
+  transform.iree.apply_patterns %variant_op {cse}
+    : (!pdl.operation) -> ()
 
   //
   // From now on we can't apply canonicalizations before we lower the masks away.
@@ -351,6 +329,11 @@ transform.sequence failures(propagate) {
     
   // TODO: pipelining masks everything and only computes zero atm.
 
+  // Late canonicalizations and cleanups.
+  transform.iree.apply_patterns %variant_op_3
+    {canonicalization, cse, licm }
+    : (!pdl.operation) -> ()
+
   // Step 11. Pipeline shared memory copies.
   // ===========================================================================
   %mma_compute = transform.structured.match ops{["gpu.subgroup_mma_compute"]} in %variant_op_3
@@ -362,8 +345,8 @@ transform.sequence failures(propagate) {
   %pipelined_for = transform.iree.pipeline_shared_memory_copies %for { depth = 2 } 
     : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
 
-  // Late canonicalizations and cleanups.
-  transform.iree.apply_patterns %variant_op_3
-    {canonicalization, cse, licm, tiling_canonicalization}
-    : (!pdl.operation) -> ()
+  // // Late canonicalizations and cleanups.
+  // transform.iree.apply_patterns %variant_op_3
+  //   {canonicalization, cse, licm, tiling_canonicalization}
+  //   : (!pdl.operation) -> ()
 }

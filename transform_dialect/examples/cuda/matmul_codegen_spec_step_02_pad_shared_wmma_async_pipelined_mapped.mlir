@@ -22,7 +22,7 @@
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
-//   sed "s/\${M}/1024/g" | sed "s/\${K}/2048/g" | sed "s/\${N}/4096/g" | \
+//   sed "s/\${M}/3456/g" | sed "s/\${K}/1024/g" | sed "s/\${N}/2048/g" | \
 //   sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-opt \
@@ -42,7 +42,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/1024/g" | sed "s/\${K}/2048/g" | sed "s/\${N}/4096/g" | \
+//   sed "s/\${M}/3456/g" | sed "s/\${K}/1024/g" | sed "s/\${N}/2048/g" | \
 //   sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -59,7 +59,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/1024/g" | sed "s/\${K}/2048/g" | sed "s/\${N}/4096/g" | \
+//   sed "s/\${M}/3456/g" | sed "s/\${K}/1024/g" | sed "s/\${N}/2048/g" | \
 //   sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -69,7 +69,7 @@
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
-//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=fill_matmul_static --device=cuda --module=foo.vmfb --input=1024x2048xf32=1 --input=2048x4096xf32=1 --input=1024x4096xf32=1 2>&1" | \
+//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=fill_matmul_static --device=cuda --module=foo.vmfb --input=3456x1024xf32=1 --input=1024x2048xf32=1 --input=3456x2048xf32=1 2>&1" | \
 //   grep fill_matmul_static_dispatch | awk '{print $6}'
 //
 //   # The above prints the min across the 5 invocations.
@@ -85,7 +85,7 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/1024/g" | sed "s/\${K}/2048/g" | sed "s/\${N}/4096/g" | \
+//   sed "s/\${M}/3456/g" | sed "s/\${K}/1024/g" | sed "s/\${N}/2048/g" | \
 //   sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
@@ -95,7 +95,7 @@
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
 //   ssh ${USER}@${A100_MACHINE_IP} "sudo /usr/local/cuda/bin/ncu -f --set full -o profile ~/iree-run-module --function=fill_matmul_static --device=cuda --module=foo.vmfb \
-//     --input=1024x2048xf32=1 --input=2048x4096xf32=1 --input=1024x4096xf32=1"
+//     --input=3456x1024xf32=1 --input=1024x2048xf32=1 --input=3456x2048xf32=1"
 // ```
 //
 //
@@ -106,37 +106,37 @@
 //
 // TODO: C should either be fused with a consumer or better interleaved and we shouldn't start with a large blocking read to global.
 //
-// CHECK-COUNT-16: gpu.subgroup_mma_load_matrix %{{.*}} {leadDimension = 4096 : index} : memref<64x64xf32, strided<[4096, 1], offset: ?>> -> !gpu.mma_matrix<16x16xf32, "COp">
+// CHECK-COUNT-16: gpu.subgroup_mma_load_matrix %{{.*}} {leadDimension = 2048 : index} : memref<64x64xf32, strided<[2048, 1], offset: ?>> -> !gpu.mma_matrix<16x16xf32, "COp">
 //
-//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[2048, 1], offset: ?>> to memref<4x4xf32, strided<[16, 1], offset: ?>, #gpu.address_space<workgroup>>
+//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[1024, 1], offset: ?>> to memref<4x4xf32, strided<[16, 1], offset: ?>, #gpu.address_space<workgroup>>
 //          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
 //          CHECK:   gpu.barrier {__pipelining_first_stage__}
 //
-//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[4096, 1], offset: ?>> to memref<4x4xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
+//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[2048, 1], offset: ?>> to memref<4x4xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
 //          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
-//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[2048, 1], offset: ?>> to memref<4x4xf32, strided<[16, 1], offset: ?>, #gpu.address_space<workgroup>>
-//          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
-//          CHECK:   gpu.barrier {__pipelining_first_stage__}
-//
-//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[4096, 1], offset: ?>> to memref<4x4xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
-//          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
-//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[2048, 1], offset: ?>> to memref<4x4xf32, strided<[16, 1], offset: ?>, #gpu.address_space<workgroup>>
+//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[1024, 1], offset: ?>> to memref<4x4xf32, strided<[16, 1], offset: ?>, #gpu.address_space<workgroup>>
 //          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
 //          CHECK:   gpu.barrier {__pipelining_first_stage__}
 //
-//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[4096, 1], offset: ?>> to memref<4x4xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
+//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[2048, 1], offset: ?>> to memref<4x4xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
 //          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
-//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[2048, 1], offset: ?>> to memref<4x4xf32, strided<[16, 1], offset: ?>, #gpu.address_space<workgroup>>
-//          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
-//          CHECK:   gpu.barrier {__pipelining_first_stage__}
-//
-//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[4096, 1], offset: ?>> to memref<4x4xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
-//          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
-//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[2048, 1], offset: ?>> to memref<4x4xf32, strided<[16, 1], offset: ?>, #gpu.address_space<workgroup>>
+//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[1024, 1], offset: ?>> to memref<4x4xf32, strided<[16, 1], offset: ?>, #gpu.address_space<workgroup>>
 //          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
 //          CHECK:   gpu.barrier {__pipelining_first_stage__}
 //
-//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[4096, 1], offset: ?>> to memref<4x4xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
+//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[2048, 1], offset: ?>> to memref<4x4xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
+//          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
+//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[1024, 1], offset: ?>> to memref<4x4xf32, strided<[16, 1], offset: ?>, #gpu.address_space<workgroup>>
+//          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
+//          CHECK:   gpu.barrier {__pipelining_first_stage__}
+//
+//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[2048, 1], offset: ?>> to memref<4x4xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
+//          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
+//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[1024, 1], offset: ?>> to memref<4x4xf32, strided<[16, 1], offset: ?>, #gpu.address_space<workgroup>>
+//          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
+//          CHECK:   gpu.barrier {__pipelining_first_stage__}
+//
+//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[2048, 1], offset: ?>> to memref<4x4xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
 //          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
 //
 // CHECK:     scf.for %{{.*}} -> (!gpu.mma_matrix<16x16xf32, "COp">
@@ -148,14 +148,14 @@
 //
 // CHECK-COUNT-32:   gpu.subgroup_mma_compute %{{.*}} : !gpu.mma_matrix<16x8xf32, "AOp">, !gpu.mma_matrix<8x16xf32, "BOp"> -> !gpu.mma_matrix<16x16xf32, "COp">
 //
-//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[2048, 1], offset: ?>> to memref<4x4xf32, strided<[16, 1], offset: ?>, #gpu.address_space<workgroup>>
+//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[1024, 1], offset: ?>> to memref<4x4xf32, strided<[16, 1], offset: ?>, #gpu.address_space<workgroup>>
 //          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
 //          CHECK:   gpu.barrier {__pipelining_first_stage__}
-//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[4096, 1], offset: ?>> to memref<4x4xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
+//  CHECK-COUNT-4:   nvgpu.device_async_copy %{{.*}} : memref<4x4xf32, strided<[2048, 1], offset: ?>> to memref<4x4xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
 //          CHECK:   nvgpu.device_async_create_group %{{.*}} {__pipelining_first_stage__}
 //          CHECK:   scf.yield %{{.*}} : !gpu.mma_matrix<16x16xf32, "COp">
 //          CHECK: }
-// CHECK-COUNT-16:     gpu.subgroup_mma_store_matrix %{{.*}} {leadDimension = 4096 : index} : !gpu.mma_matrix<16x16xf32, "COp">, memref<64x64xf32, strided<[4096, 1], offset: ?>>
+// CHECK-COUNT-16:     gpu.subgroup_mma_store_matrix %{{.*}} {leadDimension = 2048 : index} : !gpu.mma_matrix<16x16xf32, "COp">, memref<64x64xf32, strided<[2048, 1], offset: ?>>
 //          CHECK:     memref.dealloc %{{.*}} : memref<5x128x16xf32, #gpu.address_space<workgroup>>
 //          CHECK:     memref.dealloc %{{.*}} : memref<5x16x128xf32, #gpu.address_space<workgroup>>
 
@@ -234,13 +234,13 @@ transform.sequence failures(propagate) {
   // vectors in memory and prepare for bufferization.
   transform.iree.apply_patterns %func_v_3 {canonicalization, cse, licm }
     : (!pdl.operation) -> ()
-  %func_v_5 = transform.structured.hoist_redundant_tensor_subsets %func_v_3
-    : (!pdl.operation) -> !pdl.operation
+  transform.structured.hoist_redundant_tensor_subsets %func_v_3
+    : (!pdl.operation) -> ()
 
   // Step 7. Bufferize and drop HAL descriptor from memref ops.
   // ==========================================================
   // Pre-buferization canonicalizations and cleanups help avoid extra copies.
-  transform.iree.apply_patterns %func_v_5 {canonicalization, cse, licm}
+  transform.iree.apply_patterns %func_v_3 {canonicalization, cse, licm}
     : (!pdl.operation) -> ()
   transform.iree.eliminate_empty_tensors %variant_op : (!pdl.operation) -> ()
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op

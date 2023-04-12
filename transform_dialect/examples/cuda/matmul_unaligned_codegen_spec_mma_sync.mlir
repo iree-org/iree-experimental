@@ -4,14 +4,14 @@
 // Note: this is currently dependent on IREE + LLVM WIP PRs that have not yet 
 // landed.
 //
-// Note: this is currently using vector 1 so it works more generally on static 
-// and dynamic sizes.
+// Note: this is currently using vector 4 so it only works if all tensors have
+// sizes divisible by 4 in the f32 case.
 //
 // ```
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir |\
-//   sed "s/\${M}/3455/g" | sed "s/\${K}/1023/g" | sed "s/\${N}/2047/g" | \
+//   sed "s/\${M}/3452/g" | sed "s/\${N}/1020/g" | sed "s/\${K}/2044/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-opt \
@@ -22,7 +22,7 @@
 //     --iree-hal-configuration-pipeline | \
 //   ${IREE_DIR}/build/tools/iree-opt \
 //      --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
-//      --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped_vector_1.mlir \
+//      --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_mma_sync.mlir \
 //      --iree-codegen-llvmgpu-enable-transform-dialect-jit=false
 // ```
 //
@@ -31,12 +31,12 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/3455/g" | sed "s/\${K}/1023/g" | sed "s/\${N}/2047/g" | \
+//   sed "s/\${M}/3452/g" | sed "s/\${N}/1020/g" | sed "s/\${K}/2044/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped_vector_1.mlir \
+//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_mma_sync.mlir \
 //     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false 
 // ```
 //
@@ -48,44 +48,21 @@
 //   export IREE_DIR=${HOME}/github/iree; 
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
 //   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/3455/g" | sed "s/\${K}/1023/g" | sed "s/\${N}/2047/g" | \
+//   sed "s/\${M}/3452/g" | sed "s/\${N}/1020/g" | sed "s/\${K}/2044/g" | \
 //   sed "s/private @matmul_static(/@matmul_static(/g" | \
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped_vector_1.mlir \
+//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_mma_sync.mlir \
 //     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb; \
 //   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
-//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb --input=3455x1023xf32=1 --input=1023x2047xf32=1 --input=3455x2047xf32=1 2>&1" | \
-//   grep matmul_static_dispatch | awk '{print $6}'
-//
-//   # The above prints the min across the 5 invocations.
-//   # Alternatively, grep a little more to see what happens in more detail.
-//   grep -3 matmul_static_dispatch
+//   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb --input=3452x2044xf32=1 --input=2044x1020xf32=1 --input=3452x1020xf32=1 2>&1"
 // ```
 //
-// The above command simply prints `370944` (i.e. 0.371 million nanoseconds).
-//
-//
-// Alternatively, run with the profiler:
-// ```
-//   export IREE_DIR=${HOME}/github/iree; 
-//   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; 
-//   cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
-//   sed "s/\${M}/3455/g" | sed "s/\${K}/1023/g" | sed "s/\${N}/2047/g" | \
-//   sed "s/private @matmul_static(/@matmul_static(/g" | \
-//   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
-//   ${IREE_DIR}/build/tools/iree-compile - \
-//     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped_vector_1.mlir \
-//     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-//     -o /tmp/foo.vmfb; \
-//   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
-//   ssh ${USER}@${A100_MACHINE_IP} "sudo /usr/local/cuda/bin/ncu -f --set full -o profile ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb \
-//     --input=3455x1023xf32=1 --input=1023x2047xf32=1 --input=3455x2047xf32=1"
-// ```
+// Alternatively, run with the profiler: 
+//   `sudo /usr/local/cuda/bin/ncu -f --set full -o profile ~/iree-run-module ...`
 //
 transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
@@ -135,7 +112,7 @@ transform.sequence failures(propagate) {
   %pad_lhs = transform.get_producer_of_operand %matmul_padded_l2[0] 
      : (!pdl.operation) -> !pdl.operation
   %forall_pad_lhs, %tiled_pad_lhs = 
-    transform.structured.tile_to_forall_op %pad_lhs num_threads [8, 16]
+    transform.structured.tile_to_forall_op %pad_lhs num_threads [32, 4]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %if_lhs = transform.structured.match ops{["scf.if"]} in %forall_pad_lhs 
     : (!pdl.operation) -> !transform.any_op
@@ -145,7 +122,7 @@ transform.sequence failures(propagate) {
   %pad_rhs = transform.get_producer_of_operand %matmul_padded_l2[1] 
      : (!pdl.operation) -> !pdl.operation
   %forall_pad_rhs, %tiled_pad_rhs = 
-    transform.structured.tile_to_forall_op %pad_rhs num_threads [1, 128]
+    transform.structured.tile_to_forall_op %pad_rhs num_threads [4, 32]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   %if_rhs = transform.structured.match ops{["scf.if"]} in %forall_pad_rhs 
     : (!pdl.operation) -> !transform.any_op
@@ -153,7 +130,7 @@ transform.sequence failures(propagate) {
     : (!transform.any_op) -> ()
 
   %forall_pad_res, %tiled_pad_res = 
-    transform.structured.tile_to_forall_op %pad_res_hoisted num_threads [1, 128]
+    transform.structured.tile_to_forall_op %pad_res_hoisted num_threads [4, 32]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   transform.iree.apply_patterns %variant_op 
     {canonicalization, cse, licm} : (!pdl.operation) -> ()
@@ -163,7 +140,7 @@ transform.sequence failures(propagate) {
     : (!transform.any_op) -> ()
 
   %forall_copy_back, %tiled_copy_back = 
-    transform.structured.tile_to_forall_op %copy_back num_threads [1, 128]
+    transform.structured.tile_to_forall_op %copy_back num_threads [4, 32]
       ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
   transform.iree.apply_patterns %variant_op 
     {canonicalization, cse, licm} : (!pdl.operation) -> ()
@@ -171,10 +148,10 @@ transform.sequence failures(propagate) {
   // Masked vectorize prevents canonicalizations to occur until they are lowered.
   // This is because they only allow a single masked op and canonicalization will
   // pull ops inside the mask region, emitting invalid IR.
-  transform.structured.masked_vectorize %tiled_pad_lhs vector_sizes [16, 1]
-  transform.structured.masked_vectorize %tiled_pad_rhs vector_sizes [16, 1]
-  transform.structured.masked_vectorize %tiled_pad_res vector_sizes [128, 1]
-  transform.structured.masked_vectorize %tiled_copy_back vector_sizes [128, 1]
+  transform.structured.masked_vectorize %tiled_pad_lhs vector_sizes [4, 4]
+  transform.structured.masked_vectorize %tiled_pad_rhs vector_sizes [4, 4]
+  transform.structured.masked_vectorize %tiled_pad_res vector_sizes [32, 4]
+  transform.structured.masked_vectorize %tiled_copy_back vector_sizes [32, 4]
 
   // Step 5. Contraction part mapped to threads with a **SIMD** programming model.
   // =============================================================================
@@ -239,7 +216,7 @@ transform.sequence failures(propagate) {
   transform.iree.apply_patterns %func_m {canonicalization, cse, licm}
     : (!pdl.operation) -> ()
   // TODO: This currently crashes without Thomas' hack.
-  transform.iree.apply_patterns %func_m { unroll_vectors_gpu_wmma }
+  transform.iree.apply_patterns %func_m { unroll_vectors_gpu_mma_sync }
     : (!pdl.operation) -> ()
  
   // Hoist redundant vector transfers to allow vectorization to proceed.
@@ -255,7 +232,7 @@ transform.sequence failures(propagate) {
  
   // This must occur after bufferization, unrolling and hoisting because of the
   // fancy CUDA types.
-  transform.iree.vector.vector_to_mma_conversion %func_m_2 { use_wmma }
+  transform.iree.vector.vector_to_mma_conversion %func_m_2 { use_mma_sync }
     : (!pdl.operation) -> ()
   //===---------------------------------------------------------------------===//
   // END - Annoying phase-ordered section
@@ -292,7 +269,7 @@ transform.sequence failures(propagate) {
     : (!pdl.operation) -> ()
   %func_m_cp = transform.structured.match ops{["func.func"]} in %variant_op_3 
     : (!pdl.operation) -> !pdl.operation
-  transform.iree.create_async_groups %func_m_cp {use_mma_sync = false} 
+  transform.iree.create_async_groups %func_m_cp {use_mma_sync = true} 
     : (!pdl.operation) -> ()
   transform.iree.apply_patterns %func_m_cp {canonicalize, cse, fold_memref_aliases, licm}
     : (!pdl.operation) -> ()
