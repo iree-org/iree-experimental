@@ -22,7 +22,7 @@
 //     --iree-hal-configuration-pipeline | \
 //   ${IREE_DIR}/build/tools/iree-opt \
 //      --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
-//      --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/fill_matmul_unaligned_wmma_vector_4_codegen_spec.mlir \
+//      --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/fill_matmul_unaligned_mma_sync_vector_4_codegen_spec.mlir \
 //      --iree-codegen-llvmgpu-enable-transform-dialect-jit=false
 // ```
 //
@@ -36,7 +36,7 @@
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/fill_matmul_unaligned_wmma_vector_4_codegen_spec.mlir \
+//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/fill_matmul_unaligned_mma_sync_vector_4_codegen_spec.mlir \
 //     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false 
 // ```
 //
@@ -53,7 +53,7 @@
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/fill_matmul_unaligned_wmma_vector_4_codegen_spec.mlir \
+//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/fill_matmul_unaligned_mma_sync_vector_4_codegen_spec.mlir \
 //     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
 //     -o /tmp/foo.vmfb && \
@@ -217,7 +217,7 @@ transform.sequence failures(propagate) {
   transform.iree.apply_patterns %func_m {canonicalization, cse, licm}
     : (!pdl.operation) -> ()
   // TODO: This currently crashes without Thomas' hack.
-  transform.iree.apply_patterns %func_m { unroll_vectors_gpu_wmma }
+  transform.iree.apply_patterns %func_m { unroll_vectors_gpu_mma_sync }
     : (!pdl.operation) -> ()
  
   // Hoist redundant vector transfers to allow vectorization to proceed.
@@ -233,7 +233,7 @@ transform.sequence failures(propagate) {
  
   // This must occur after bufferization, unrolling and hoisting because of the
   // fancy CUDA types.
-  transform.iree.vector.vector_to_mma_conversion %func_m_2 { use_wmma }
+  transform.iree.vector.vector_to_mma_conversion %func_m_2 { use_mma_sync }
     : (!pdl.operation) -> ()
   //===---------------------------------------------------------------------===//
   // END - Annoying phase-ordered section
@@ -270,7 +270,7 @@ transform.sequence failures(propagate) {
     : (!pdl.operation) -> ()
   %func_m_cp = transform.structured.match ops{["func.func"]} in %variant_op_3 
     : (!pdl.operation) -> !pdl.operation
-  transform.iree.create_async_groups %func_m_cp {use_mma_sync = false} 
+  transform.iree.create_async_groups %func_m_cp {use_mma_sync = true} 
     : (!pdl.operation) -> ()
   transform.iree.apply_patterns %func_m_cp {canonicalize, cse, fold_memref_aliases, licm}
     : (!pdl.operation) -> ()
