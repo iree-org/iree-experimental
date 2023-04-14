@@ -22,7 +22,7 @@
 //     --iree-hal-configuration-pipeline | \
 //   ${IREE_DIR}/build/tools/iree-opt \
 //      --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
-//      --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped.mlir \
+//      --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_wmma_vector_4_codegen_spec.mlir \
 //      --iree-codegen-llvmgpu-enable-transform-dialect-jit=false
 // ```
 //
@@ -36,7 +36,7 @@
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped.mlir \
+//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_wmma_vector_4_codegen_spec.mlir \
 //     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false 
 // ```
 //
@@ -53,11 +53,11 @@
 //   ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
 //   ${IREE_DIR}/build/tools/iree-compile - \
 //     --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_codegen_spec_step_02_pad_shared_wmma_async_pipelined_mapped.mlir \
+//     --iree-codegen-llvmgpu-use-transform-dialect=${IREE_SAMPLES_DIR}/transform_dialect/examples/cuda/matmul_unaligned_wmma_vector_4_codegen_spec.mlir \
 //     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 //     --iree-hal-benchmark-dispatch-repeat-count=5 \
-//     -o /tmp/foo.vmfb; \
-//   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null; \
+//     -o /tmp/foo.vmfb && \
+//   scp /tmp/foo.vmfb ${USER}@${A100_MACHINE_IP}:~/ > /dev/null && \
 //   ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=matmul_static --device=cuda --module=foo.vmfb --input=3452x2044xf32=1 --input=2044x1020xf32=1 --input=3452x1020xf32=1 2>&1"
 // ```
 //
