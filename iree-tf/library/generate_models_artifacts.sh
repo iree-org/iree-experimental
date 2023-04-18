@@ -34,6 +34,7 @@ for model_dir in ${MODEL_DIRS}; do
     BATCH_DIRS=$(find "${model_dir}/" -maxdepth 1 -mindepth 1 -type d)
     for batch_dir in ${BATCH_DIRS}; do
         SM_DIR="${batch_dir}/saved_model"
+        echo "Importing ${SM_DIR}"
         iree-import-tf --output-format=mlir-bytecode --tf-import-type=savedmodel_v2 --tf-savedmodel-exported-names=forward ${SM_DIR} -o "${batch_dir}/hlo.mlirbc"
     done
 done

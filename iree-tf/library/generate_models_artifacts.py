@@ -21,7 +21,7 @@ def generate_artifacts(model_name: str, model_class: type[tf.Module], batch_size
         hlo_dir = os.path.join(save_dir, "hlo")
         os.makedirs(save_dir, exist_ok=True)
         os.environ["XLA_FLAGS"] = f"--xla_dump_to={hlo_dir}"
-        
+
         model = model_class()
         inputs = model.generate_inputs(batch_size)
 
@@ -49,7 +49,7 @@ def generate_artifacts(model_name: str, model_class: type[tf.Module], batch_size
         tf.saved_model.save(model, saved_model_path,
                             signatures={"serving_default": call_signature})
     except Exception as e:
-        print(f"Failed to import model {model_name}. Exception: {e}")   
+        print(f"Failed to import model {model_name}. Exception: {e}")
 
 
 if __name__ == "__main__":
@@ -75,4 +75,3 @@ if __name__ == "__main__":
                         args=(model_name, model_class, batch_size, save_dir))
             p.start()
             p.join()
-            
