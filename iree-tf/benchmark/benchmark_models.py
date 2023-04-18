@@ -122,14 +122,19 @@ def run_framework_benchmark(model_name: str, model_class: type[tf.Module],
 
 
 def run_compiler_benchmark(hlo_benchmark_tool_path: str, hlo_dir: str,
-                           device: str, shared_dict) -> None:
+                           benchmark_iterations: int, device: str,
+                           shared_dict) -> None:
     hlo_file = glob.glob(f"{hlo_dir}/*.before_optimizations.txt")
     assert (len(hlo_file) == 1)
 
     cmd = [
-        hlo_benchmark_tool_path, "--input_format=hlo", f"--platform={device}",
-        "--reference_platform=", "--logtostderr",
-        f"--input_module={hlo_file[0]}"
+        hlo_benchmark_tool_path,
+        "--input_format=hlo",
+        f"--platform={device}",
+        "--reference_platform=",
+        "--logtostderr",
+        f"--input_module={hlo_file[0]}",
+        f"--iterations={benchmark_iterations}",
     ]
     result = subprocess.run(cmd,
                             stdout=subprocess.PIPE,
@@ -137,19 +142,35 @@ def run_compiler_benchmark(hlo_benchmark_tool_path: str, hlo_dir: str,
     result_text = result.stdout.decode("utf-8")
     print(f"result: {result_text}")
 
+    compile_latencies = []
     regex = re.compile(r"... compiled and ran in (.*)s.")
     matches = re.findall(regex, result_text)
-    assert (len(matches) == 1)
-    compiler_compile_time_s = matches[0]
-    print(f"compiler_compile_time_s: {compiler_compile_time_s}")
+    for match in matches:
+        compile_latencies.append(float(match))
 
     regex = re.compile(r"execution time for runner CUDA: (.*)s.")
     matches = re.findall(regex, result_text)
-    compiler_latency_ms = float(matches[0]) * 1000
+    latencies = []
+    for match in matches:
+        latencies.append(float(match) * 1000)
 
     shared_dict.update({
-        "compiler_compile_time_s": str(compiler_compile_time_s),
-        "compiler_latency_ms": str(compiler_latency_ms),
+        "compiler_min_compile_time_s":
+        str(min(compile_latencies)),
+        "compiler_max_compile_time_s":
+        str(max(compile_latencies)),
+        "compiler_min_latency_ms":
+        str(min(latencies)),
+        "compiler_max_latency_ms":
+        str(max(latencies)),
+        "compiler_mean_latency_ms":
+        str(statistics.mean(latencies)),
+        "compiler_median_latency_ms":
+        str(statistics.median(latencies)),
+        "compiler_stddev_latency_ms":
+        str(statistics.stdev(latencies)),
+        "compiler_benchmark_iterations":
+        str(benchmark_iterations),
     })
 
 
@@ -173,6 +194,10 @@ if __name__ == "__main__":
                            help="The device to run on. Currently `cpu` and `gpu` are supported.")
     argParser.add_argument("--hlo_benchmark_path",
                            help="The path to `run_hlo_module`.")
+    argParser.add_argument(
+        "--hlo_iterations",
+        default=100,
+        help="The number of iterations to run compiler-level benchmarks.")
     args = argParser.parse_args()
     tf_device = _TF_GPU_DEVICE if args.device == "gpu" else _TF_CPU_DEVICE
 
@@ -209,6 +234,7 @@ if __name__ == "__main__":
                 p = multiprocessing.Process(
                     target=run_compiler_benchmark,
                     args=(args.hlo_benchmark_path, _HLO_DUMP_DIR,
+                          args.hlo_iterations,
                           "cuda" if args.device == "gpu" else "cpu",
                           shared_dict))
                 p.start()
