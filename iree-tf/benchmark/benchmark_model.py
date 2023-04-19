@@ -17,19 +17,26 @@ from typing import Optional, Dict
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "library"))
 from models import resnet50, bert_large, t5_large
 
-_MODEL_NAME_TO_MODEL_CONFIG = {
-    # Batch sizes taken from MLPerf A100 Configs: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/resnet50
-    "RESNET50": (resnet50.ResNet50, [1, 8, 64, 128, 256, 2048]),
-    # Batch sizes based on MLPerf config: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/bert
-    "BERT_LARGE":
-    (bert_large.BertLarge, [1, 16, 24, 32, 48, 64, 512, 1024, 1280]),
-    # Uses the same batch sizes as Bert-Large
-    "T5_LARGE": (t5_large.T5Large, [1, 16, 24, 32, 48, 64, 512]),
-}
+# Add benchmark definitions to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent / "data" / "python" / "benchmark_suite"))
+from benchmark_suite import data_types, tf_model_definitions, unique_ids
+
 
 _HLO_DUMP_DIR = "/tmp/hlo_dump"
 _TF_CPU_DEVICE = "/CPU:0"
 _TF_GPU_DEVICE = "/GPU:0"
+
+
+def benchmark_lookup(unique_id: str):
+    if unique_id not in tf_model_definitions.TF_MODELS_DICT:
+        raise ValueError(f"Id {unique_id} does not exist in model suite.")
+    
+    model_definition = tf_model_definitions.TF_MODELS_DICT[unique_id]
+    if unique_id.startswith(unique_ids.MODEL_RESNET50_FP32_TF):
+        return ("RESNET50", resnet50.ResNet50, model_definition.input_batch_size)
+    else:
+        raise ValueError(f"Model definition not supported")
+
 
 def write_line(file_path: str, text: str, append: bool = True) -> None:
     with open(file_path, "a" if append else "w") as f:
@@ -140,7 +147,6 @@ def run_compiler_benchmark(hlo_benchmark_tool_path: str, hlo_dir: str,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
     result_text = result.stdout.decode("utf-8")
-    print(f"result: {result_text}")
 
     compile_latencies = []
     regex = re.compile(r"... compiled and ran in (.*)s.")
@@ -180,6 +186,12 @@ if __name__ == "__main__":
                            "--output_path",
                            default="/tmp/tf_benchmarks.csv",
                            help="Path to results csv file.")
+    argParser.add_argument("--append",
+                           default=False,
+                           help="Whether to append results to the output file.")
+    argParser.add_argument("-bid",
+                           "--benchmark_id",
+                           help="The unique id that defines a benchmark.")
     argParser.add_argument("-w",
                            "--warmup_iterations",
                            default=5,
@@ -194,58 +206,50 @@ if __name__ == "__main__":
                            help="The device to run on. Currently `cpu` and `gpu` are supported.")
     argParser.add_argument("--hlo_benchmark_path",
                            help="The path to `run_hlo_module`.")
-    argParser.add_argument(
-        "--hlo_iterations",
-        default=100,
-        help="The number of iterations to run compiler-level benchmarks.")
+    argParser.add_argument("--hlo_iterations", default=100,
+                           help="The number of iterations to run compiler-level benchmarks.")
     args = argParser.parse_args()
+    
+    model_name, model_class, batch_size = benchmark_lookup(args.benchmark_id)
+    print(f"\n\n--- {model_name} {args.benchmark_id} -------------------------------------")
+
+    if os.path.exists(_HLO_DUMP_DIR):
+        shutil.rmtree(_HLO_DUMP_DIR)
+    os.mkdir(_HLO_DUMP_DIR)
+
+    result_dict = {
+        "model": model_name,
+        "batch_size": str(batch_size),
+    }
+
+    # Retrieve framework-level benchmarks.
     tf_device = _TF_GPU_DEVICE if args.device == "gpu" else _TF_CPU_DEVICE
+    with multiprocessing.Manager() as manager:
+        shared_dict = manager.dict()
+        p = multiprocessing.Process(
+            target=run_framework_benchmark,
+            args=(model_name, model_class, batch_size,
+                    args.warmup_iterations, args.iterations, tf_device,
+                    _HLO_DUMP_DIR, shared_dict))
+        p.start()
+        p.join()
+        result_dict.update(shared_dict)
 
-    header_written = False
-    for model_name, model_config in _MODEL_NAME_TO_MODEL_CONFIG.items():
-        print(f"\n\n--- {model_name} -------------------------------------")
-        model_class, batch_sizes = model_config
+    # Retrieve compiler-level benchmarks.
+    with multiprocessing.Manager() as manager:
+        shared_dict = manager.dict()
+        p = multiprocessing.Process(
+            target=run_compiler_benchmark,
+            args=(args.hlo_benchmark_path, _HLO_DUMP_DIR,
+                    args.hlo_iterations,
+                    "cuda" if args.device == "gpu" else "cpu",
+                    shared_dict))
+        p.start()
+        p.join()
+        result_dict.update(shared_dict)
 
-        for batch_size in batch_sizes:
-            if os.path.exists(_HLO_DUMP_DIR):
-                shutil.rmtree(_HLO_DUMP_DIR)
-            os.mkdir(_HLO_DUMP_DIR)
-
-            result_dict = {
-                "model": model_name,
-                "batch_size": str(batch_size),
-            }
-
-            # Retrieve framework-level benchmarks.
-            with multiprocessing.Manager() as manager:
-                shared_dict = manager.dict()
-                p = multiprocessing.Process(
-                    target=run_framework_benchmark,
-                    args=(model_name, model_class, batch_size,
-                          args.warmup_iterations, args.iterations, tf_device,
-                          _HLO_DUMP_DIR, shared_dict))
-                p.start()
-                p.join()
-                result_dict.update(shared_dict)
-
-            # Retrieve compiler-level benchmarks.
-            with multiprocessing.Manager() as manager:
-                shared_dict = manager.dict()
-                p = multiprocessing.Process(
-                    target=run_compiler_benchmark,
-                    args=(args.hlo_benchmark_path, _HLO_DUMP_DIR,
-                          args.hlo_iterations,
-                          "cuda" if args.device == "gpu" else "cpu",
-                          shared_dict))
-                p.start()
-                p.join()
-                result_dict.update(shared_dict)
-
-            if not header_written:
-                write_line(args.output_path,
-                           ",".join(result_dict.keys()),
-                           append=False)
-                header_written = True
-            write_line(args.output_path,
-                       ",".join(result_dict.values()),
-                       append=True)
+    if not args.append:
+        write_line(args.output_path, ",".join(result_dict.keys()), append=False)
+    write_line(args.output_path, ",".join(result_dict.values()), append=True)
+    
+    print(f"Results {result_dict}")
