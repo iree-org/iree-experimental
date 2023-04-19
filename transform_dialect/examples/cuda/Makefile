@@ -1,3 +1,19 @@
+# Instructions
+# ============
+# ```
+#    make clean && make -j 8 some_tests
+# ```
+# This will generate the following files:
+#   - logs/*.log the runtimes for various matmul sizes
+#
+# To produce PTX:
+# ```
+#   # IREE without transform dialect.
+#   make iree_cuda_fill_matmul_200_300_400.vmfb
+#   # IREE with transform dialect.
+#   make iree_cuda_fill_matmul_200_300_400.td.vmfb
+# ```
+
 LLVM_SRC=$(HOME)/github/llvm-project
 LLVM_BUILD=$(HOME)/github/llvm-project/build
 IREE_SRC=$(HOME)/github/iree
@@ -11,12 +27,9 @@ IREE_RUN_MODULE=$(IREE_BUILD)/tools/iree-run-module
 
 MATMUL_STUB=$(IREE_SAMPLES_DIR)/matmul.mlir
 
-
 .PHONY: all
 
-
 all: fill_matmul
-
 
 define extract_size_from_matmul
   $(subst _, ,$(shell echo $1 | sed -e "s/.*_matmul_//g" | sed -e "s/\.mlir//g" | sed -e "s/\.td//g"))
