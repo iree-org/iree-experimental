@@ -30,7 +30,7 @@ _TF_GPU_DEVICE = "/GPU:0"
 def benchmark_lookup(unique_id: str):
     if unique_id not in tf_model_definitions.TF_MODELS_DICT:
         raise ValueError(f"Id {unique_id} does not exist in model suite.")
-    
+
     model_definition = tf_model_definitions.TF_MODELS_DICT[unique_id]
     if unique_id.startswith(unique_ids.MODEL_RESNET50_FP32_TF):
         return ("RESNET50", resnet50.ResNet50, model_definition.input_batch_size)
@@ -186,18 +186,21 @@ if __name__ == "__main__":
                            "--output_path",
                            default="/tmp/tf_benchmarks.csv",
                            help="Path to results csv file.")
-    argParser.add_argument("--append",
-                           default=False,
-                           help="Whether to append results to the output file.")
+    argParser.add_argument(
+        "--append",
+        action=argparse.BooleanOptionalAction,
+        help="Whether to append results to the output file.")
     argParser.add_argument("-bid",
                            "--benchmark_id",
                            help="The unique id that defines a benchmark.")
     argParser.add_argument("-w",
                            "--warmup_iterations",
+                           type=int,
                            default=5,
                            help="The number of warmup steps.")
     argParser.add_argument("-iter",
                            "--iterations",
+                           type=int,
                            default=100,
                            help="The number of iterations to benchmark.")
     argParser.add_argument("-d",
@@ -206,10 +209,13 @@ if __name__ == "__main__":
                            help="The device to run on. Currently `cpu` and `gpu` are supported.")
     argParser.add_argument("--hlo_benchmark_path",
                            help="The path to `run_hlo_module`.")
-    argParser.add_argument("--hlo_iterations", default=100,
-                           help="The number of iterations to run compiler-level benchmarks.")
+    argParser.add_argument(
+        "--hlo_iterations",
+        type=int,
+        default=100,
+        help="The number of iterations to run compiler-level benchmarks.")
     args = argParser.parse_args()
-    
+
     model_name, model_class, batch_size = benchmark_lookup(args.benchmark_id)
     print(f"\n\n--- {model_name} {args.benchmark_id} -------------------------------------")
 
@@ -251,5 +257,5 @@ if __name__ == "__main__":
     if not args.append:
         write_line(args.output_path, ",".join(result_dict.keys()), append=False)
     write_line(args.output_path, ",".join(result_dict.values()), append=True)
-    
+
     print(f"Results {result_dict}")
