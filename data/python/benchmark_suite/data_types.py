@@ -22,12 +22,16 @@ class ModelData(object):
   # Tags that describe the data characteristics.
   tags: List[str]
   data_format: DataFormat
-  # Where to download the input data.
-  source_url: str
+  # If applicable, the model id that generated the data.
+  model_id: str
   # Information on where the data was originally sourced.
   source_info: str
+  # The name of the tensors.
+  tensor_names: List[str]
   # The dimensions of the data e.g. "1x224x224x3xf32".
-  tensor_dimensions: str
+  tensor_dimensions: List[str]
+  # Where to download the input data.
+  source_url: List[str]
 
   def __str__(self):
     return self.name
@@ -44,8 +48,8 @@ class Model(object):
   # Source of the model implementation.
   source_info: str
   input_batch_size: int
-  inputs: List[ModelData]
-  expected_outputs: List[ModelData]
+  inputs: ModelData
+  outputs: ModelData
 
   def __str__(self):
     return self.name
