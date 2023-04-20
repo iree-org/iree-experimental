@@ -5,13 +5,29 @@
 # ```
 # This will generate the following files:
 #   - logs/*.log the runtimes for various matmul sizes
+#   - gen/* various generated files with IR and PTX
 #
 # To produce PTX:
 # ```
 #   # IREE without transform dialect.
-#   make iree_cuda_fill_matmul_200_300_400.vmfb
+#   make gen/iree_cuda_fill_matmul_200_300_400.vmfb
 #   # IREE with transform dialect.
-#   make iree_cuda_fill_matmul_200_300_400.td.vmfb
+#   make gen/iree_cuda_fill_matmul_200_300_400.td.vmfb
+# ```
+#
+# To produce the TD script:
+# ```
+#   make gen/fill_matmul_2052_2052_2052.embedded.td.mlir
+# ```
+#
+# Then further process with:
+# ```
+#   iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' gen/fill_matmul_2052_2052_2052.embedded.td.mlir
+# ```
+#
+# Or: 
+# ```
+#   iree-compile --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 gen/fill_matmul_2052_2052_2052.embedded.td.mlir
 # ```
 
 LLVM_SRC=$(HOME)/github/llvm-project
@@ -29,10 +45,9 @@ MATMUL_STUB=$(IREE_SAMPLES_DIR)/matmul.mlir
 
 .PHONY: all
 
-all: fill_matmul
 
 define extract_size_from_matmul
-  $(subst _, ,$(shell echo $1 | sed -e "s/.*_matmul_//g" | sed -e "s/\.mlir//g" | sed -e "s/\.td//g"))
+  $(subst _, ,$(shell echo $1 | sed -e "s/.*_matmul_//g" | sed -e "s/\..*//g" ))
 endef
 
 
@@ -43,18 +58,38 @@ tmp_fill_matmul_%.mlir: $(MATMUL_STUB)
 	@cat $(MATMUL_STUB) | sed "s/\$${M}/$M/g" | sed "s/\$${N}/$N/g" | sed "s/\$${K}/$K/g" > $@;
 
 
-fill_matmul_%.mlir: tmp_fill_matmul_%.mlir $(MLIR_OPT)
+gen/fill_matmul_%.embedded.td.mlir: gen/fill_matmul_%.mlir $(IREE_OPT)
+	@echo make $@
+	@$(IREE_OPT) $< \
+	  --iree-hal-target-backends=cuda \
+		--iree-hal-cuda-llvm-target-arch=sm_80 \
+		--iree-abi-transformation-pipeline \
+		--iree-flow-transformation-pipeline \
+		--iree-stream-transformation-pipeline \
+		--iree-hal-configuration-pipeline | \
+	$(IREE_OPT) --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+	  --iree-hal-target-backends=cuda \
+		--iree-hal-cuda-llvm-target-arch=sm_80 \
+		--iree-codegen-llvmgpu-enable-transform-dialect-jit \
+		--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy \
+	> $@
+
+
+gen/fill_matmul_%.mlir: gen/tmp_fill_matmul_%.mlir $(MLIR_OPT)
+	@echo make $@
 	@cat $< | sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
     $(MLIR_OPT) -symbol-dce > $@
 
 
-iree_cuda_fill_matmul_%.vmfb: fill_matmul_%.mlir $(IREE_COMPILE)
+gen/iree_cuda_fill_matmul_%.vmfb: gen/fill_matmul_%.mlir $(IREE_COMPILE)
+	@echo make $@
 	@$(IREE_COMPILE) $< --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
 	  --iree-hal-benchmark-dispatch-repeat-count=3 \
 		-o $@
 
 
-iree_cuda_fill_matmul_%.td.vmfb: fill_matmul_%.mlir $(IREE_COMPILE)
+gen/iree_cuda_fill_matmul_%.td.vmfb: gen/fill_matmul_%.mlir gen/fill_matmul_%.embedded.td.mlir $(IREE_COMPILE)
+	@echo make $@
 	@$(IREE_COMPILE) $< --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
 	  --iree-hal-benchmark-dispatch-repeat-count=3 \
 		--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy \
@@ -62,7 +97,7 @@ iree_cuda_fill_matmul_%.td.vmfb: fill_matmul_%.mlir $(IREE_COMPILE)
 
 
 run_%: %.vmfb
-	@echo Processing $<
+	@echo ssh into ${A100_MACHINE_IP} and run $<
 	$(eval M:=$(word 1, $(call extract_size_from_matmul,$@)))
 	$(eval N:=$(word 2, $(call extract_size_from_matmul,$@)))
 	$(eval K:=$(word 3, $(call extract_size_from_matmul,$@)))
@@ -77,15 +112,24 @@ run_%: %.vmfb
 
 
 fill_matmul_%: run_iree_cuda_fill_matmul_% run_iree_cuda_fill_matmul_%.td
-	@echo Done with $@
+	$(NOECHO) $(NOOP)
+
 
 logs:
-	mkdir -p logs
+	@mkdir -p logs
 
-some_tests: fill_matmul_3452_1000_1000 fill_matmul_2052_2052_2052 fill_matmul_1000_1000_3052 logs
+
+gen_dir:
+	@mkdir -p gen
+
+
+some_tests: fill_matmul_3452_1020_2044 fill_matmul_3452_1000_1000 fill_matmul_2052_2052_2052 fill_matmul_1000_1000_3052 logs gen_dir
 	ls logs/*.log | sort -n | xargs cat
 
 
 clean:
-	rm -f *.vmfb logs/*
-	rmdir logs
+	rm -Rf *.embedded.td.mlir *.vmfb logs gen_dir
+
+
+all: some_tests
+	
