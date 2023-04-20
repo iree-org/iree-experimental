@@ -34,6 +34,10 @@ def benchmark_lookup(unique_id: str):
     model_definition = tf_model_definitions.TF_MODELS_DICT[unique_id]
     if unique_id.startswith(unique_ids.MODEL_RESNET50_FP32_TF):
         return ("RESNET50", resnet50.ResNet50, model_definition.input_batch_size)
+    elif unique_id.startswith(unique_ids.MODEL_BERT_LARGE_FP32_TF):
+        return ("BERT_LARGE", bert_large.BertLarge, model_definition.input_batch_size)
+    elif unique_id.startswith(unique_ids.MODEL_T5_LARGE_FP32_TF):
+        return ("T5_LARGE", t5_large.T5Large, model_definition.input_batch_size)
     else:
         raise ValueError(f"Model definition not supported")
 
@@ -208,6 +212,7 @@ if __name__ == "__main__":
                            default="gpu",
                            help="The device to run on. Currently `cpu` and `gpu` are supported.")
     argParser.add_argument("--hlo_benchmark_path",
+                           default=None,
                            help="The path to `run_hlo_module`.")
     argParser.add_argument(
         "--hlo_iterations",
@@ -242,17 +247,18 @@ if __name__ == "__main__":
         result_dict.update(shared_dict)
 
     # Retrieve compiler-level benchmarks.
-    with multiprocessing.Manager() as manager:
-        shared_dict = manager.dict()
-        p = multiprocessing.Process(
-            target=run_compiler_benchmark,
-            args=(args.hlo_benchmark_path, _HLO_DUMP_DIR,
-                    args.hlo_iterations,
-                    "cuda" if args.device == "gpu" else "cpu",
-                    shared_dict))
-        p.start()
-        p.join()
-        result_dict.update(shared_dict)
+    if args.hlo_benchmark_path is not None:
+        with multiprocessing.Manager() as manager:
+            shared_dict = manager.dict()
+            p = multiprocessing.Process(
+                target=run_compiler_benchmark,
+                args=(args.hlo_benchmark_path, _HLO_DUMP_DIR,
+                        args.hlo_iterations,
+                        "cuda" if args.device == "gpu" else "cpu",
+                        shared_dict))
+            p.start()
+            p.join()
+            result_dict.update(shared_dict)
 
     if not args.append:
         write_line(args.output_path, ",".join(result_dict.keys()), append=False)
