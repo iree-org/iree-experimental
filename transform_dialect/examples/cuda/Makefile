@@ -1,7 +1,7 @@
 # Instructions
 # ============
 # ```
-#    make clean && make -j 8 some_tests
+#    make clean && make -j 8 unaligned_matmuls
 # ```
 # This will generate the following files:
 #   - logs/*.log the runtimes for various matmul sizes
@@ -10,24 +10,24 @@
 # To produce PTX:
 # ```
 #   # IREE without transform dialect.
-#   make gen/iree_cuda_a100_fill_matmul_sizes_200_300_400.vmfb
+#   make gen/cuda_a100_fill_matmul_sizes_200_300_400.vmfb
 #   # IREE with transform dialect.
-#   make gen/iree_cuda_a100_fill_matmul_sizes_200_300_400.td.vmfb
+#   make gen/cuda_a100_fill_matmul_sizes_200_300_400.td.vmfb
 # ```
 #
 # To produce the TD script:
 # ```
-#   make gen/fill_matmul_sizes_2052_2052_2052.embedded.td.mlir
+#   make gen/cuda_a100_fill_matmul_sizes_2052_2052_2052.embedded.td.mlir
 # ```
 #
 # Then further process with:
 # ```
-#   iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' gen/fill_matmul_sizes_2052_2052_2052.embedded.td.mlir
+#   iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' gen/cuda_a100_fill_matmul_sizes_2052_2052_2052.embedded.td.mlir
 # ```
 #
 # Or: 
 # ```
-#   iree-compile --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 gen/fill_matmul_sizes_2052_2052_2052.embedded.td.mlir
+#   iree-compile --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 gen/cuda_a100_fill_matmul_sizes_2052_2052_2052.embedded.td.mlir
 # ```
 
 LLVM_SRC=$(HOME)/github/llvm-project
