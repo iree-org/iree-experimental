@@ -10,24 +10,24 @@
 # To produce PTX:
 # ```
 #   # IREE without transform dialect.
-#   make gen/iree_cuda_fill_matmul_200_300_400.vmfb
+#   make gen/iree_cuda_a100_fill_matmul_sizes_200_300_400.vmfb
 #   # IREE with transform dialect.
-#   make gen/iree_cuda_fill_matmul_200_300_400.td.vmfb
+#   make gen/iree_cuda_a100_fill_matmul_sizes_200_300_400.td.vmfb
 # ```
 #
 # To produce the TD script:
 # ```
-#   make gen/fill_matmul_2052_2052_2052.embedded.td.mlir
+#   make gen/fill_matmul_sizes_2052_2052_2052.embedded.td.mlir
 # ```
 #
 # Then further process with:
 # ```
-#   iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' gen/fill_matmul_2052_2052_2052.embedded.td.mlir
+#   iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' gen/fill_matmul_sizes_2052_2052_2052.embedded.td.mlir
 # ```
 #
 # Or: 
 # ```
-#   iree-compile --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 gen/fill_matmul_2052_2052_2052.embedded.td.mlir
+#   iree-compile --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 gen/fill_matmul_sizes_2052_2052_2052.embedded.td.mlir
 # ```
 
 LLVM_SRC=$(HOME)/github/llvm-project
@@ -41,22 +41,49 @@ IREE_OPT=$(IREE_BUILD)/tools/iree-opt
 IREE_COMPILE=$(IREE_BUILD)/tools/iree-compile
 IREE_RUN_MODULE=$(IREE_BUILD)/tools/iree-run-module
 
+#################################################################################
+################# Problem-specific rules, one set per problem ###################
+#################################################################################
 MATMUL_STUB=$(IREE_SAMPLES_DIR)/matmul.mlir
 
-
-define extract_size_from_matmul
-  $(subst _, ,$(shell echo $1 | sed -e "s/.*_matmul_//g" | sed -e "s/\..*//g" ))
-endef
-
-
-gen/tmp_fill_matmul_%.mlir: $(MATMUL_STUB)
-	$(eval M:=$(word 1, $(call extract_size_from_matmul,$@)))
-	$(eval N:=$(word 2, $(call extract_size_from_matmul,$@)))
-	$(eval K:=$(word 3, $(call extract_size_from_matmul,$@)))
+gen/tmp_fill_matmul_sizes_%.mlir: $(MATMUL_STUB)
+	@echo make $@
+	$(eval M:=$(word 1, $(call extract_size_from_problem,$@)))
+	$(eval N:=$(word 2, $(call extract_size_from_problem,$@)))
+	$(eval K:=$(word 3, $(call extract_size_from_problem,$@)))
 	@cat $(MATMUL_STUB) | sed "s/\$${M}/$M/g" | sed "s/\$${N}/$N/g" | sed "s/\$${K}/$K/g" > $@;
 
 
-gen/fill_matmul_%.embedded.td.mlir: gen/fill_matmul_%.mlir $(IREE_OPT)
+gen/fill_matmul_sizes_%.mlir: gen/tmp_fill_matmul_sizes_%.mlir $(MLIR_OPT)
+	@echo make $@
+	@cat $< | sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
+    $(MLIR_OPT) -symbol-dce > $@
+
+
+run_cuda_a100_fill_matmul_%: gen/cuda_a100_fill_matmul_%.vmfb
+	@echo ssh into ${A100_MACHINE_IP} and run $<
+	scp $< $(USER)@$(A100_MACHINE_IP):~/ > /dev/null 2>&1
+	$(eval M:=$(word 1, $(call extract_size_from_problem,$@)))
+	$(eval N:=$(word 2, $(call extract_size_from_problem,$@)))
+	$(eval K:=$(word 3, $(call extract_size_from_problem,$@)))
+	@printf 'make %-50s -> ' "$@" > logs/$@.log
+	@{ \
+		ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=fill_matmul_static --device=cuda  --module=$(notdir $<) --input=$(M)x$(K)xf32=1 --input=$(K)x$(N)xf32=1 --input=$(M)x$(N)xf32=1 2>&1" | \
+		grep fill_matmul_static | grep -v EXEC | \
+		awk '{print $$6}'; \
+	} >> logs/$@.log
+
+
+#################################################################################
+########################### Problem-agnostic rules ##############################
+#################################################################################
+
+define extract_size_from_problem
+  $(subst _, ,$(shell echo $1 | sed -e "s/.*_sizes_//g" | sed -e "s/\..*//g" ))
+endef
+
+
+gen/cuda_a100_%.embedded.td.mlir: gen/%.mlir $(IREE_OPT)
 	@echo make $@
 	@$(IREE_OPT) $< \
 	  --iree-hal-target-backends=cuda \
@@ -73,63 +100,34 @@ gen/fill_matmul_%.embedded.td.mlir: gen/fill_matmul_%.mlir $(IREE_OPT)
 	> $@
 
 
-gen/fill_matmul_%.mlir: gen/tmp_fill_matmul_%.mlir $(MLIR_OPT)
+gen/cuda_a100_%.vmfb: gen/%.mlir $(IREE_COMPILE)
 	@echo make $@
-	@cat $< | sed "s/private @fill_matmul_static(/@fill_matmul_static(/g" | \
-    $(MLIR_OPT) -symbol-dce > $@
-
-
-gen/iree_cuda_fill_matmul_%.vmfb: gen/fill_matmul_%.mlir $(IREE_COMPILE)
-	@echo make $@
-	@$(IREE_COMPILE) $< --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-	  --iree-hal-benchmark-dispatch-repeat-count=5  --iree-codegen-llvmgpu-use-mma-sync \
+	@$(IREE_COMPILE) $< \
+	  --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
+	  --iree-hal-benchmark-dispatch-repeat-count=3 \
+		--iree-codegen-llvmgpu-use-mma-sync \
 		-o $@
 
 
-gen/iree_cuda_fill_matmul_%.td.vmfb: gen/fill_matmul_%.mlir gen/fill_matmul_%.embedded.td.mlir $(IREE_COMPILE)
+gen/cuda_a100_%.td.vmfb: gen/%.mlir $(IREE_COMPILE)
 	@echo make $@
-	@$(IREE_COMPILE) $< --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
-	  --iree-hal-benchmark-dispatch-repeat-count=5 \
+	@$(IREE_COMPILE) $< \
+	  --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 \
+	  --iree-hal-benchmark-dispatch-repeat-count=3 \
 		--iree-codegen-llvmgpu-use-mma-sync \
 		--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy \
+		--td-matmul-strategy-use-mma-sync \
 		-o $@
 
 
-run_%: gen/%.vmfb
-	@echo ssh into ${A100_MACHINE_IP} and run $<
-	scp $< $(USER)@$(A100_MACHINE_IP):~/ > /dev/null 2>&1
-	$(eval M:=$(word 1, $(call extract_size_from_matmul,$@)))
-	$(eval N:=$(word 2, $(call extract_size_from_matmul,$@)))
-	$(eval K:=$(word 3, $(call extract_size_from_matmul,$@)))
-	@printf 'make %-50s -> ' "$@" > logs/$@.log
-	@{ \
-		ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=fill_matmul_static --device=cuda  --module=$(notdir $<) --input=$(M)x$(K)xf32=1 --input=$(K)x$(N)xf32=1 --input=$(M)x$(N)xf32=1 2>&1" | \
-		grep fill_matmul_static | grep -v EXEC | \
-		awk '{print $$6}'; \
-	} >> logs/$@.log
+# Also build the cuda_a100_%.embedded.td.mlir for simpler debugging purposes.
+case_%: run_cuda_a100_% run_cuda_a100_%.td gen/cuda_a100_%.embedded.td.mlir 
+	@echo make $@
 
 
-manual_run_%: gen/%.vmfb
-	@echo ssh into ${A100_MACHINE_IP} and run $<
-	scp $< $(USER)@$(A100_MACHINE_IP):~/ > /dev/null 2>&1
-	$(eval M:=$(word 1, $(call extract_size_from_matmul,$@)))
-	$(eval N:=$(word 2, $(call extract_size_from_matmul,$@)))
-	$(eval K:=$(word 3, $(call extract_size_from_matmul,$@)))
-	@{ \
-		ssh ${USER}@${A100_MACHINE_IP} "/usr/local/cuda/bin/nsys profile --stats=true ~/iree-run-module --function=fill_matmul_static --device=cuda  --module=$(notdir $<) --input=$(M)x$(K)xf32=1 --input=$(K)x$(N)xf32=1 --input=$(M)x$(N)xf32=1 2>&1"; \
-	}
-	@{ \
-		ssh ${USER}@${A100_MACHINE_IP} "sudo /usr/local/cuda/bin/ncu -f --set full -o profile ~/iree-run-module --function=fill_matmul_static --device=cuda  --module=$(notdir $<) --input=$(M)x$(K)xf32=1 --input=$(K)x$(N)xf32=1 --input=$(M)x$(N)xf32=1 2>&1"; \
-	}
-	@scp  ${USER}@${A100_MACHINE_IP}:~/profile.ncu-rep ~/
+# case_fill_matmul_sizes_3455_1023_2047 case_fill_matmul_sizes_3452_1000_1000 case_fill_matmul_sizes_2052_2052_2052 case_fill_matmul_sizes_1000_1000_3052
 
-
-fill_matmul_%: run_iree_cuda_fill_matmul_% run_iree_cuda_fill_matmul_%.td
-	$(NOECHO) $(NOOP)
-
-
-# fill_matmul_3455_1023_2047 fill_matmul_3452_1000_1000 fill_matmul_2052_2052_2052 fill_matmul_1000_1000_3052
-some_tests: gen_dir logs_dir fill_matmul_3452_1020_2044
+some_tests: gen_dir logs_dir case_fill_matmul_sizes_3452_1024_2044
 	ls logs/*.log | sort -n | xargs cat
 
 
