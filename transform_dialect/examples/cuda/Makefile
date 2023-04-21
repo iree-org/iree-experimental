@@ -125,9 +125,17 @@ case_%: run_cuda_a100_% run_cuda_a100_%.td gen/cuda_a100_%.embedded.td.mlir
 	@echo make $@
 
 
-# case_fill_matmul_sizes_3455_1023_2047 case_fill_matmul_sizes_3452_1000_1000 case_fill_matmul_sizes_2052_2052_2052 case_fill_matmul_sizes_1000_1000_3052
-
-some_tests: gen_dir logs_dir case_fill_matmul_sizes_3452_1024_2044
+unaligned_matmul: gen_dir logs_dir \
+            case_fill_matmul_sizes_3456_1022_2044 \
+            case_fill_matmul_sizes_3452_1024_2044 \
+            case_fill_matmul_sizes_3452_1022_2044 \
+            case_fill_matmul_sizes_3456_1023_2044 \
+            case_fill_matmul_sizes_3452_1024_2046 \
+            case_fill_matmul_sizes_3451_1022_2046 \
+						case_fill_matmul_sizes_3455_1023_2047 \
+						case_fill_matmul_sizes_3452_1000_1000 \
+						case_fill_matmul_sizes_2052_2052_2052 \
+						case_fill_matmul_sizes_1000_1000_3052
 	ls logs/*.log | sort -n | xargs cat
 
 
