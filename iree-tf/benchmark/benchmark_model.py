@@ -18,8 +18,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "library"))
 from models import resnet50, bert_large, t5_large
 
 # Add benchmark definitions to the search path.
-sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent / "data" / "python" / "benchmark_suite"))
-from benchmark_suite import data_types, tf_model_definitions, unique_ids
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent / "oobi" / "benchmark-definitions" / "python"))
+import data_types, tf_model_definitions, unique_ids
 
 
 _HLO_DUMP_DIR = "/tmp/hlo_dump"

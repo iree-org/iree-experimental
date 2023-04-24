@@ -44,7 +44,7 @@ APPEND=false
 for benchmark_id in "${benchmark_ids[@]}"; do
   declare -a args=(
     --benchmark_id="${benchmark_id}"
-    --device=gpu
+    --device="${DEVICE}"
     --output_path="${OUTPUT_PATH}"
     --iterations=100
     --hlo_iterations=100
