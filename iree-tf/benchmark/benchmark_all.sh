@@ -1,9 +1,14 @@
 #!/bin/bash
 
-bash setup_venv.sh
-source tf-benchmarks.venv/bin/activate
+DEVICE=$1
+TENSORFLOW_VERSION=$2
+OUTPUT_PATH=$3
+HLO_BENCHMARK_PATH=$4
 
-HLO_BENCHMARK_PATH=$1
+VENV_DIR="tf-benchmarks"
+
+VENV_DIR="${VENV_DIR}" TENSORFLOW_VERSION="${TENSORFLOW_VERSION}" ./setup_venv.sh
+source ${VENV_DIR}.venv/bin/activate
 
 MODEL_RESNET50_FP32_TF="2e1bd635-eeb3-41fa-90a6-e1cfdfa9be0a"
 MODEL_BERT_LARGE_FP32_TF="979ff492-f363-4320-875f-e1ef93521132"
@@ -34,7 +39,6 @@ declare -a benchmark_ids=(
   "${MODEL_T5_LARGE_FP32_TF}-batch512"
 )
 
-OUTPUT_PATH="/tmp/tf_benchmarks.csv"
 APPEND=false
 
 for benchmark_id in "${benchmark_ids[@]}"; do
@@ -63,4 +67,3 @@ for benchmark_id in "${benchmark_ids[@]}"; do
   python benchmark_model.py "${args[@]}"
   APPEND=true
 done
-
