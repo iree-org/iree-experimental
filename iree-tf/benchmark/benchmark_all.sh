@@ -5,10 +5,10 @@ TENSORFLOW_VERSION=$2
 OUTPUT_PATH=$3
 HLO_BENCHMARK_PATH=$4
 
-VENV_DIR="tf-benchmarks"
+VENV_DIR="tf-benchmarks.venv"
 
 VENV_DIR="${VENV_DIR}" TENSORFLOW_VERSION="${TENSORFLOW_VERSION}" ./setup_venv.sh
-source ${VENV_DIR}.venv/bin/activate
+source ${VENV_DIR}/bin/activate
 
 MODEL_RESNET50_FP32_TF="2e1bd635-eeb3-41fa-90a6-e1cfdfa9be0a"
 MODEL_BERT_LARGE_FP32_TF="979ff492-f363-4320-875f-e1ef93521132"
