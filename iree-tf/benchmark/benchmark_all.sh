@@ -3,11 +3,11 @@
 DEVICE=$1
 TENSORFLOW_VERSION=$2
 OUTPUT_PATH=$3
-HLO_BENCHMARK_PATH=$4
 
+TD="$(cd $(dirname $0) && pwd)"
 VENV_DIR="tf-benchmarks.venv"
 
-VENV_DIR="${VENV_DIR}" TENSORFLOW_VERSION="${TENSORFLOW_VERSION}" ./setup_venv.sh
+VENV_DIR="${VENV_DIR}" TENSORFLOW_VERSION="${TENSORFLOW_VERSION}" ${TD}/setup_venv.sh
 source ${VENV_DIR}/bin/activate
 
 MODEL_RESNET50_FP32_TF="2e1bd635-eeb3-41fa-90a6-e1cfdfa9be0a"
@@ -56,14 +56,14 @@ for benchmark_id in "${benchmark_ids[@]}"; do
     )
   fi
 
-  if [ -z "${HLO_BENCHMARK_PATH}" ]; then
-    echo "HLO Benchmark Path not provided. Disabling compiler-level benchmarks."
+  if [ -z "${TF_RUN_HLO_MODULE_PATH}" ]; then
+    echo "HLO Benchmark Path not set in environment variable TF_RUN_HLO_MODULE_PATH. Disabling compiler-level benchmarks."
   else
     args+=(
-      --hlo_benchmark_path="${HLO_BENCHMARK_PATH}"
+      --hlo_benchmark_path="${TF_RUN_HLO_MODULE_PATH}"
     )
   fi
 
-  python benchmark_model.py "${args[@]}"
+  python ${TD}/benchmark_model.py "${args[@]}"
   APPEND=true
 done

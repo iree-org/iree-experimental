@@ -1,0 +1,4 @@
+# Python package requirements for building as a user.
+# Usage:
+#   python -m pip install -r oobi/build_tools/docker/context/python_build_requirements.txt
+pip>=21.3
