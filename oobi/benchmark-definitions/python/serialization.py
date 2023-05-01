@@ -21,7 +21,7 @@ SUPPORTED_PRIMITIVE_TYPES = {str, int, float, bool, NONE_TYPE}
 def serialize_and_pack(obj,
                        root_obj_field_name="root_obj",
                        keyed_obj_map_field_name="keyed_obj_map"):
-    """Converts and packs the object into a serializable object.
+  """Converts and packs the object into a serializable object.
   
   Args:
     obj: object to be serialized.
@@ -32,16 +32,16 @@ def serialize_and_pack(obj,
     A serializable dict.
   """
 
-    if root_obj_field_name == keyed_obj_map_field_name:
-        raise ValueError(
-            f"root_obj and keyed_obj_map can't have the same field name.")
+  if root_obj_field_name == keyed_obj_map_field_name:
+    raise ValueError(
+        f"root_obj and keyed_obj_map can't have the same field name.")
 
-    keyed_obj_map = {}
-    root_obj = _serialize(obj=obj, keyed_obj_map=keyed_obj_map)
-    return {
-        root_obj_field_name: root_obj,
-        keyed_obj_map_field_name: keyed_obj_map
-    }
+  keyed_obj_map = {}
+  root_obj = _serialize(obj=obj, keyed_obj_map=keyed_obj_map)
+  return {
+      root_obj_field_name: root_obj,
+      keyed_obj_map_field_name: keyed_obj_map
+  }
 
 
 T = TypeVar('T')
@@ -51,7 +51,7 @@ def unpack_and_deserialize(data,
                            root_type: Type[T],
                            root_obj_field_name="root_obj",
                            keyed_obj_map_field_name="keyed_obj_map") -> T:
-    """Unpacks and deserializes the data back to the typed object.
+  """Unpacks and deserializes the data back to the typed object.
 
   Args:
     data: serialized data dict.
@@ -61,14 +61,14 @@ def unpack_and_deserialize(data,
   Returns:
     A deserialized object.
   """
-    obj = _deserialize(data=data[root_obj_field_name],
-                       obj_type=root_type,
-                       keyed_obj_map=data[keyed_obj_map_field_name])
-    return typing.cast(root_type, obj)
+  obj = _deserialize(data=data[root_obj_field_name],
+                     obj_type=root_type,
+                     keyed_obj_map=data[keyed_obj_map_field_name])
+  return typing.cast(root_type, obj)
 
 
 def _serialize(obj, keyed_obj_map: Dict[str, Any]):
-    """Converts the object into a serializable object.
+  """Converts the object into a serializable object.
   
   Args:
     obj: object to be serialized.
@@ -77,35 +77,35 @@ def _serialize(obj, keyed_obj_map: Dict[str, Any]):
     A serializable object.
   """
 
-    serialize_func = getattr(obj, SERIALIZE_FUNC_NAME, None)
-    if serialize_func is not None:
-        return serialize_func(keyed_obj_map)
+  serialize_func = getattr(obj, SERIALIZE_FUNC_NAME, None)
+  if serialize_func is not None:
+    return serialize_func(keyed_obj_map)
 
-    elif isinstance(obj, list):
-        return [_serialize(value, keyed_obj_map) for value in obj]
+  elif isinstance(obj, list):
+    return [_serialize(value, keyed_obj_map) for value in obj]
 
-    elif isinstance(obj, Enum):
-        return obj.name
+  elif isinstance(obj, Enum):
+    return obj.name
 
-    elif isinstance(obj, dict):
-        result_dict = {}
-        for key, value in obj.items():
-            if type(key) not in SUPPORTED_DICT_KEY_TYPES:
-                raise ValueError(f"Unsupported key {key} in the dict {obj}.")
-            result_dict[key] = _serialize(value, keyed_obj_map)
-        return result_dict
+  elif isinstance(obj, dict):
+    result_dict = {}
+    for key, value in obj.items():
+      if type(key) not in SUPPORTED_DICT_KEY_TYPES:
+        raise ValueError(f"Unsupported key {key} in the dict {obj}.")
+      result_dict[key] = _serialize(value, keyed_obj_map)
+    return result_dict
 
-    elif type(obj) in SUPPORTED_PRIMITIVE_TYPES:
-        return obj
+  elif type(obj) in SUPPORTED_PRIMITIVE_TYPES:
+    return obj
 
-    raise ValueError(f"Unsupported object: {obj}.")
+  raise ValueError(f"Unsupported object: {obj}.")
 
 
 def _deserialize(data,
                  obj_type: Type,
                  keyed_obj_map: Dict[str, Any],
                  obj_cache: Dict[str, Any] = {}):
-    """Deserializes the data back to the typed object.
+  """Deserializes the data back to the typed object.
 
   Args:
     data: serialized data.
@@ -115,61 +115,59 @@ def _deserialize(data,
     A deserialized object.
   """
 
-    deserialize_func = getattr(obj_type, DESERIALIZE_FUNC_NAME, None)
-    if deserialize_func is not None:
-        return deserialize_func(data, keyed_obj_map, obj_cache)
+  deserialize_func = getattr(obj_type, DESERIALIZE_FUNC_NAME, None)
+  if deserialize_func is not None:
+    return deserialize_func(data, keyed_obj_map, obj_cache)
 
-    elif _get_type_origin(obj_type) == list:
-        subtype, = _get_type_args(obj_type)
-        return [
-            _deserialize(item, subtype, keyed_obj_map, obj_cache)
-            for item in data
-        ]
+  elif _get_type_origin(obj_type) == list:
+    subtype, = _get_type_args(obj_type)
+    return [
+        _deserialize(item, subtype, keyed_obj_map, obj_cache) for item in data
+    ]
 
-    elif _get_type_origin(obj_type) == dict:
-        _, value_type = _get_type_args(obj_type)
-        return dict(
-            (key, _deserialize(value, value_type, keyed_obj_map, obj_cache))
-            for key, value in data.items())
+  elif _get_type_origin(obj_type) == dict:
+    _, value_type = _get_type_args(obj_type)
+    return dict((key, _deserialize(value, value_type, keyed_obj_map, obj_cache))
+                for key, value in data.items())
 
-    elif _get_type_origin(obj_type) == Union:
-        subtypes = _get_type_args(obj_type)
-        if len(subtypes) != 2 or NONE_TYPE not in subtypes:
-            raise ValueError(f"Unsupported union type: {obj_type}.")
-        subtype = subtypes[0] if subtypes[1] == NONE_TYPE else subtypes[1]
-        return _deserialize(data, subtype, keyed_obj_map, obj_cache)
+  elif _get_type_origin(obj_type) == Union:
+    subtypes = _get_type_args(obj_type)
+    if len(subtypes) != 2 or NONE_TYPE not in subtypes:
+      raise ValueError(f"Unsupported union type: {obj_type}.")
+    subtype = subtypes[0] if subtypes[1] == NONE_TYPE else subtypes[1]
+    return _deserialize(data, subtype, keyed_obj_map, obj_cache)
 
-    elif issubclass(obj_type, Enum):
-        for member in obj_type:
-            if data == member.name:
-                return member
-        raise ValueError(f"Member {data} not found in the enum {obj_type}.")
+  elif issubclass(obj_type, Enum):
+    for member in obj_type:
+      if data == member.name:
+        return member
+    raise ValueError(f"Member {data} not found in the enum {obj_type}.")
 
-    return data
+  return data
 
 
 def _get_type_origin(tp):
-    """Get the unsubscripted type. Returns None is unsupported.
+  """Get the unsubscripted type. Returns None is unsupported.
 
   This is similar to typing.get_origin, but only exists after Python 3.8.
   TODO(#11087): Replace with typing.get_origin after upgrading to 3.8.
   """
-    return getattr(tp, "__origin__", None)
+  return getattr(tp, "__origin__", None)
 
 
 def _get_type_args(tp) -> Tuple:
-    """Get the type arguments.
+  """Get the type arguments.
 
   This is similar to typing.get_args, but only exists after Python 3.8.
   TODO(#11087): Replace with typing.get_origin after upgrading to 3.8.
   """
-    return getattr(tp, "__args__", ())
+  return getattr(tp, "__args__", ())
 
 
 def serializable(cls=None,
                  type_key: Optional[str] = None,
                  id_field: str = "id"):
-    """Decorator to make a dataclass serializable.
+  """Decorator to make a dataclass serializable.
   
   Args:
     type_key: string defines the object type and indeicates that the class is a
@@ -189,79 +187,76 @@ def serializable(cls=None,
       id: str
   """
 
-    if type_key is not None and ":" in type_key:
-        raise ValueError("':' is the reserved character in type_key.")
+  if type_key is not None and ":" in type_key:
+    raise ValueError("':' is the reserved character in type_key.")
 
-    def wrap(cls):
-        if not dataclasses.is_dataclass(cls):
-            raise ValueError(f"{cls} is not a dataclass.")
+  def wrap(cls):
+    if not dataclasses.is_dataclass(cls):
+      raise ValueError(f"{cls} is not a dataclass.")
 
-        fields = dataclasses.fields(cls)
-        if type_key is not None and all(field.name != id_field
-                                        for field in fields):
-            raise ValueError(
-                f'Id field "{id_field}" not found in the class {cls}.')
+    fields = dataclasses.fields(cls)
+    if type_key is not None and all(field.name != id_field for field in fields):
+      raise ValueError(f'Id field "{id_field}" not found in the class {cls}.')
 
-        def serialize(self, keyed_obj_map: Dict[str, Any]):
-            if type_key is None:
-                return _fields_to_dict(self, fields, keyed_obj_map)
+    def serialize(self, keyed_obj_map: Dict[str, Any]):
+      if type_key is None:
+        return _fields_to_dict(self, fields, keyed_obj_map)
 
-            obj_id = getattr(self, id_field)
-            obj_key = f"{type_key}:{obj_id}"
-            if obj_key in keyed_obj_map:
-                # If the value in the map is None, it means we have visited this object
-                # before but not yet finished serializing it. This will only happen if
-                # there is a circular reference.
-                if keyed_obj_map[obj_key] is None:
-                    raise ValueError(
-                        f"Circular reference is not supported: {obj_key}.")
-                return obj_id
+      obj_id = getattr(self, id_field)
+      obj_key = f"{type_key}:{obj_id}"
+      if obj_key in keyed_obj_map:
+        # If the value in the map is None, it means we have visited this object
+        # before but not yet finished serializing it. This will only happen if
+        # there is a circular reference.
+        if keyed_obj_map[obj_key] is None:
+          raise ValueError(f"Circular reference is not supported: {obj_key}.")
+        return obj_id
 
-            # Populate the keyed_obj_map with None first to detect circular reference.
-            keyed_obj_map[obj_key] = None
-            obj_dict = _fields_to_dict(self, fields, keyed_obj_map)
-            keyed_obj_map[obj_key] = obj_dict
-            return obj_id
+      # Populate the keyed_obj_map with None first to detect circular reference.
+      keyed_obj_map[obj_key] = None
+      obj_dict = _fields_to_dict(self, fields, keyed_obj_map)
+      keyed_obj_map[obj_key] = obj_dict
+      return obj_id
 
-        def deserialize(data, keyed_obj_map: Dict[str, Any],
-                        obj_cache: Dict[str, Any]):
-            if type_key is None:
-                field_value_map = _dict_to_fields(data, fields, keyed_obj_map,
-                                                  obj_cache)
-                return cls(**field_value_map)
+    def deserialize(data, keyed_obj_map: Dict[str, Any], obj_cache: Dict[str,
+                                                                         Any]):
+      if type_key is None:
+        field_value_map = _dict_to_fields(data, fields, keyed_obj_map,
+                                          obj_cache)
+        return cls(**field_value_map)
 
-            obj_id = data
-            obj_key = f"{type_key}:{obj_id}"
-            if obj_key in obj_cache:
-                return obj_cache[obj_key]
+      obj_id = data
+      obj_key = f"{type_key}:{obj_id}"
+      if obj_key in obj_cache:
+        return obj_cache[obj_key]
 
-            field_value_map = _dict_to_fields(keyed_obj_map[obj_key], fields,
-                                              keyed_obj_map, obj_cache)
-            derialized_obj = cls(**field_value_map)
-            obj_cache[obj_key] = derialized_obj
-            return derialized_obj
+      field_value_map = _dict_to_fields(keyed_obj_map[obj_key], fields,
+                                        keyed_obj_map, obj_cache)
+      derialized_obj = cls(**field_value_map)
+      obj_cache[obj_key] = derialized_obj
+      return derialized_obj
 
-        setattr(cls, SERIALIZE_FUNC_NAME, serialize)
-        setattr(cls, DESERIALIZE_FUNC_NAME, deserialize)
-        return cls
+    setattr(cls, SERIALIZE_FUNC_NAME, serialize)
+    setattr(cls, DESERIALIZE_FUNC_NAME, deserialize)
+    return cls
 
-    # Trick to allow the decoration with `@serializable(...)`. In that case,
-    # `serializable` is called without cls and should return a decorator.
-    if cls is None:
-        return wrap
-    return wrap(cls)
+  # Trick to allow the decoration with `@serializable(...)`. In that case,
+  # `serializable` is called without cls and should return a decorator.
+  if cls is None:
+    return wrap
+  return wrap(cls)
 
 
 def _fields_to_dict(obj, fields: Sequence[dataclasses.Field],
                     keyed_obj_map: Dict[str, Any]) -> Dict[str, Any]:
-    return dict(
-        (field.name, _serialize(getattr(obj, field.name), keyed_obj_map))
-        for field in fields)
+  return dict((field.name, _serialize(getattr(obj, field.name), keyed_obj_map))
+              for field in fields)
 
 
 def _dict_to_fields(obj_dict, fields: Sequence[dataclasses.Field],
                     keyed_obj_map: Dict[str, Any],
                     obj_cache: Dict[str, Any]) -> Dict[str, Any]:
-    return dict((field.name,
-                 _deserialize(obj_dict[field.name], field.type, keyed_obj_map,
-                              obj_cache)) for field in fields)
+  return dict(
+      (field.name,
+       _deserialize(obj_dict[field.name], field.type, keyed_obj_map, obj_cache))
+      for field in fields)

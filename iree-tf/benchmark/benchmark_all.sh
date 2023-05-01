@@ -39,22 +39,17 @@ declare -a benchmark_ids=(
   "${MODEL_T5_LARGE_FP32_TF}-batch512"
 )
 
-APPEND=false
+# Create json file and populate with global information.
+echo "{\"trigger\": { \"timestamp\": \"$(date +'%s')\" }, \"benchmarks\": []}" > ${OUTPUT_PATH}
 
 for benchmark_id in "${benchmark_ids[@]}"; do
   declare -a args=(
     --benchmark_id="${benchmark_id}"
     --device="${DEVICE}"
     --output_path="${OUTPUT_PATH}"
-    --iterations=100
-    --hlo_iterations=100
+    --iterations=50
+    --hlo_iterations=50
   )
-
-  if ${APPEND}; then
-    args+=(
-      --append
-    )
-  fi
 
   if [ -z "${TF_RUN_HLO_MODULE_PATH}" ]; then
     echo "HLO Benchmark Path not set in environment variable TF_RUN_HLO_MODULE_PATH. Disabling compiler-level benchmarks."
@@ -65,5 +60,4 @@ for benchmark_id in "${benchmark_ids[@]}"; do
   fi
 
   python ${TD}/benchmark_model.py "${args[@]}"
-  APPEND=true
 done
