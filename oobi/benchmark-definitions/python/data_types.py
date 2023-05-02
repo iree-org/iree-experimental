@@ -2,17 +2,20 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List
 
+
 class FrameworkType(Enum):
   """Type of model source."""
   TENSORFLOW_V1 = "tensorflow_v1"
   TENSORFLOW_V2 = "tensorflow_v2"
   PYTORCH = "framework_pt"
 
+
 class DataFormat(Enum):
   """Model input data format."""
   ZEROS = "zeros"
   NUMPY_NPY = "numpy_npy"
-   
+
+
 @dataclass(frozen=True)
 class ModelData(object):
   """Input or output data to benchmark the model."""
@@ -35,6 +38,7 @@ class ModelData(object):
 
   def __str__(self):
     return self.name
+
 
 @dataclass(frozen=True)
 class Model(object):
