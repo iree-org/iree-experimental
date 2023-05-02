@@ -158,11 +158,12 @@ def run_compiler_benchmark(hlo_benchmark_tool_path: str, hlo_dir: str,
     for match in matches:
         compile_latencies.append(float(match))
 
-    regex = re.compile(r"execution time for runner CUDA: (.*)s.")
+    regex = re.compile(r"execution time for runner [A-Za-z]*: (.*)s.")
     matches = re.findall(regex, result_text)
-    latencies = []
-    for match in matches:
-        latencies.append(float(match) * 1000)
+    assert len(matches) == benchmark_iterations, (
+        f"Expected to find {benchmark_iterations} latencies but found "
+        f"{len(matches)} instead:\n{result_text}")
+    latencies = [float(match) * 1000 for match in matches]
 
     shared_dict.update({
         "compiler_min_compile_time_s":
