@@ -1,0 +1,50 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# Benchmarks XLA:GPU workloads.
+
+name: Benchmark XLA:GPU
+
+on:
+  schedule:
+    # Scheduled to run at 09:00 UTC and 21:00 UTC.
+    - cron: '0 09,21 * * *'
+  workflow_dispatch:
+
+jobs:
+  benchmark_xla_gpu:
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=presubmit
+      - environment=testing
+      - gpu
+      - os-family=Linux
+    env:
+      TENSORFLOW_VERSION: 2.12.0
+      BENCHMARK_OUTPUT_DIR: xla-results-dir
+      BENCHMARK_RESULTS_JSON: tf-xla.json
+      BENCHMARK_DEVICE: gpu
+      GCS_UPLOAD_DIR: "gs://comparative-benchmark-artifacts/xla"
+    steps:
+      - name: "Checking out PR repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791  # v2.5.0
+      - name: "Build docker"  # TODO(b/277242108): build once and reference docker image by digest.
+        run: |
+          docker build --file oobi/build_tools/docker/dockerfiles/tensorflow2.12.0-cuda11.8-cudnn8.9.Dockerfile \
+            --tag tensorflow2.12.0-cuda11.8-cudnn8.9 oobi/build_tools/docker/context
+      - name: "Benchmark XLA:GPU"
+        run: |
+          mkdir ${BENCHMARK_OUTPUT_DIR} && \
+          docker run --gpus all --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
+            tensorflow2.12.0-cuda11.8-cudnn8.9:latest \
+            ./iree-tf/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${TENSORFLOW_VERSION}" "${BENCHMARK_OUTPUT_DIR}/${BENCHMARK_RESULTS_JSON}"
+      - name: "Printing results"
+        run: |
+          cat "${BENCHMARK_OUTPUT_DIR}/${BENCHMARK_RESULTS_JSON}"
+      - name: "Uploading results"
+        run: |
+          GCS_UPLOAD_PATH="${GCS_UPLOAD_DIR}/${TENSORFLOW_VERSION}_$(date +'%Y-%m-%d').$(date +'%s')"
+          gcloud storage cp "${BENCHMARK_OUTPUT_DIR}/**" "${GCS_UPLOAD_PATH}/"
