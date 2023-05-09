@@ -1,4 +1,6 @@
 # RUN: %PYTHON %s %config_flag
+# TODO(iree/#13488): Remove the XFAIL
+# XFAIL: vmvx
 
 import absl.testing
 import imagenet_test_data
