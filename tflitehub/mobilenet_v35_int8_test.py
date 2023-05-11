@@ -1,5 +1,5 @@
 # RUN: %PYTHON %s %config_flag
-# TODO(iree/#13488): Remove the XFAIL
+# TODO(iree/#10514): Address vmvx numerical mismatch issue.
 # XFAIL: vmvx
 
 import absl.testing
