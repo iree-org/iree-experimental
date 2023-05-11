@@ -1,8 +1,8 @@
 # Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions. See
-# https://llvm.org/LICENSE.txt for license information. SPDX-License-Identifier:
-# Apache-2.0 WITH LLVM-exception
+# https://llvm.org/LICENSE.txt for license
+# information. SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 cmake_minimum_required(VERSION 3.21...3.24)
 
@@ -46,9 +46,9 @@ endif()
 # development as it precludes important optimizations.
 option(BUILD_SHARED_LIBS "Build development shared runtime library" OFF)
 
-# When building a shared library, further customize: (1) Build with hidden
-# visibility by default. (2) Unhide API exported functions. (3) Mark symbols for
-# dllexport on Windows by default.
+# When building a shared library, further customize: (1) Build with
+# hidden visibility by default. (2) Unhide API exported functions. (3)
+# Mark symbols for dllexport on Windows by default.
 if(BUILD_SHARED_LIBS)
   message(
     STATUS
