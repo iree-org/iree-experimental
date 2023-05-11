@@ -19,13 +19,13 @@ the IREE repository proper as a standalone project.
 
 ## Options
 
-* `-DIREE_ROOT_DIR=<path>` : Override the path to the main IREE repo. Defaults
+- `-DIREE_ROOT_DIR=<path>` : Override the path to the main IREE repo. Defaults
   to assuming that `iree` is checked out adjacent to `iree-samples`.
-* `-DBUILD_SHARED_LIBS=ON` : Builds a libireert.so (or corresponding DLL/dylib)
+- `-DBUILD_SHARED_LIBS=ON` : Builds a libireert.so (or corresponding DLL/dylib)
   for development use. Note that the low-level IREE runtime API is fine grained
   and usage in a shared library will pessimize optimizations. Therefore, this
   is only recommended for development or getting started.
-* `-DIREERT_ENABLE_LTO=ON` : Enables LTO if the toolchain supports it. This is
+- `-DIREERT_ENABLE_LTO=ON` : Enables LTO if the toolchain supports it. This is
   supported for both shared and static library builds, but for shared libraries,
   the optimizations stop at the exported symbol boundary. As of early 2023,
   this has the side effect of reducing the binary size by ~16%.
@@ -53,24 +53,36 @@ header files.
 
 ## Build for iOS
 
-Follow [this step](https://iree-org.github.io/iree/building-from-source/ios/#build-the-iree-compiler-for-the-host) to build the IREE compiler for macOS.
-Let's say the CMake build directory is `$HOME/w/iree/build`. To configure and build this project for the iOS Simulator, we could use the following commands.
+Download Xcode from the App Store.  Stick with the Python that comes with Xcode.
 
-```
-cmake -S . -B build-ios-sim -GNinja \
-  -DCMAKE_SYSTEM_NAME=iOS \
-  -DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphonesimulator Path) \
-  -DCMAKE_OSX_ARCHITECTURES=arm64 \
-  -DCMAKE_SYSTEM_PROCESSOR=arm64 \
-  -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-  -DCMAKE_IOS_INSTALL_COMBINED=YES \
-  -DIREE_HOST_BIN_DIR="$HOME/w/iree-build/install/bin" \
-  -DCMAKE_INSTALL_PREFIX=../build-ios-sim/install \
-  -DIREE_BUILD_COMPILER=OFF
-  
-cmake --build build-ios-sim
+Don't try to be clever by downloading a specific version of Xcode from https://developer.apple.com/download or installing Python from python.org. Homebrew may download Xcode Command Line Tools, however this is inadequate to develop IREE for iOS, tvOS, and watchOS.
+
+Install [Homebrew](https://brew.sh/) after installing Xcode.
+
+Install build tools.
+
+```bash
+brew install cmake ninja tree
 ```
 
-This will give us the app bundle `build-ios-sim/bin/ireert_test.app` and the IREE runtime framework `build-ios-sim/lib/ireert.framework`.
+Git-clone IREE to a directory side-by-side with this repository.
 
-To configure and build for iOS devices, we can change `-DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphonesimulator Path)` into `-DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphoneos Path)`.
+```bash
+cd ~/work # Where we have ~/work/iree-samples
+git clone --recursive https://github.com/openxla/iree
+cd iree
+git submodule update --init
+```
+
+Run the bash script `create_xcframework.sh` to build
+
+1. the IREE compiler, runtime, and Python binding for macOS, and
+1. the IREE runtime for macOS and iOS.
+
+If you want Metal GPU, please add the  `-m` option.
+
+```bash
+./create_xcframework.sh -m
+```
+
+Currently, IREE works with macOS and iOS.  We are working on enabling IREE for tvOS and watchOS.
