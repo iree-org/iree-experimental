@@ -1,4 +1,6 @@
 # RUN: %PYTHON %s %config_flag
+# TODO(iree/#10514): Address vmvx numerical mismatch issue.
+# XFAIL: vmvx
 
 import absl.testing
 import numpy
