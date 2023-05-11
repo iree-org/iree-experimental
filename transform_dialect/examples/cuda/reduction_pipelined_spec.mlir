@@ -66,8 +66,10 @@ transform.sequence failures(propagate) {
     : (!pdl.operation) -> !pdl.operation
 
   %forall_l1, %generic_l1 =
-    transform.iree.tile_to_forall_and_workgroup_count_region %generic tile_sizes [3]
+    transform.structured.tile_to_forall_op %generic tile_sizes [3]
       ( mapping = [#gpu.block<x>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice
+    %forall_l1 : (!pdl.operation) -> ()
   %generic_l2, %loops:1 = transform.structured.tile_to_scf_for %generic_l1 [0, 32]
 
   // Step 2. Pad, force packing abd hoist to create the buffer in shared memory.

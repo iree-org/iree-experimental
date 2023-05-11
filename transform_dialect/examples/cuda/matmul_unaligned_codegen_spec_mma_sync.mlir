@@ -76,8 +76,10 @@ transform.sequence failures(propagate) {
   // Step 1. Tile to forall and sequential scf.for.
   // ======================================================
   %forall_l1, %matmul_l1 =
-    transform.iree.tile_to_forall_and_workgroup_count_region %matmul tile_sizes [128, 128]
+    transform.structured.tile_to_forall_op %matmul tile_sizes [128, 128]
       ( mapping = [#gpu.block<y>, #gpu.block<x>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice
+    %forall_l1 : (!pdl.operation) -> ()
   // %fill_l1 = transform.structured.fuse_into_containing_op %fill into %forall_l1
   %matmul_l2, %loops:1 = transform.structured.tile_to_scf_for %matmul_l1 [0, 0, 16]
   // Post-tiling canonicalizations and cleanups.

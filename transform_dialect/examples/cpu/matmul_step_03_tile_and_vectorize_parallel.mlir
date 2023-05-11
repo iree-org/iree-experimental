@@ -95,10 +95,12 @@ transform.sequence failures(propagate) {
   // IREE-specific connection to the runtime and threadpool, required to run e2e.
   // ============================================================================
   %forall, %matmul =
-    transform.iree.tile_to_forall_and_workgroup_count_region %original_matmul 
+    transform.structured.tile_to_forall_op %original_matmul
       tile_sizes [64, 256]
       // TODO: IREE needs own workgroup mapping attribute independent of GPU.
       ( mapping = [#gpu.block<x>, #gpu.block<y>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice
+    %forall : (!pdl.operation) -> ()
 
   // Step 1. Tile to forall and sequential scf.for.
   // ======================================================

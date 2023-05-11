@@ -29,8 +29,10 @@ transform.sequence failures(propagate) {
     : (!pdl.operation) -> !pdl.operation
 
   %forall_l1, %copy_l1 =
-    transform.iree.tile_to_forall_and_workgroup_count_region %copy num_threads [2]
+    transform.structured.tile_to_forall_op %copy num_threads [2]
       ( mapping = [#gpu.block<x>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice
+    %forall_l1 : (!pdl.operation) -> ()
 
   // Late canonicalizations and cleanups.
   transform.iree.apply_patterns %variant_op

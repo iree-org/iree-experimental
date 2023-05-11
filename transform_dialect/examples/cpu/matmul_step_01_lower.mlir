@@ -56,10 +56,12 @@ transform.sequence failures(propagate) {
   // IREE-specific connection to the runtime and threadpool, required to run e2e.
   // ============================================================================
   %forall, %matmul =
-    transform.iree.tile_to_forall_and_workgroup_count_region %original_matmul 
+    transform.structured.tile_to_forall_op %original_matmul
       num_threads [1]
       // TODO: IREE needs own workgroup mapping attribute independent of GPU.
       ( mapping = [#gpu.block<x>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice
+    %forall : (!pdl.operation) -> ()
   // Post-tiling canonicalizations, in particular to ensure num_threads == 1 in 
   // the IR and prepare for bufferization.
   transform.iree.apply_patterns %variant_op 
