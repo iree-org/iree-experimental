@@ -297,10 +297,22 @@ build_iree_for_host
 # build_iree_runtime_for_ios dev x86_64
 #
 # This step also merge dependent static libraries into the target library.
+build_iree_runtime_for_device tv-sim arm64
+build_iree_runtime_for_device tv-sim x86_64
+build_iree_runtime_for_device tv-dev arm64
+build_iree_runtime_for_device tv-dev arm64e
+
+# watchOS does not have thread_resume.
+# build_iree_runtime_for_device watch-sim arm64
+# build_iree_runtime_for_device watch-sim x86_64
+# build_iree_runtime_for_device watch-dev arm64
+# build_iree_runtime_for_device watch-dev arm64e
+
 build_iree_runtime_for_device ios-sim arm64
 build_iree_runtime_for_device ios-sim x86_64
 build_iree_runtime_for_device ios-dev arm64
 build_iree_runtime_for_device ios-dev arm64e
+
 build_iree_runtime_for_macos x86_64
 build_iree_runtime_for_macos arm64
 
@@ -323,5 +335,7 @@ xcodebuild -create-xcframework \
     -framework "$IREE_BUILD_RUNTIME_DIR"/macos-arm64/lib/iree.framework \
     -framework "$IREE_BUILD_RUNTIME_DIR"/ios-sim-arm64/lib/iree.framework \
     -framework "$IREE_BUILD_RUNTIME_DIR"/ios-dev-arm64/lib/iree.framework \
+    -framework "$IREE_BUILD_RUNTIME_DIR"/tv-sim-arm64/lib/iree.framework \
+    -framework "$IREE_BUILD_RUNTIME_DIR"/tv-dev-arm64/lib/iree.framework \
     -output "$IREE_BUILD_RUNTIME_XCFRAMEWORK"
 tree -L 1 -d "$IREE_BUILD_RUNTIME_XCFRAMEWORK"
