@@ -32,7 +32,7 @@ while getopts dDhfrsm flag; do
 done
 
 SCRIPT_DIR=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
-IREE_SRC_DIR=$(realpath $SCRIPT_DIR/../../iree) # The IREE project must be side-by-side with this project.
+IREE_SRC_DIR=$(realpath "$SCRIPT_DIR"/../../iree) # The IREE project must be side-by-side with this project.
 IREE_BUILD_DIR=$SCRIPT_DIR/build
 IREE_BUILD_COMPILER_DIR=$IREE_BUILD_DIR/compiler
 IREE_BUILD_COMPILER_INSTALL_DIR=$IREE_BUILD_COMPILER_DIR/install

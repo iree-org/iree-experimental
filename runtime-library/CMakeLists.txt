@@ -1,20 +1,21 @@
 # Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions. See
-# https://llvm.org/LICENSE.txt for license
-# information. SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+# https://llvm.org/LICENSE.txt for license information. SPDX-License-Identifier:
+# Apache-2.0 WITH LLVM-exception
 
 cmake_minimum_required(VERSION 3.21...3.24)
 
-# NOTE: This file is for building the IREE runtime for Apple
-# platforms.  To build the IREE compiler for macOS, please use the
-# CMakeLists.txt file in the IREE source tree.
+# NOTE: This file is for building the IREE runtime for Apple platforms.  To
+# build the IREE compiler for macOS, please use the CMakeLists.txt file in the
+# IREE source tree.
 project(IREE_RUNTIME_LIBRARY)
 cmake_policy(SET CMP0069 NEW)
 
 # NOTE: The IREE source code must be cloned to a directory side-by-side with
 # this project.
-option(IREE_ROOT_DIR "Tell where is the local git-cloen of IREE" ${CMAKE_CURRENT_SOURCE_DIR}/../../iree)
+option(IREE_ROOT_DIR "Tell where is the local git-cloen of IREE"
+       ${CMAKE_CURRENT_SOURCE_DIR}/../../iree)
 
 # Enable LTO if supported.
 option(IREERT_ENABLE_LTO "Enable LTO (link time optimization) if supported" ON)
@@ -24,9 +25,9 @@ if(APPLE)
   #
   # xcodebuild -create-xcframework -framework build-ios-sim/iree.framework ...
   #
-  # it will complain "unable to find any architecture information in
-  # the binary", even though lipo -info could recognize the
-  # architecture of each framework.
+  # it will complain "unable to find any architecture information in the
+  # binary", even though lipo -info could recognize the architecture of each
+  # framework.
   set(IREERT_ENABLE_LTO OFF)
 endif()
 
@@ -45,9 +46,9 @@ endif()
 # development as it precludes important optimizations.
 option(BUILD_SHARED_LIBS "Build development shared runtime library" OFF)
 
-# When building a shared library, further customize: (1) Build with
-# hidden visibility by default. (2) Unhide API exported functions. (3)
-# Mark symbols for dllexport on Windows by default.
+# When building a shared library, further customize: (1) Build with hidden
+# visibility by default. (2) Unhide API exported functions. (3) Mark symbols for
+# dllexport on Windows by default.
 if(BUILD_SHARED_LIBS)
   message(
     STATUS
