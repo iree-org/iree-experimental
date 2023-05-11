@@ -29,8 +29,10 @@ transform.sequence failures(propagate) {
   // Step 1. Parallelize.
   // ====================
   %forall_l1, %generic_l1 =
-    transform.iree.tile_to_forall_and_workgroup_count_region %generic tile_sizes [128]
+    transform.structured.tile_to_forall_op %generic tile_sizes [128]
       ( mapping = [#gpu.block<x>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice
+    %forall_l1 : (!pdl.operation) -> ()
   transform.structured.tile_to_forall_op %generic_l1 num_threads [32]
       ( mapping = [#gpu.linear<x>] )
 

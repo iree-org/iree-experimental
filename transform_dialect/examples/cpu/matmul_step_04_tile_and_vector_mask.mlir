@@ -50,9 +50,11 @@ transform.sequence failures(propagate) {
   // Step 1. Tile to forall and sequential scf.for.
   // ======================================================
   %forall_l1, %generic_l1 =
-    transform.iree.tile_to_forall_and_workgroup_count_region %generic
+    transform.structured.tile_to_forall_op %generic
       num_threads [1]
       ( mapping = [#gpu.block<x>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice
+    %forall_l1 : (!pdl.operation) -> ()
   transform.iree.apply_patterns %variant_op {canonicalization, cse, tiling_canonicalization}
     : (!pdl.operation) -> ()
  
