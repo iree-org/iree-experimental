@@ -19,13 +19,13 @@ the IREE repository proper as a standalone project.
 
 ## Options
 
-* `-DIREE_ROOT_DIR=<path>` : Override the path to the main IREE repo. Defaults
+- `-DIREE_ROOT_DIR=<path>` : Override the path to the main IREE repo. Defaults
   to assuming that `iree` is checked out adjacent to `iree-samples`.
-* `-DBUILD_SHARED_LIBS=ON` : Builds a libireert.so (or corresponding DLL/dylib)
+- `-DBUILD_SHARED_LIBS=ON` : Builds a libireert.so (or corresponding DLL/dylib)
   for development use. Note that the low-level IREE runtime API is fine grained
   and usage in a shared library will pessimize optimizations. Therefore, this
   is only recommended for development or getting started.
-* `-DIREERT_ENABLE_LTO=ON` : Enables LTO if the toolchain supports it. This is
+- `-DIREERT_ENABLE_LTO=ON` : Enables LTO if the toolchain supports it. This is
   supported for both shared and static library builds, but for shared libraries,
   the optimizations stop at the exported symbol boundary. As of early 2023,
   this has the side effect of reducing the binary size by ~16%.
@@ -66,6 +66,7 @@ brew install cmake ninja tree
 ```
 
 Git-clone IREE to a directory side-by-side with this repository.
+
 ```bash
 cd ~/work # Where we have ~/work/iree-samples
 git clone --recursive https://github.com/openxla/iree
@@ -74,11 +75,12 @@ git submodule update --init
 ```
 
 Run the bash script `create_xcframework.sh` to build
+
 1. the IREE compiler, runtime, and Python binding for macOS, and
 1. the IREE runtime for macOS and iOS.
 
-
 If you want Metal GPU, please add the  `-m` option.
+
 ```bash
 ./create_xcframework.sh -m
 ```

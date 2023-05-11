@@ -32,7 +32,7 @@ while getopts dDhfrsm flag; do
 done
 
 SCRIPT_DIR=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
-IREE_SRC_DIR=$SCRIPT_DIR/../../iree # The IREE project must be side-by-side with this project.
+IREE_SRC_DIR=$(realpath $SCRIPT_DIR/../../iree) # The IREE project must be side-by-side with this project.
 IREE_BUILD_DIR=$SCRIPT_DIR/build
 IREE_BUILD_COMPILER_DIR=$IREE_BUILD_DIR/compiler
 IREE_BUILD_COMPILER_INSTALL_DIR=$IREE_BUILD_COMPILER_DIR/install
@@ -192,6 +192,7 @@ function build_iree_runtime_for_device() {
         mkdir -p "$build_dir" # So to create the build.log file.
         cmake -S . \
               -B "$build_dir" \
+              -DIREE_ROOT_DIR="$IREE_SRC_DIR" \
 	      -DCMAKE_C_COMPILER=/usr/bin/clang \
 	      -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
 	      -DCMAKE_RANLIB=/usr/bin/ranlib \
@@ -243,6 +244,7 @@ function build_iree_runtime_for_macos() {
         mkdir -p "$build_dir" # So to create the build.log file.
         cmake -S . \
             -B "$build_dir" \
+            -DIREE_ROOT_DIR="$IREE_SRC_DIR" \
 	    -DCMAKE_C_COMPILER=/usr/bin/clang \
 	    -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
 	    -DCMAKE_RANLIB=/usr/bin/ranlib \
