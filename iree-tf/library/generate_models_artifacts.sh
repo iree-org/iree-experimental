@@ -49,12 +49,6 @@ for model_dir in ${MODEL_DIRS}; do
         tar -czvf ../tf-model.tar.gz .
         popd
         rm -rf "${SM_DIR}"
-        # Zip hlo dump.
-        HLO_DIR="${batch_dir}/hlo"
-        pushd "${HLO_DIR}"
-        tar -czvf ../hlo.tar.gz .
-        popd
-        rm -rf "${HLO_DIR}"
     done
 done
 
