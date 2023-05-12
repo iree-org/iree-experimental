@@ -141,8 +141,9 @@ function merge_static_libraries() {
     (
         cd "$static_lib_dir"
         mv iree libiree.a
-        if libtool -static -o iree libiree.a libflatcc_parsing.a libclog.a libcpuinfo.a \
-            >"$build_dir"/merge_static_libraries.log 2>&1; then
+        libtool -static -o iree libiree.a libflatcc_parsing.a libclog.a libcpuinfo.a \
+		>"$build_dir"/merge_static_libraries.log 2>&1
+        if $?; then
             echo "Merged for $label successfully"
         fi
     )
