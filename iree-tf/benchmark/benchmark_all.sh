@@ -14,7 +14,7 @@ MODEL_RESNET50_FP32_TF="2e1bd635-eeb3-41fa-90a6-e1cfdfa9be0a"
 MODEL_BERT_LARGE_FP32_TF="979ff492-f363-4320-875f-e1ef93521132"
 MODEL_T5_LARGE_FP32_TF="723da674-f42e-4d14-991e-16ad86a0d81b"
 
-declare -a benchmark_ids=(
+declare -a gpu_benchmark_ids=(
   "${MODEL_RESNET50_FP32_TF}-batch1"
   "${MODEL_RESNET50_FP32_TF}-batch8"
   "${MODEL_RESNET50_FP32_TF}-batch64"
@@ -39,17 +39,37 @@ declare -a benchmark_ids=(
   "${MODEL_T5_LARGE_FP32_TF}-batch512"
 )
 
+declare -a cpu_benchmark_ids=(
+  "${MODEL_RESNET50_FP32_TF}-batch1"
+  "${MODEL_RESNET50_FP32_TF}-batch64"
+  "${MODEL_RESNET50_FP32_TF}-batch128"
+  "${MODEL_BERT_LARGE_FP32_TF}-batch1"
+  "${MODEL_BERT_LARGE_FP32_TF}-batch32"
+  "${MODEL_BERT_LARGE_FP32_TF}-batch64"
+  "${MODEL_T5_LARGE_FP32_TF}-batch1"
+  "${MODEL_T5_LARGE_FP32_TF}-batch16"
+  "${MODEL_T5_LARGE_FP32_TF}-batch32"
+)
+
+if [ "${DEVICE}" = "gpu" ]; then
+    BENCHMARK_IDS=("${gpu_benchmark_ids[@]}")
+    ITERATIONS=50
+else
+    BENCHMARK_IDS=("${cpu_benchmark_ids[@]}")
+    ITERATIONS=20
+fi
+
 # Create json file and populate with global information.
 rm "${OUTPUT_PATH}"
 echo "{\"trigger\": { \"timestamp\": \"$(date +'%s')\" }, \"benchmarks\": []}" > "${OUTPUT_PATH}"
 
-for benchmark_id in "${benchmark_ids[@]}"; do
+for benchmark_id in "${BENCHMARK_IDS[@]}"; do
   declare -a args=(
     --benchmark_id="${benchmark_id}"
     --device="${DEVICE}"
     --output_path="${OUTPUT_PATH}"
-    --iterations=50
-    --hlo_iterations=50
+    --iterations=${ITERATIONS}
+    --hlo_iterations=${ITERATIONS}
   )
 
   if [ -z "${TF_RUN_HLO_MODULE_PATH}" ]; then
