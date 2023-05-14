@@ -40,7 +40,8 @@ declare -a benchmark_ids=(
 )
 
 # Create json file and populate with global information.
-echo "{\"trigger\": { \"timestamp\": \"$(date +'%s')\" }, \"benchmarks\": []}" > ${OUTPUT_PATH}
+rm "${OUTPUT_PATH}"
+echo "{\"trigger\": { \"timestamp\": \"$(date +'%s')\" }, \"benchmarks\": []}" > "${OUTPUT_PATH}"
 
 for benchmark_id in "${benchmark_ids[@]}"; do
   declare -a args=(
