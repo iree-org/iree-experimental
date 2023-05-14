@@ -59,11 +59,12 @@ def bytes_to_mb_str(bytes: Optional[int]) -> str:
 def run_framework_benchmark(model_name: str, model_class: type[tf.Module],
                             batch_size: int, warmup_iterations: int,
                             benchmark_iterations: int, tf_device: str,
-                            hlo_dump_dir: str, shared_dict) -> None:
+                            hlo_dump_dir: str, dump_hlo: bool, shared_dict) -> None:
   try:
     with tf.device(tf_device):
-      # Configure to dump hlo.
-      os.environ["XLA_FLAGS"] = f"--xla_dump_to={hlo_dump_dir}"
+      if dump_hlo:
+        # Configure to dump hlo.
+        os.environ["XLA_FLAGS"] = f"--xla_dump_to={hlo_dump_dir}"
 
       if tf_device == _TF_GPU_DEVICE:
         tf.config.experimental.reset_memory_stats(tf_device)
@@ -223,12 +224,14 @@ if __name__ == "__main__":
   framework_metrics = {}
   # Retrieve framework-level benchmarks.
   tf_device = _TF_GPU_DEVICE if args.device == "gpu" else _TF_CPU_DEVICE
+  dump_hlo = False if args.hlo_benchmark_path is None else True
   with multiprocessing.Manager() as manager:
     shared_dict = manager.dict()
     p = multiprocessing.Process(target=run_framework_benchmark,
                                 args=(model_name, model_class, batch_size,
                                       args.warmup_iterations, args.iterations,
-                                      tf_device, _HLO_DUMP_DIR, shared_dict))
+                                      tf_device, _HLO_DUMP_DIR, dump_hlo,
+                                      shared_dict))
     p.start()
     p.join()
     framework_metrics.update(shared_dict)
