@@ -102,11 +102,11 @@ def run_framework_benchmark(model_name: str, model_class: type[tf.Module],
 
       # Save results.
       result_dict = {
-          "min_warmup_latency_ms": str(min(warmup_latencies)),
-          "max_warmup_latency_ms": str(max(warmup_latencies)),
-          "mean_warmup_latency_ms": str(statistics.mean(warmup_latencies)),
-          "median_warmup_latency_ms": str(statistics.median(warmup_latencies)),
-          "stddev_warmup_latency_ms": str(statistics.stdev(warmup_latencies)),
+          "min_warmup_latency_ms": "n/a" if warmup_latencies.empty() else str(min(warmup_latencies)),
+          "max_warmup_latency_ms": "n/a" if warmup_latencies.empty() else str(max(warmup_latencies)),
+          "mean_warmup_latency_ms": "n/a" if warmup_latencies.empty() else str(statistics.mean(warmup_latencies)),
+          "median_warmup_latency_ms": "n/a" if warmup_latencies.empty() else str(statistics.median(warmup_latencies)),
+          "stddev_warmup_latency_ms": "n/a" if warmup_latencies.empty() else str(statistics.stdev(warmup_latencies)),
           "warmup_iterations": str(warmup_iterations),
           "min_latency_ms": str(min(latencies)),
           "max_latency_ms": str(max(latencies)),
