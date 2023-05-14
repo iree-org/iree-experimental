@@ -97,16 +97,15 @@ def run_framework_benchmark(model_name: str, model_class: type[tf.Module],
         device_peak_b = None
       device_peak_mb = bytes_to_mb_str(device_peak_b)
 
-      compile_time_s = (max(warmup_latencies) -
-                        statistics.median(latencies)) / 1000
+      compile_time_s = "n/a" if not warmup_latencies else (max(warmup_latencies) - statistics.median(latencies)) / 1000
 
       # Save results.
       result_dict = {
-          "min_warmup_latency_ms": "n/a" if warmup_latencies.empty() else str(min(warmup_latencies)),
-          "max_warmup_latency_ms": "n/a" if warmup_latencies.empty() else str(max(warmup_latencies)),
-          "mean_warmup_latency_ms": "n/a" if warmup_latencies.empty() else str(statistics.mean(warmup_latencies)),
-          "median_warmup_latency_ms": "n/a" if warmup_latencies.empty() else str(statistics.median(warmup_latencies)),
-          "stddev_warmup_latency_ms": "n/a" if warmup_latencies.empty() else str(statistics.stdev(warmup_latencies)),
+          "min_warmup_latency_ms": "n/a" if not warmup_latencies else str(min(warmup_latencies)),
+          "max_warmup_latency_ms": "n/a" if not warmup_latencies else str(max(warmup_latencies)),
+          "mean_warmup_latency_ms": "n/a" if not warmup_latencies else str(statistics.mean(warmup_latencies)),
+          "median_warmup_latency_ms": "n/a" if not warmup_latencies else str(statistics.median(warmup_latencies)),
+          "stddev_warmup_latency_ms": "n/a" if not warmup_latencies else str(statistics.stdev(warmup_latencies)),
           "warmup_iterations": str(warmup_iterations),
           "min_latency_ms": str(min(latencies)),
           "max_latency_ms": str(max(latencies)),
