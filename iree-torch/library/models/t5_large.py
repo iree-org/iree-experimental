@@ -11,7 +11,9 @@ class T5Large(torch.nn.Module):
         super().__init__()
         self.model = T5Model.from_pretrained("t5-large", return_dict=True)
 
-    def generate_inputs(self, batch_size=1):
+    def generate_inputs(self, batch_size=1, dtype=torch.float32):
+        assert dtype == torch.float32, "Input generation only implemented for float32"
+
         tokenizer = AutoTokenizer.from_pretrained("t5-large")
         tokenization_kwargs = {
             "pad_to_multiple_of": _SEQUENCE_LENGTH,

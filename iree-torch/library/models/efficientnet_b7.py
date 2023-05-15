@@ -22,7 +22,9 @@ class EfficientNetB7(torch.nn.Module):
         self.preprocess = weights.transforms()
         self.train(False)
 
-    def generate_inputs(self, batch_size=1):
+    def generate_inputs(self, batch_size=1, dtype=torch.float32):
+        assert dtype == torch.float32, "Input generation only implemented for float32"
+
         image = imagenet_test_data.get_image_input()
         tensor = self.preprocess(image).unsqueeze(0)
         tensor = tensor.repeat(batch_size, 1, 1, 1)

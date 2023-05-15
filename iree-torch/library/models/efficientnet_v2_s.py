@@ -22,9 +22,9 @@ class EfficientNetV2S(torch.nn.Module):
         self.preprocess = weights.transforms()
         self.train(False)
 
-    def generate_inputs(self, batch_size=1):
+    def generate_inputs(self, batch_size=1, dtype=torch.float32):
         image = imagenet_test_data.get_image_input()
-        tensor = self.preprocess(image).unsqueeze(0)
+        tensor = self.preprocess(image).to(dtype=dtype).unsqueeze(0)
         tensor = tensor.repeat(batch_size, 1, 1, 1)
         return (tensor, )
 

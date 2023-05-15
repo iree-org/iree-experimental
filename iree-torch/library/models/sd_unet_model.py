@@ -17,7 +17,9 @@ class SDUnetModel(torch.nn.Module):
         )
         self.train(False)
 
-    def generate_inputs(self, batch_size=1):
+    def generate_inputs(self, batch_size=1, dtype=torch.float32):
+        assert dtype == torch.float32, "Input generation only implemented for float32"
+
         # Use `SDClipTextModel` to generate text embeddings.
         clip = sd_clip_text_model.SDClipTextModel()
         text_embedding = clip.forward(*clip.generate_inputs(

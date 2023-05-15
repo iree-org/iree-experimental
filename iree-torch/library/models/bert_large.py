@@ -12,8 +12,8 @@ class BertLarge(torch.nn.Module):
         super().__init__()
         self.model = BertModel.from_pretrained("bert-large-uncased")
 
-    def generate_inputs(self, batch_size=1):
-        tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
+    def generate_inputs(self, batch_size=1, dtype=torch.float32):
+        tokenizer = BertTokenizer.from_pretrained('bert-large-uncased', torch_dtype=dtype)
         input_text = ["a photo of a cat"] * batch_size
         inputs = tokenizer(text=input_text,
                            padding="max_length",
