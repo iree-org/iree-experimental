@@ -20,7 +20,7 @@ from models import resnet50, bert_large, t5_large
 
 # Add benchmark definitions to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent / "oobi" / "benchmark-definitions" / "python"))
-import data_types, tf_model_definitions, unique_ids
+import tf_model_definitions, unique_ids
 
 
 _HLO_DUMP_DIR = "/tmp/hlo_dump"
@@ -223,6 +223,7 @@ if __name__ == "__main__":
       "benchmark_id": args.benchmark_id,
       "benchmark_name": model_definition.name,
       "batch_size": str(batch_size),
+      "framework": "tensorflow",
       "compiler": "xla",
       "device": args.device,
   }
@@ -271,8 +272,8 @@ if __name__ == "__main__":
   result = {
       "definition": benchmark_definition,
       "metrics": {
-          "framework-level": framework_metrics,
-          "compiler-level": compiler_metrics,
+          "framework_level": framework_metrics,
+          "compiler_level": compiler_metrics,
       }
   }
   print(result)

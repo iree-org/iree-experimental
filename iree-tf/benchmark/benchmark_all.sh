@@ -68,8 +68,8 @@ for benchmark_id in "${BENCHMARK_IDS[@]}"; do
     --benchmark_id="${benchmark_id}"
     --device="${DEVICE}"
     --output_path="${OUTPUT_PATH}"
-    --iterations=${ITERATIONS}
-    --hlo_iterations=${ITERATIONS}
+    --iterations="${ITERATIONS}"
+    --hlo_iterations="${ITERATIONS}"
   )
 
   if [ -z "${TF_RUN_HLO_MODULE_PATH}" ]; then
@@ -80,5 +80,5 @@ for benchmark_id in "${BENCHMARK_IDS[@]}"; do
     )
   fi
 
-  python ${TD}/benchmark_model.py "${args[@]}"
+  python "${TD}/benchmark_model.py" "${args[@]}"
 done
