@@ -35,7 +35,7 @@ jobs:
         run: |
           docker build --file oobi/build_tools/docker/dockerfiles/tensorflow2.12.0-cuda11.8-cudnn8.9.Dockerfile \
             --tag tensorflow2.12.0-cuda11.8-cudnn8.9 oobi/build_tools/docker/context
-      - name: "Benchmark XLA:GPU"
+      - name: "Benchmark Tensorflow XLA:GPU"
         run: |
           mkdir ${BENCHMARK_OUTPUT_DIR} && \
           docker run --gpus all --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \

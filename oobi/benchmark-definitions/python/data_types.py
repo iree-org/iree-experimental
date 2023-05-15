@@ -11,6 +11,7 @@ class ModelFrameworkType(Enum):
   TENSORFLOW_V1 = "tensorflow_v1"
   TENSORFLOW_V2 = "tensorflow_v2"
   PYTORCH = "framework_pt"
+  JAX = "framework_jax"
 
 
 class ModelArtifactType(Enum):
