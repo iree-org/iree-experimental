@@ -77,6 +77,7 @@ def run_framework_benchmark(model_name: str, model_class: type[tf.Module],
       for i in range(warmup_iterations):
         start = time.perf_counter()
         model.forward(*inputs)
+        tf.test.experimental.sync_devices()
         latency = 1000 * (time.perf_counter() - start)
         warmup_latencies.append(latency)
 
@@ -85,6 +86,7 @@ def run_framework_benchmark(model_name: str, model_class: type[tf.Module],
       for i in range(benchmark_iterations):
         start = time.perf_counter()
         model.forward(*inputs)
+        tf.test.experimental.sync_devices()
         latency = 1000 * (time.perf_counter() - start)
         latencies.append(latency)
 
@@ -199,6 +201,11 @@ if __name__ == "__main__":
       type=int,
       default=100,
       help="The number of iterations to run compiler-level benchmarks.")
+  argParser.add_argument(
+      "--run_in_process",
+      action=argparse.BooleanOptionalAction,
+      help="Whether to run the benchmark under the same process. Set this to true when profiling a single workload")
+
   args = argParser.parse_args()
 
   model_name, model_class, model_definition = benchmark_lookup(
@@ -226,13 +233,20 @@ if __name__ == "__main__":
   dump_hlo = False if args.hlo_benchmark_path is None else True
   with multiprocessing.Manager() as manager:
     shared_dict = manager.dict()
-    p = multiprocessing.Process(target=run_framework_benchmark,
-                                args=(model_name, model_class, batch_size,
-                                      args.warmup_iterations, args.iterations,
-                                      tf_device, _HLO_DUMP_DIR, dump_hlo,
-                                      shared_dict))
-    p.start()
-    p.join()
+
+    if args.run_in_process:
+      run_framework_benchmark(model_name, model_class, batch_size, args.warmup_iterations,
+                              args.iterations, tf_device, _HLO_DUMP_DIR, dump_hlo,
+                              shared_dict)
+    else:
+      p = multiprocessing.Process(target=run_framework_benchmark,
+                                  args=(model_name, model_class, batch_size,
+                                        args.warmup_iterations, args.iterations,
+                                        tf_device, _HLO_DUMP_DIR, dump_hlo,
+                                        shared_dict))
+      p.start()
+      p.join()
+
     framework_metrics.update(shared_dict)
 
   # Retrieve compiler-level benchmarks.
@@ -240,12 +254,18 @@ if __name__ == "__main__":
   if args.hlo_benchmark_path is not None:
     with multiprocessing.Manager() as manager:
       shared_dict = manager.dict()
-      p = multiprocessing.Process(
-          target=run_compiler_benchmark,
-          args=(args.hlo_benchmark_path, _HLO_DUMP_DIR, args.hlo_iterations,
-                "cuda" if args.device == "gpu" else "cpu", shared_dict))
-      p.start()
-      p.join()
+
+      if args.run_in_process:
+        run_compiler_benchmark(args.hlo_benchmark_path, _HLO_DUMP_DIR, args.hlo_iterations,
+                              "cuda" if args.device == "gpu" else "cpu", shared_dict)
+      else:
+        p = multiprocessing.Process(
+            target=run_compiler_benchmark,
+            args=(args.hlo_benchmark_path, _HLO_DUMP_DIR, args.hlo_iterations,
+                  "cuda" if args.device == "gpu" else "cpu", shared_dict))
+        p.start()
+        p.join()
+
       compiler_metrics.update(shared_dict)
 
   result = {
