@@ -37,7 +37,7 @@ jobs:
             --tag tensorflow2.12.0-cuda11.8-cudnn8.9 oobi/build_tools/docker/context
       - name: "Benchmark XLA:GPU"
         run: |
-          mkdir ${BENCHMARK_OUTPUT_DIR} && \
+          mkdir "${BENCHMARK_OUTPUT_DIR}" && \
           docker run --gpus all --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
             tensorflow2.12.0-cuda11.8-cudnn8.9:latest \
             ./iree-tf/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${TENSORFLOW_VERSION}" "${BENCHMARK_OUTPUT_DIR}/${BENCHMARK_RESULTS_JSON}"
@@ -71,7 +71,7 @@ jobs:
             --tag tensorflow2.12.0 oobi/build_tools/docker/context
       - name: "Benchmark XLA:CPU"
         run: |
-          mkdir "${BENCHMARK_OUTPUT_DIR}"" && \
+          mkdir "${BENCHMARK_OUTPUT_DIR}" && \
           docker run --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
           tensorflow2.12.0:latest \
             ./iree-tf/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${TENSORFLOW_VERSION}" "${BENCHMARK_OUTPUT_DIR}/${BENCHMARK_RESULTS_JSON}"
