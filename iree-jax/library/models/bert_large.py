@@ -22,4 +22,4 @@ class BertLarge():
     return (inputs["input_ids"], inputs["attention_mask"])
 
   def forward(self, input_ids, attention_mask, backend="gpu"):
-    return self.model(input_ids, attention_mask)
+    return self.model(input_ids, attention_mask)[0]
