@@ -33,6 +33,11 @@ for model_dir in */; do
         ${IREE_OPT_PATH} --emit-bytecode "stablehlo.mlir" -o "stablehlo.mlirbc"
         rm "stablehlo.mlir"
 
+        # The name of the input file varies depending on the number of modules compiled.
+        # Copy the file to a name that is known and static.
+        HLO_INPUT_PATH=$(realpath "hlo/*.jit_forward.before_optimizations.txt")
+        cp ${HLO_INPUT_PATH} "hlo/jit_forward.before_optimizations.txt"
+
         # Remove compiled hlo artifacts since we only need the input hlo.
         rm hlo/*.ll
         rm hlo/*.o

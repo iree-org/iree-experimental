@@ -12,7 +12,7 @@ from typing import Optional, Any
 
 # Add library dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "library"))
-from models import bert_large
+from models import bert_large, resnet50, t5_large
 
 # Add benchmark definitions to the search path.
 sys.path.insert(
@@ -28,8 +28,12 @@ def benchmark_lookup(unique_id: str):
     raise ValueError(f"Id {unique_id} does not exist in model suite.")
 
   model_definition = jax_model_definitions.JAX_MODELS_DICT[unique_id]
-  if unique_id.startswith(unique_ids.MODEL_BERT_LARGE_FP32_JAX):
+  if unique_id.startswith(unique_ids.MODEL_RESNET50_FP32_JAX):
+    return ("RESNET50", resnet50.ResNet50, model_definition)
+  elif unique_id.startswith(unique_ids.MODEL_BERT_LARGE_FP32_JAX):
     return ("BERT_LARGE", bert_large.BertLarge, model_definition)
+  elif unique_id.startswith(unique_ids.MODEL_T5_LARGE_FP32_JAX):
+    return ("T5_LARGE", t5_large.T5Large, model_definition)
   else:
     raise ValueError(f"Model definition not supported")
 
@@ -56,7 +60,11 @@ def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
       inputs = model.generate_inputs(batch_size)
 
       # Create jits.
+      start = time.perf_counter()
       jit_inputs = jax.device_put(inputs)
+      end = time.perf_counter()
+      input_data_transfer_ms = 1000 * (end - start)
+
       jit_function = jax.jit(model.forward)
 
       # Run warmup.
@@ -64,7 +72,10 @@ def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
       for i in range(warmup_iterations):
         start = time.perf_counter()
         jax.block_until_ready(jit_function(*jit_inputs))
-        latency = 1000 * (time.perf_counter() - start)
+        end = time.perf_counter()
+        latency = 1000 * (end - start)
+        if i == 0:
+          compilation_time_s = latency / 1000
         warmup_latencies.append(latency)
 
       # Run benchmark.
@@ -72,8 +83,8 @@ def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
       for i in range(benchmark_iterations):
         start = time.perf_counter()
         jax.block_until_ready(jit_function(*jit_inputs))
-        latency = 1000 * (time.perf_counter() - start)
-        latencies.append(latency)
+        end = time.perf_counter()
+        latencies.append(1000 * (end - start))
 
       # Save results.
       result_dict = {
@@ -104,6 +115,8 @@ def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
             str(statistics.stdev(latencies)),
         "benchmark_iterations":
             str(benchmark_iterations),
+        "compile_time_s": "n/a" if not warmup_latencies else str(compilation_time_s),
+        "input_data_transfer_ms": str(input_data_transfer_ms),
       }
       shared_dict.update(result_dict)
 

@@ -1,3 +1,4 @@
 flax
 jax
 transformers
+pillow

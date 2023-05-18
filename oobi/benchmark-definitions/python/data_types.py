@@ -19,6 +19,7 @@ class ModelArtifactType(Enum):
   TF_SAVEDMODEL_V1 = "tf_savedmodel_v1"
   TF_SAVEDMODEL_V2 = "tf_savedmodel_v2"
   TF_HLO_DUMP = "tf_hlo_dump"
+  JAX_HLO_DUMP = "jax_hlo_dump"
   MLIR_STABLEHLO = "mlir_stablehlo"
   MLIR_MHLO = "mlir_mhlo"
   MLIR_LINALG = "mlir_linalg"
