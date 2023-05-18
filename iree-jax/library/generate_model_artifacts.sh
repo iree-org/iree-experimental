@@ -28,7 +28,7 @@ for model_dir in */; do
     pushd "${model_dir}"
     for batch_dir in */; do
         pushd "${batch_dir}"
-        
+
         # Binarize mlir artifacts.
         ${IREE_OPT_PATH} --emit-bytecode "stablehlo.mlir" -o "stablehlo.mlirbc"
         rm "stablehlo.mlir"

@@ -5,7 +5,7 @@ import unique_ids
 
 from typing import List
 
-PARENT_GCS_DIR = "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684283564"
+PARENT_GCS_DIR = "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684386307"
 
 # Bert-Large models.
 # Model implementation from https://huggingface.co/docs/transformers/model_doc/bert#transformers.FlaxBertModel.
@@ -28,7 +28,7 @@ BERT_LARGE_FP32_JAX_384XI32_BATCH1 = data_types.Model(
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
             source_url=
-            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1/hlo/module_0081.jit_model_jitted.before_optimizations.txt",
+            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1/hlo/module_0081.jit_forward.before_optimizations.txt",
         ),
     ],
 )
@@ -52,7 +52,7 @@ BERT_LARGE_FP32_JAX_384XI32_BATCH16 = data_types.Model(
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
             source_url=
-            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_16/hlo/module_0081.jit_model_jitted.before_optimizations.txt",
+            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_16/hlo/module_0081.jit_forward.before_optimizations.txt",
         ),
     ],
 )
@@ -76,7 +76,7 @@ BERT_LARGE_FP32_JAX_384XI32_BATCH24 = data_types.Model(
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
             source_url=
-            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_24/hlo/module_0081.jit_model_jitted.before_optimizations.txt",
+            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_24/hlo/module_0081.jit_forward.before_optimizations.txt",
         ),
     ],
 )
@@ -100,7 +100,7 @@ BERT_LARGE_FP32_JAX_384XI32_BATCH32 = data_types.Model(
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
             source_url=
-            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_32/hlo/module_0081.jit_model_jitted.before_optimizations.txt",
+            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_32/hlo/module_0081.jit_forward.before_optimizations.txt",
         ),
     ],
 )
@@ -124,7 +124,7 @@ BERT_LARGE_FP32_JAX_384XI32_BATCH48 = data_types.Model(
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
             source_url=
-            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_48/hlo/module_0081.jit_model_jitted.before_optimizations.txt",
+            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_48/hlo/module_0081.jit_forward.before_optimizations.txt",
         ),
     ],
 )
@@ -148,7 +148,7 @@ BERT_LARGE_FP32_JAX_384XI32_BATCH64 = data_types.Model(
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
             source_url=
-            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_64/hlo/module_0081.jit_model_jitted.before_optimizations.txt",
+            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_64/hlo/module_0081.jit_forward.before_optimizations.txt",
         ),
     ],
 )
@@ -172,7 +172,7 @@ BERT_LARGE_FP32_JAX_384XI32_BATCH512 = data_types.Model(
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
             source_url=
-            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_512/hlo/module_0081.jit_model_jitted.before_optimizations.txt",
+            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_512/hlo/module_0081.jit_forward.before_optimizations.txt",
         ),
     ],
 )
@@ -197,7 +197,7 @@ BERT_LARGE_FP32_JAX_384XI32_BATCH1024 = data_types.Model(
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
             source_url=
-            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1024/hlo/module_0081.jit_model_jitted.before_optimizations.txt",
+            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1024/hlo/module_0081.jit_forward.before_optimizations.txt",
         ),
     ],
 )
@@ -222,7 +222,7 @@ BERT_LARGE_FP32_JAX_384XI32_BATCH1280 = data_types.Model(
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
             source_url=
-            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1280/hlo/module_0081.jit_model_jitted.before_optimizations.txt",
+            f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1280/hlo/module_0081.jit_forward.before_optimizations.txt",
         ),
     ],
 )
