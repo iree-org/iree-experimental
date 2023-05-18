@@ -23,10 +23,13 @@ def generate_artifacts(model_name: str, model_class: Any, batch_size: int,
     os.makedirs(save_dir, exist_ok=True)
     # Only dump hlo for the inference function `jit_model_jitted`.
     os.environ[
-        "XLA_FLAGS"] = f"--xla_dump_to={hlo_dir} --xla_dump_hlo_module_re=.*jit_model_jitted.*"
+        "XLA_FLAGS"] = f"--xla_dump_to={hlo_dir} --xla_dump_hlo_module_re=.*jit_forward.*"
 
     model = model_class()
     inputs = model.generate_inputs(batch_size)
+
+    jit_inputs = jax.device_put(inputs)
+    jit_function = jax.jit(model.forward)
 
     # Save inputs.
     for idx, input in enumerate(inputs):
@@ -35,13 +38,13 @@ def generate_artifacts(model_name: str, model_class: Any, batch_size: int,
       np.save(input_path, input)
 
     # Save output.
-    outputs = model.forward(*inputs)
+    outputs = jit_function(*jit_inputs)
     output_path = os.path.join(save_dir, f"output_0.npy")
     print(f"Saving output {jnp.shape(outputs)} to {output_path}")
     np.save(output_path, outputs)
 
     # Export.
-    mlir = jax.jit(model.model).lower(*inputs).compiler_ir(dialect="stablehlo")
+    mlir = jit_function.lower(*jit_inputs).compiler_ir(dialect="stablehlo")
     with open(f"{save_dir}/stablehlo.mlir", "w") as f:
       f.write(str(mlir))
 
