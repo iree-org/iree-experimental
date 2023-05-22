@@ -52,8 +52,8 @@ def dump_result(file_path: str, result: dict) -> None:
     json.dump(dictObj, f)
 
 
-def bytes_to_mb_str(bytes: Optional[int]) -> str:
-  return "n/a" if bytes is None else f"{bytes / 1e6:.6f}"
+def bytes_to_mb(bytes: Optional[int]) -> Optional[float]:
+  return None if bytes is None else bytes / 1e6
 
 
 def run_framework_benchmark(model_name: str, model_class: type[tf.Module],
@@ -97,26 +97,26 @@ def run_framework_benchmark(model_name: str, model_class: type[tf.Module],
       else:
         # tf.config.experimental does not currently support measuring CPU memory usage.
         device_peak_b = None
-      device_peak_mb = bytes_to_mb_str(device_peak_b)
+      device_peak_mb = bytes_to_mb(device_peak_b)
 
-      compile_time_s = "n/a" if not warmup_latencies else (max(warmup_latencies) - statistics.median(latencies)) / 1000
+      compile_time_s = None if not warmup_latencies else (max(warmup_latencies) - statistics.median(latencies)) / 1000
 
       # Save results.
       result_dict = {
-          "min_warmup_latency_ms": "n/a" if not warmup_latencies else str(min(warmup_latencies)),
-          "max_warmup_latency_ms": "n/a" if not warmup_latencies else str(max(warmup_latencies)),
-          "mean_warmup_latency_ms": "n/a" if not warmup_latencies else str(statistics.mean(warmup_latencies)),
-          "median_warmup_latency_ms": "n/a" if not warmup_latencies else str(statistics.median(warmup_latencies)),
-          "stddev_warmup_latency_ms": "n/a" if not warmup_latencies else str(statistics.stdev(warmup_latencies)),
-          "warmup_iterations": str(warmup_iterations),
-          "min_latency_ms": str(min(latencies)),
-          "max_latency_ms": str(max(latencies)),
-          "mean_latency_ms": str(statistics.mean(latencies)),
-          "median_latency_ms": str(statistics.median(latencies)),
-          "stddev_latency_ms": str(statistics.stdev(latencies)),
-          "benchmark_iterations": str(benchmark_iterations),
-          "compile_time_s": str(compile_time_s),
-          "device_memory_peak_mb": str(device_peak_mb),
+          "min_warmup_latency_ms": None if not warmup_latencies else min(warmup_latencies),
+          "max_warmup_latency_ms": None if not warmup_latencies else max(warmup_latencies),
+          "mean_warmup_latency_ms": None if not warmup_latencies else statistics.mean(warmup_latencies),
+          "median_warmup_latency_ms": None if not warmup_latencies else statistics.median(warmup_latencies),
+          "stddev_warmup_latency_ms": None if not warmup_latencies else statistics.stdev(warmup_latencies),
+          "warmup_iterations": warmup_iterations,
+          "min_latency_ms": min(latencies),
+          "max_latency_ms": max(latencies),
+          "mean_latency_ms": statistics.mean(latencies),
+          "median_latency_ms": statistics.median(latencies),
+          "stddev_latency_ms": statistics.stdev(latencies),
+          "benchmark_iterations": benchmark_iterations,
+          "compile_time_s": compile_time_s,
+          "device_memory_peak_mb": device_peak_mb,
       }
       shared_dict.update(result_dict)
 
@@ -156,14 +156,14 @@ def run_compiler_benchmark(hlo_benchmark_tool_path: str, hlo_dir: str,
   latencies = [float(match) * 1000 for match in matches]
 
   shared_dict.update({
-      "min_compile_time_s": str(min(compile_latencies)),
-      "max_compile_time_s": str(max(compile_latencies)),
-      "min_latency_ms": str(min(latencies)),
-      "max_latency_ms": str(max(latencies)),
-      "mean_latency_ms": str(statistics.mean(latencies)),
-      "median_latency_ms": str(statistics.median(latencies)),
-      "stddev_latency_ms": str(statistics.stdev(latencies)),
-      "benchmark_iterations": str(benchmark_iterations),
+      "min_compile_time_s": min(compile_latencies),
+      "max_compile_time_s": max(compile_latencies),
+      "min_latency_ms": min(latencies),
+      "max_latency_ms": max(latencies),
+      "mean_latency_ms": statistics.mean(latencies),
+      "median_latency_ms": statistics.median(latencies),
+      "stddev_latency_ms": statistics.stdev(latencies),
+      "benchmark_iterations": benchmark_iterations,
   })
 
 
