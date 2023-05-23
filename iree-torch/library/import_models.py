@@ -3,6 +3,7 @@ import numpy as np
 import os
 import torch
 import torch_mlir
+import re
 
 from import_utils import import_torch_module_with_fx, import_torch_module
 from models import bert_large, sd_clip_text_model, sd_unet_model, sd_vae_model, resnet50, t5_large, efficientnet_b7, efficientnet_v2_s
@@ -86,9 +87,16 @@ if __name__ == "__main__":
                            "--output_dir",
                            default="/tmp",
                            help="Path to save mlir files")
+    argParser.add_argument("-f", 
+                           "--filter", 
+                           default=".*", 
+                           help="Regexp filter to match benchmark names")
     args = argParser.parse_args()
 
     for model_name, model_config in _MODEL_NAME_TO_MODEL_CONFIG.items():
+        if not re.match(args.filter, model_name, re.IGNORECASE):
+            continue
+        
         print(f"\n\n--- {model_name} -------------------------------------")
         if model_config.force_gpu and not torch.cuda.is_available():
             print("SKIPPED due to missing CUDA installation")

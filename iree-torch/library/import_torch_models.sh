@@ -24,4 +24,4 @@ mkdir ${OUTPUT_DIR}
 
 pip list > ${OUTPUT_DIR}/version_info.txt
 
-python import_models.py -o ${OUTPUT_DIR}
+python import_models.py -o ${OUTPUT_DIR} "$@"
