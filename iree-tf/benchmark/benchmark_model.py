@@ -99,21 +99,22 @@ def run_framework_benchmark(model_name: str, model_class: type[tf.Module],
         device_peak_b = None
       device_peak_mb = bytes_to_mb(device_peak_b)
 
-      compile_time_s = None if not warmup_latencies else (max(warmup_latencies) - statistics.median(latencies)) / 1000
+      compile_time_s = None if not warmup_latencies else (
+          max(warmup_latencies) - statistics.median(latencies)) / 1000
 
       # Save results.
       result_dict = {
-          "min_warmup_latency_ms": None if not warmup_latencies else min(warmup_latencies),
-          "max_warmup_latency_ms": None if not warmup_latencies else max(warmup_latencies),
+          "min_warmup_latency_ms": min(warmup_latencies, default=None),
+          "max_warmup_latency_ms": max(warmup_latencies, default=None),
           "mean_warmup_latency_ms": None if not warmup_latencies else statistics.mean(warmup_latencies),
           "median_warmup_latency_ms": None if not warmup_latencies else statistics.median(warmup_latencies),
           "stddev_warmup_latency_ms": None if not warmup_latencies else statistics.stdev(warmup_latencies),
           "warmup_iterations": warmup_iterations,
-          "min_latency_ms": min(latencies),
-          "max_latency_ms": max(latencies),
-          "mean_latency_ms": statistics.mean(latencies),
-          "median_latency_ms": statistics.median(latencies),
-          "stddev_latency_ms": statistics.stdev(latencies),
+          "min_latency_ms": min(latencies, default=None),
+          "max_latency_ms": max(latencies, default=None),
+          "mean_latency_ms": None if not latencies else statistics.mean(latencies),
+          "median_latency_ms": None if not latencies else statistics.median(latencies),
+          "stddev_latency_ms": None if not latencies else statistics.stdev(latencies),
           "benchmark_iterations": benchmark_iterations,
           "compile_time_s": compile_time_s,
           "device_memory_peak_mb": device_peak_mb,
@@ -222,10 +223,14 @@ if __name__ == "__main__":
   benchmark_definition = {
       "benchmark_id": args.benchmark_id,
       "benchmark_name": model_definition.name,
-      "batch_size": str(batch_size),
-      "framework": "tensorflow",
+      "framework": str(model_definition.meta_model.framework_type),
+      "data_type": str(model_definition.meta_model.data_type),
+      "batch_size": batch_size,
+      "inputs": model_definition.inputs.tensor_dimensions,
+      "outputs": model_definition.outputs.tensor_dimensions,
       "compiler": "xla",
       "device": args.device,
+      "tags": model_definition.meta_model.tags + model_definition.tags,
   }
 
   framework_metrics = {}

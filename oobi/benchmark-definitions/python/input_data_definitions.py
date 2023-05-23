@@ -6,11 +6,11 @@ IMAGENET_APPLES_224X224X3XF32_BATCH1 = data_types.ModelData(
     name="IMAGENET_APPLES_224X224X3XF32_BATCH1",
     tags=["input-data", "imagenet", "batch-1"],
     data_format=data_types.DataFormat.NUMPY_NPY,
-    model_id=unique_ids.MODEL_RESNET50_FP32_TF_3X224X224XF32_BATCH1,
+    model_id=unique_ids.MODEL_RESNET50_FP32_TF_224X224X3XF32_BATCH1,
     source_info=
     "Original image: https://storage.googleapis.com/iree-model-artifacts/ILSVRC2012_val_00000023.JPEG",
     tensor_names=["serving_default_inputs"],
-    tensor_dimensions=["1x224x224xf32"],
+    tensor_dimensions=["1x224x224x3xf32"],
     source_url=[
         "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681767794/RESNET50/batch_1/input_0.npy"
     ],
@@ -21,11 +21,11 @@ IMAGENET_APPLES_224X224X3XF32_BATCH8 = data_types.ModelData(
     name="IMAGENET_APPLES_224X224X3XF32_BATCH8",
     tags=["input-data", "imagenet", "batch-8"],
     data_format=data_types.DataFormat.NUMPY_NPY,
-    model_id=unique_ids.MODEL_RESNET50_FP32_TF_3X224X224XF32_BATCH8,
+    model_id=unique_ids.MODEL_RESNET50_FP32_TF_224X224X3XF32_BATCH8,
     source_info=
     "Original image: https://storage.googleapis.com/iree-model-artifacts/ILSVRC2012_val_00000023.JPEG",
     tensor_names=["serving_default_inputs"],
-    tensor_dimensions=["8x224x224xf32"],
+    tensor_dimensions=["8x224x224x3xf32"],
     source_url=[
         "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681767794/RESNET50/batch_8/input_0.npy"
     ],
@@ -36,11 +36,11 @@ IMAGENET_APPLES_224X224X3XF32_BATCH64 = data_types.ModelData(
     name="IMAGENET_APPLES_224X224X3XF32_BATCH64",
     tags=["input-data", "imagenet", "batch-64"],
     data_format=data_types.DataFormat.NUMPY_NPY,
-    model_id=unique_ids.MODEL_RESNET50_FP32_TF_3X224X224XF32_BATCH64,
+    model_id=unique_ids.MODEL_RESNET50_FP32_TF_224X224X3XF32_BATCH64,
     source_info=
     "Original image: https://storage.googleapis.com/iree-model-artifacts/ILSVRC2012_val_00000023.JPEG",
     tensor_names=["serving_default_inputs"],
-    tensor_dimensions=["64x224x224xf32"],
+    tensor_dimensions=["64x224x224x3xf32"],
     source_url=[
         "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681767794/RESNET50/batch_64/input_0.npy"
     ],
@@ -51,11 +51,11 @@ IMAGENET_APPLES_224X224X3XF32_BATCH128 = data_types.ModelData(
     name="IMAGENET_APPLES_224X224X3XF32_BATCH128",
     tags=["input-data", "imagenet", "batch-128"],
     data_format=data_types.DataFormat.NUMPY_NPY,
-    model_id=unique_ids.MODEL_RESNET50_FP32_TF_3X224X224XF32_BATCH128,
+    model_id=unique_ids.MODEL_RESNET50_FP32_TF_224X224X3XF32_BATCH128,
     source_info=
     "Original image: https://storage.googleapis.com/iree-model-artifacts/ILSVRC2012_val_00000023.JPEG",
     tensor_names=["serving_default_inputs"],
-    tensor_dimensions=["128x224x224xf32"],
+    tensor_dimensions=["128x224x224x3xf32"],
     source_url=[
         "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681767794/RESNET50/batch_128/input_0.npy"
     ],
@@ -66,11 +66,11 @@ IMAGENET_APPLES_224X224X3XF32_BATCH256 = data_types.ModelData(
     name="IMAGENET_APPLES_224X224X3XF32_BATCH256",
     tags=["input-data", "imagenet", "batch-256"],
     data_format=data_types.DataFormat.NUMPY_NPY,
-    model_id=unique_ids.MODEL_RESNET50_FP32_TF_3X224X224XF32_BATCH256,
+    model_id=unique_ids.MODEL_RESNET50_FP32_TF_224X224X3XF32_BATCH256,
     source_info=
     "Original image: https://storage.googleapis.com/iree-model-artifacts/ILSVRC2012_val_00000023.JPEG",
     tensor_names=["serving_default_inputs"],
-    tensor_dimensions=["256x224x224xf32"],
+    tensor_dimensions=["256x224x224x3xf32"],
     source_url=[
         "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681767794/RESNET50/batch_256/input_0.npy"
     ],
@@ -81,11 +81,11 @@ IMAGENET_APPLES_224X224X3XF32_BATCH2048 = data_types.ModelData(
     name="IMAGENET_APPLES_224X224X3XF32_BATCH2048",
     tags=["input-data", "imagenet", "batch-2048"],
     data_format=data_types.DataFormat.NUMPY_NPY,
-    model_id=unique_ids.MODEL_RESNET50_FP32_TF_3X224X224XF32_BATCH2048,
+    model_id=unique_ids.MODEL_RESNET50_FP32_TF_224X224X3XF32_BATCH2048,
     source_info=
     "Original image: https://storage.googleapis.com/iree-model-artifacts/ILSVRC2012_val_00000023.JPEG",
     tensor_names=["serving_default_inputs"],
-    tensor_dimensions=["2048x224x224xf32"],
+    tensor_dimensions=["2048x224x224x3xf32"],
     source_url=[
         "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681767794/RESNET50/batch_2048/input_0.npy"
     ],
