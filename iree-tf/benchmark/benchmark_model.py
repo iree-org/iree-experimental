@@ -12,7 +12,7 @@ import sys
 import tensorflow as tf
 import time
 
-from typing import Optional, Dict
+from typing import Optional
 
 # Add library dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "library"))
@@ -21,6 +21,7 @@ from models import resnet50, bert_large, t5_large
 # Add benchmark definitions to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent / "oobi" / "benchmark-definitions" / "python"))
 import tf_model_definitions, unique_ids
+from utils import execution_environment
 
 
 _HLO_DUMP_DIR = "/tmp/hlo_dump"
@@ -47,7 +48,11 @@ def dump_result(file_path: str, result: dict) -> None:
   with open(file_path, "r") as f:
     dictObj = json.load(f)
 
+  dictObj["execution_environment"] = {
+      "python_environment": execution_environment.get_python_environment_info()
+  }
   dictObj["benchmarks"].append(result)
+
   with open(file_path, "w") as f:
     json.dump(dictObj, f)
 
@@ -279,7 +284,7 @@ if __name__ == "__main__":
       "metrics": {
           "framework_level": framework_metrics,
           "compiler_level": compiler_metrics,
-      }
+      },
   }
   print(result)
   dump_result(args.output_path, result)
