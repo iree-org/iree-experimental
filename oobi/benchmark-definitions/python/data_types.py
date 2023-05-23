@@ -97,11 +97,32 @@ class Model(object):
   # Tags that describe the model characteristics.
   tags: List[str]
   meta_model: MetaModel
-  input_batch_size: int
-  inputs: ModelData
-  outputs: ModelData
   # A list of artifacts derived from this model.
   artifacts: List[ModelArtifact]
+
+  def __str__(self):
+    return self.name
+
+
+@serialization.serializable
+@dataclass(frozen=True)
+class InferenceBenchmark(object):
+  """Inference benchmark definition"""
+
+  id: str
+  # Unique friendly name.
+  name: str
+  # Tags that describe the benchmark characteristics.
+  tags: List[str]
+
+  # Model to inference
+  model: Model
+  # Model inputs
+  inputs: ModelData
+  # Model input batch size
+  input_batch_size: int
+  # Expected model outputs
+  outputs: ModelData
 
   def __str__(self):
     return self.name
