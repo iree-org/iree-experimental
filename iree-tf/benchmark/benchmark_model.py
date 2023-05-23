@@ -142,11 +142,12 @@ def run_compiler_benchmark(hlo_benchmark_tool_path: str, hlo_dir: str,
   result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
   result_text = result.stdout.decode("utf-8")
 
-  compile_latencies = []
   regex = re.compile(r"... compiled and ran in (.*)s.")
   matches = re.findall(regex, result_text)
-  for match in matches:
-    compile_latencies.append(float(match))
+  # Take the first iteration compile-time latency. Profiles show that this is
+  # where tuning and other initialization occurs. Subsequent calls to compile
+  # in the same process will reuse these results.
+  compile_time_latency = float(matches[0]) if matches else None
 
   regex = re.compile(r"execution time for runner [A-Za-z]*: (.*)s.")
   matches = re.findall(regex, result_text)
@@ -156,13 +157,12 @@ def run_compiler_benchmark(hlo_benchmark_tool_path: str, hlo_dir: str,
   latencies = [float(match) * 1000 for match in matches]
 
   shared_dict.update({
-      "min_compile_time_s": min(compile_latencies),
-      "max_compile_time_s": max(compile_latencies),
-      "min_latency_ms": min(latencies),
-      "max_latency_ms": max(latencies),
-      "mean_latency_ms": statistics.mean(latencies),
-      "median_latency_ms": statistics.median(latencies),
-      "stddev_latency_ms": statistics.stdev(latencies),
+      "compile_time_s": compile_time_latency,
+      "min_latency_ms": min(latencies, default=None),
+      "max_latency_ms": max(latencies, default=None),
+      "mean_latency_ms": statistics.mean(latencies) if latencies else None,
+      "median_latency_ms": statistics.median(latencies) if latencies else None,
+      "stddev_latency_ms": statistics.stdev(latencies) if latencies else None,
       "benchmark_iterations": benchmark_iterations,
   })
 
