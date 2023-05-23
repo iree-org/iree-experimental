@@ -26,6 +26,14 @@ class ModelArtifactType(Enum):
   MLIR_TOSA = "mlir_tosa"
 
 
+class DataType(Enum):
+  """Model data type used in the model."""
+  FP32 = "fp32"
+  FP16 = "fp16"
+  BF16 = "bf16"
+  INT8 = "int8"
+  UINT8 = "uint8"
+
 class DataFormat(Enum):
   """Model input data format."""
   ZEROS = "zeros"
@@ -68,6 +76,19 @@ class ModelArtifact(object):
 
 @serialization.serializable
 @dataclass(frozen=True)
+class MetaModel(object):
+  """ A model implementation without concrete inputs."""
+  id: str
+  name: str
+  tags: List[str]
+  framework_type: ModelFrameworkType
+  # Source of the model implementation.
+  source_info: str
+  data_type: DataType
+
+
+@serialization.serializable
+@dataclass(frozen=True)
 class Model(object):
   """A Model implementation"""
   id: str
@@ -75,9 +96,7 @@ class Model(object):
   name: str
   # Tags that describe the model characteristics.
   tags: List[str]
-  framework_type: ModelFrameworkType
-  # Source of the model implementation.
-  source_info: str
+  meta_model: MetaModel
   input_batch_size: int
   inputs: ModelData
   outputs: ModelData
