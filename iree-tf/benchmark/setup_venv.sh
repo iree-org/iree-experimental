@@ -27,6 +27,15 @@ if [[ ! -z "${TENSORFLOW_VERSION}" ]]; then
   python3 -m pip install tensorflow==${TENSORFLOW_VERSION}
 fi
 
+# If the TF version is an release candidate, install the dev version of transformers.
+if [[ "${TENSORFLOW_VERSION}" == *-rc* ]]; then
+  python3 -m pip install --pre keras
+  python3 -m pip install git+https://github.com/huggingface/transformers
+else
+  python3 -m pip install keras
+  python3 -m pip install transformers
+fi
+
 python3 -m pip install -r "${TD}/requirements.txt"
 
 echo "Activate venv with:"
