@@ -17,7 +17,9 @@ class SDClipTextModel(torch.nn.Module):
             subfolder="text_encoder",
         )
 
-    def generate_inputs(self, batch_size=1):
+    def generate_inputs(self, batch_size=1, dtype=torch.float32):
+        assert dtype == torch.float32, "Input generation only implemented for float32"
+
         tokenizer = AutoTokenizer.from_pretrained(
             "openai/clip-vit-base-patch32")
         input_text = ["a photo of a cat"] * batch_size

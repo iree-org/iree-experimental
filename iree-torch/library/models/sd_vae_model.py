@@ -26,7 +26,9 @@ class SDVaeModel(torch.nn.Module):
         self.model = AutoencoderKL.from_pretrained(
             "CompVis/stable-diffusion-v1-4", subfolder="vae")
 
-    def generate_inputs(self, batch_size=1):
+    def generate_inputs(self, batch_size=1, dtype=torch.float32):
+        assert dtype == torch.float32, "Input generation only implemented for float32"
+
         # We use VAE to encode an image and return this for input to the VAE decoder.
         image = imagenet_test_data.get_image_input().resize([512, 512])
         input = transforms.ToTensor()(image).unsqueeze(0)

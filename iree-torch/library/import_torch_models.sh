@@ -8,9 +8,13 @@
 #
 # Requires python-3.10 and above and python-venv.
 # Downloads and installs the latest `torch-mlir` and `torch` dev nightly.
+#
+# Note: Some models require CUDA. If no GPU is available, these models will be skipped.
 
 rm -rf torch-models.venv
-bash setup_venv.sh
+export WITH_CUDA=1
+./setup_venv.sh
+unset WITH_CUDA
 source torch-models.venv/bin/activate
 
 TORCH_MLIR_VERSION=$(pip show torch-mlir | grep Version | sed -e "s/^Version: \(.*\)$/\1/g")
@@ -20,4 +24,4 @@ mkdir ${OUTPUT_DIR}
 
 pip list > ${OUTPUT_DIR}/version_info.txt
 
-python import_models.py -o ${OUTPUT_DIR}
+python import_models.py -o ${OUTPUT_DIR} "$@"
