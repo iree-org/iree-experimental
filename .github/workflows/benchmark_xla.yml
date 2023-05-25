@@ -23,7 +23,7 @@ jobs:
       - gpu
       - os-family=Linux
     env:
-      TENSORFLOW_VERSION: 2.13.0-rc0
+      TENSORFLOW_VERSION: 2.12.0
       BENCHMARK_OUTPUT_DIR: xla-results-dir
       BENCHMARK_RESULTS_JSON: tf-xla.json
       BENCHMARK_DEVICE: gpu
@@ -57,7 +57,7 @@ jobs:
       - machine-type=c2-standard-16
       - os-family=Linux
     env:
-      TENSORFLOW_VERSION: 2.13.0-rc0
+      TENSORFLOW_VERSION: 2.12.0
       BENCHMARK_OUTPUT_DIR: xla-results-dir
       BENCHMARK_RESULTS_JSON: tf-xla.json
       BENCHMARK_DEVICE: cpu
