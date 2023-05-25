@@ -140,7 +140,7 @@ if __name__ == "__main__":
                          help="The path to `run_hlo_module`.")
   argParser.add_argument(
       "--run_in_process",
-      action=argparse.BooleanOptionalAction,
+      action="store_true",
       help=
       "Whether to run the benchmark under the same process. Set this to true when profiling a single workload"
   )
