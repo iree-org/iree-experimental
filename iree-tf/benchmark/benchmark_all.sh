@@ -59,6 +59,10 @@ else
     ITERATIONS=20
 fi
 
+# Compiler-level benchmarks compile and run an inference per iteration.
+# We keep this number low to reduce total benchmark time.
+HLO_ITERATIONS=3
+
 # Create json file and populate with global information.
 rm "${OUTPUT_PATH}"
 echo "{\"trigger\": { \"timestamp\": \"$(date +'%s')\" }, \"benchmarks\": []}" > "${OUTPUT_PATH}"
@@ -69,7 +73,7 @@ for benchmark_id in "${BENCHMARK_IDS[@]}"; do
     --device="${DEVICE}"
     --output_path="${OUTPUT_PATH}"
     --iterations="${ITERATIONS}"
-    --hlo_iterations="${ITERATIONS}"
+    --hlo_iterations="${HLO_ITERATIONS}"
   )
 
   if [ -z "${TF_RUN_HLO_MODULE_PATH}" ]; then
