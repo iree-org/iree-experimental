@@ -1,0 +1,102 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# Comparative Benchmarks Workflow.
+
+name: Comparative Benchmarks
+
+on:
+  schedule:
+    # Scheduled to run at 09:00 UTC and 21:00 UTC.
+    - cron: '0 09,21 * * *'
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  benchmark_gpu:
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=presubmit
+      - environment=testing
+      - gpu
+      - os-family=Linux
+    env:
+      TF_VERSION: 2.12.0
+      LOCAL_OUTPUT_DIR: results-dir
+      TF_RESULTS_JSON: tf-xla.json
+      JAX_RESULTS_JSON: jax-xla.json
+      BENCHMARK_DEVICE: gpu
+      GCS_UPLOAD_ROOT_DIR: "gs://comparative-benchmark-artifacts"
+    steps:
+      - name: "Checking out PR repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791  # v2.5.0
+      - name: "Setup"
+        run: |
+          echo "GCS_UPLOAD_DIR=${GCS_UPLOAD_ROOT_DIR}/${BENCHMARK_DEVICE}_$(date +'%Y-%m-%d').$(date +'%s')" >> $GITHUB_ENV
+          mkdir "${LOCAL_OUTPUT_DIR}"
+      - name: "Benchmarking TF/XLA:GPU"
+        run: |
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${TF_RESULTS_JSON}"
+          docker build --file "oobi/build_tools/docker/dockerfiles/tensorflow${TF_VERSION}-cuda11.8-cudnn8.9.Dockerfile" \
+            --tag "tensorflow${TF_VERSION}-cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
+          docker run --gpus all --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
+            "tensorflow${TF_VERSION}-cuda11.8-cudnn8.9:latest" \
+            ./iree-tf/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${TF_VERSION}" "${RESULTS_PATH}"
+          cat "${RESULTS_PATH}"
+          gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
+      - name: "Benchmarking JAX/XLA:GPU"
+        run: |
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${JAX_RESULTS_JSON}"
+          docker build --file "oobi/build_tools/docker/dockerfiles/cuda11.8-cudnn8.9.Dockerfile" \
+            --tag "cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
+          docker run --gpus all --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
+            "cuda11.8-cudnn8.9:latest" \
+            ./iree-jax/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${RESULTS_PATH}"
+          cat "${RESULTS_PATH}"
+          gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
+          
+  
+  benchmark_cpu:
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=presubmit
+      - environment=testing
+      - machine-type=c2-standard-16
+      - os-family=Linux
+    env:
+      TF_VERSION: 2.12.0
+      LOCAL_OUTPUT_DIR: results-dir
+      TF_RESULTS_JSON: tf-xla.json
+      JAX_RESULTS_JSON: jax-xla.json
+      BENCHMARK_DEVICE: cpu
+      GCS_UPLOAD_ROOT_DIR: "gs://comparative-benchmark-artifacts"
+    steps:
+      - name: "Checking out PR repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791  # v2.5.0
+      - name: "Setup"
+        run: |
+          echo "GCS_UPLOAD_DIR=${GCS_UPLOAD_ROOT_DIR}/${BENCHMARK_DEVICE}_$(date +'%Y-%m-%d').$(date +'%s')" >> $GITHUB_ENV
+          mkdir "${LOCAL_OUTPUT_DIR}"
+      - name: "Benchmarking TF/XLA:CPU"
+        run: |
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${TF_RESULTS_JSON}"
+          docker build --file "oobi/build_tools/docker/dockerfiles/tensorflow${TF_VERSION}.Dockerfile" \
+            --tag "tensorflow${TF_VERSION}" "oobi/build_tools/docker/context"
+          docker run --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
+          "tensorflow${TF_VERSION}:latest" \
+            ./iree-tf/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${TF_VERSION}" "${RESULTS_PATH}"
+          cat "${RESULTS_PATH}"
+          gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
+      - name: "Benchmarking JAX/XLA:CPU"
+        run: |
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${JAX_RESULTS_JSON}"
+          docker build --file "oobi/build_tools/docker/dockerfiles/base.Dockerfile" \
+            --tag "base" "oobi/build_tools/docker/context"
+          docker run --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
+          "base:latest" \
+          ./iree-jax/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${RESULTS_PATH}"
+          cat "${RESULTS_PATH}"
+          gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"

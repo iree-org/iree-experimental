@@ -9,9 +9,9 @@ VENV_DIR="jax-benchmarks.venv"
 VENV_DIR="${VENV_DIR}" ${TD}/setup_venv.sh
 source ${VENV_DIR}/bin/activate
 
-MODEL_RESNET50_FP32_JAX="c0a738bc-0c21-40b6-b565-31fe7fd33d0d"
-MODEL_BERT_LARGE_FP32_JAX="f76dc3a5-3379-49ab-85e5-744ff5167310"
-MODEL_T5_LARGE_FP32_JAX="7720beef-ac1a-4a5f-8777-505ea949a138"
+MODEL_RESNET50_FP32_JAX="aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-JAX-3x224x224xf32"
+MODEL_BERT_LARGE_FP32_JAX="47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-JAX-384xi32"
+MODEL_T5_LARGE_FP32_JAX="173c7180-bad4-4b91-8423-4beeb13d2b0a-MODEL_T5_LARGE-fp32-JAX-512xi32"
 
 declare -a gpu_benchmark_ids=(
   "${MODEL_RESNET50_FP32_JAX}-batch1"
@@ -52,10 +52,10 @@ declare -a cpu_benchmark_ids=(
 
 if [ "${DEVICE}" = "gpu" ]; then
     BENCHMARK_IDS=("${gpu_benchmark_ids[@]}")
-    ITERATIONS=5
+    ITERATIONS=50
 else
     BENCHMARK_IDS=("${cpu_benchmark_ids[@]}")
-    ITERATIONS=5
+    ITERATIONS=20
 fi
 
 # Create json file and populate with global information.
