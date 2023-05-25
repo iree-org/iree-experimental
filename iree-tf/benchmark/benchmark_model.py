@@ -31,7 +31,9 @@ _TF_GPU_DEVICE = "/GPU:0"
 
 def benchmark_lookup(unique_id: str):
   if unique_id not in tf_model_definitions.TF_MODELS_DICT:
-    raise ValueError(f"Id {unique_id} does not exist in model suite.")
+    id_list = '\n  '.join(tf_model_definitions.TF_MODELS_DICT.keys())
+    raise ValueError(f"Id {unique_id} does not exist in model suite. Expected "
+                     f"one of:\n  {id_list}")
 
   model_definition = tf_model_definitions.TF_MODELS_DICT[unique_id]
   if unique_id.startswith(unique_ids.MODEL_RESNET50_FP32_TF):
@@ -286,5 +288,5 @@ if __name__ == "__main__":
           "compiler_level": compiler_metrics,
       },
   }
-  print(result)
+  print(json.dumps(result, indent=2))
   dump_result(args.output_path, result)
