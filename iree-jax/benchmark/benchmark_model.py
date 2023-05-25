@@ -15,13 +15,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "library"))
 from models import bert_large, resnet50, t5_large
 
 # Add benchmark definitions to the search path.
-sys.path.insert(
-    0,
-    str(
-        pathlib.Path(__file__).parent.parent.parent / "oobi" /
-        "benchmark-definitions" / "python"))
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent / "oobi" / "benchmark-definitions" / "python"))
 import data_types, jax_model_definitions, unique_ids
-
+from utils import execution_environment
 
 def benchmark_lookup(unique_id: str):
   if unique_id not in jax_model_definitions.JAX_MODELS_DICT:
@@ -42,7 +38,11 @@ def dump_result(file_path: str, result: dict) -> None:
   with open(file_path, "r") as f:
     dictObj = json.load(f)
 
+  dictObj["execution_environment"] = {
+      "python_environment": execution_environment.get_python_environment_info()
+  }
   dictObj["benchmarks"].append(result)
+
   with open(file_path, "w") as f:
     json.dump(dictObj, f)
 
@@ -75,7 +75,7 @@ def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
         end = time.perf_counter()
         latency = 1000 * (end - start)
         if i == 0:
-          compilation_time_s = latency / 1000
+          compile_time_s = latency / 1000
         warmup_latencies.append(latency)
 
       # Run benchmark.
@@ -88,35 +88,20 @@ def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
 
       # Save results.
       result_dict = {
-        "min_warmup_latency_ms":
-           "n/a" if not warmup_latencies else str(min(warmup_latencies)),
-        "max_warmup_latency_ms":
-            "n/a" if not warmup_latencies else str(max(warmup_latencies)),
-        "mean_warmup_latency_ms":
-            "n/a" if not warmup_latencies else str(
-                statistics.mean(warmup_latencies)),
-        "median_warmup_latency_ms":
-            "n/a" if not warmup_latencies else str(
-                statistics.median(warmup_latencies)),
-        "stddev_warmup_latency_ms":
-            "n/a" if not warmup_latencies else str(
-                statistics.stdev(warmup_latencies)),
-        "warmup_iterations":
-            str(warmup_iterations),
-        "min_latency_ms":
-            str(min(latencies)),
-        "max_latency_ms":
-            str(max(latencies)),
-        "mean_latency_ms":
-            str(statistics.mean(latencies)),
-        "median_latency_ms":
-            str(statistics.median(latencies)),
-        "stddev_latency_ms":
-            str(statistics.stdev(latencies)),
-        "benchmark_iterations":
-            str(benchmark_iterations),
-        "compile_time_s": "n/a" if not warmup_latencies else str(compilation_time_s),
-        "input_data_transfer_ms": str(input_data_transfer_ms),
+          "min_warmup_latency_ms": min(warmup_latencies, default=None),
+          "max_warmup_latency_ms": max(warmup_latencies, default=None),
+          "mean_warmup_latency_ms": None if not warmup_latencies else statistics.mean(warmup_latencies),
+          "median_warmup_latency_ms": None if not warmup_latencies else statistics.median(warmup_latencies),
+          "stddev_warmup_latency_ms": None if not warmup_latencies else statistics.stdev(warmup_latencies),
+          "warmup_iterations": warmup_iterations,
+          "min_latency_ms": min(latencies, default=None),
+          "max_latency_ms": max(latencies, default=None),
+          "mean_latency_ms": None if not latencies else statistics.mean(latencies),
+          "median_latency_ms": None if not latencies else statistics.median(latencies),
+          "stddev_latency_ms": None if not latencies else statistics.stdev(latencies),
+          "benchmark_iterations": benchmark_iterations,
+          "compile_time_s": compile_time_s,
+          "input_data_transfer_ms": input_data_transfer_ms,
       }
       shared_dict.update(result_dict)
 
@@ -172,10 +157,14 @@ if __name__ == "__main__":
   benchmark_definition = {
       "benchmark_id": args.benchmark_id,
       "benchmark_name": model_definition.name,
-      "batch_size": str(batch_size),
-      "framework": "jax",
+      "framework": str(model_definition.meta_model.framework_type),
+      "data_type": str(model_definition.meta_model.data_type),
+      "batch_size": batch_size,
+      "inputs": model_definition.inputs.tensor_dimensions,
+      "outputs": model_definition.outputs.tensor_dimensions,
       "compiler": "xla",
       "device": args.device,
+      "tags": model_definition.meta_model.tags + model_definition.tags,
   }
 
   framework_metrics = {}
