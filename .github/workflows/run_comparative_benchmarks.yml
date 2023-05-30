@@ -16,6 +16,7 @@ on:
 
 jobs:
   benchmark_gpu:
+    timeout-minutes: 720
     runs-on:
       - self-hosted  # must come first
       - runner-group=presubmit
@@ -71,6 +72,7 @@ jobs:
 
   
   benchmark_cpu:
+    timeout-minutes: 360
     runs-on:
       - self-hosted  # must come first
       - runner-group=presubmit
