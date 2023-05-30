@@ -3,7 +3,7 @@ import input_data_definitions
 import jax_output_data_definitions
 import unique_ids
 
-PARENT_GCS_DIR = "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684386307"
+PARENT_GCS_DIR = "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752"
 
 # Meta models.
 RESNET50_FP32_JAX = data_types.MetaModel(
