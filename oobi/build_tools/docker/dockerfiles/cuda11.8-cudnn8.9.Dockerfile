@@ -33,6 +33,12 @@ ENV PYTHON_BIN /usr/bin/python3
 
 WORKDIR /
 
+######## Bazel ########
+WORKDIR /install-bazel
+COPY install_bazel.sh .bazelversion ./
+RUN ./install_bazel.sh && rm -rf /install-bazel
+WORKDIR /
+
 ######## NVIDIA ########
 WORKDIR /install-cuda
 

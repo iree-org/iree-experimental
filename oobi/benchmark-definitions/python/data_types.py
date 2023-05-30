@@ -105,3 +105,9 @@ class Model(object):
 
   def __str__(self):
     return self.name
+
+  def get_artifact(self, artifact_type: ModelFrameworkType) -> ModelArtifact:
+    for artifact in self.artifacts:
+      if artifact.artifact_type == artifact_type:
+        return artifact
+    return None

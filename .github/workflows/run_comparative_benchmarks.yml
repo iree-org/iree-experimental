@@ -13,7 +13,6 @@ on:
     # Scheduled to run at 09:00 UTC and 21:00 UTC.
     - cron: '0 09,21 * * *'
   workflow_dispatch:
-  pull_request:
 
 jobs:
   benchmark_gpu:
@@ -25,9 +24,11 @@ jobs:
       - os-family=Linux
     env:
       TF_VERSION: 2.12.0
+      CUDA_VERSION: 11.8
       LOCAL_OUTPUT_DIR: results-dir
       TF_RESULTS_JSON: tf-xla.json
       JAX_RESULTS_JSON: jax-xla.json
+      HLO_RESULTS_JSON: hlo-xla.json
       BENCHMARK_DEVICE: gpu
       GCS_UPLOAD_ROOT_DIR: "gs://comparative-benchmark-artifacts"
     steps:
@@ -40,10 +41,10 @@ jobs:
       - name: "Benchmarking TF/XLA:GPU"
         run: |
           RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${TF_RESULTS_JSON}"
-          docker build --file "oobi/build_tools/docker/dockerfiles/tensorflow${TF_VERSION}-cuda11.8-cudnn8.9.Dockerfile" \
-            --tag "tensorflow${TF_VERSION}-cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
+          docker build --file "oobi/build_tools/docker/dockerfiles/cuda11.8-cudnn8.9.Dockerfile" \
+            --tag "cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
           docker run --gpus all --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
-            "tensorflow${TF_VERSION}-cuda11.8-cudnn8.9:latest" \
+            "cuda11.8-cudnn8.9:latest" \
             ./iree-tf/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${TF_VERSION}" "${RESULTS_PATH}"
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
@@ -57,7 +58,17 @@ jobs:
             ./iree-jax/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${RESULTS_PATH}"
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
-          
+      - name: "Benchmarking HLO/XLA:GPU"
+        run: |
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${HLO_RESULTS_JSON}"
+          docker build --file "oobi/build_tools/docker/dockerfiles/cuda11.8-cudnn8.9.Dockerfile" \
+            --tag "cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
+          docker run --gpus all --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
+            "cuda11.8-cudnn8.9:latest" \
+            ./xla-hlo/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${RESULTS_PATH}" "${CUDA_VERSION}"
+          cat "${RESULTS_PATH}"
+          gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
+
   
   benchmark_cpu:
     runs-on:
@@ -71,6 +82,7 @@ jobs:
       LOCAL_OUTPUT_DIR: results-dir
       TF_RESULTS_JSON: tf-xla.json
       JAX_RESULTS_JSON: jax-xla.json
+      HLO_RESULTS_JSON: hlo-xla.json
       BENCHMARK_DEVICE: cpu
       GCS_UPLOAD_ROOT_DIR: "gs://comparative-benchmark-artifacts"
     steps:
@@ -83,10 +95,10 @@ jobs:
       - name: "Benchmarking TF/XLA:CPU"
         run: |
           RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${TF_RESULTS_JSON}"
-          docker build --file "oobi/build_tools/docker/dockerfiles/tensorflow${TF_VERSION}.Dockerfile" \
-            --tag "tensorflow${TF_VERSION}" "oobi/build_tools/docker/context"
+          docker build --file "oobi/build_tools/docker/dockerfiles/base.Dockerfile" \
+            --tag "base" "oobi/build_tools/docker/context"
           docker run --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
-          "tensorflow${TF_VERSION}:latest" \
+          "base:latest" \
             ./iree-tf/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${TF_VERSION}" "${RESULTS_PATH}"
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
@@ -98,5 +110,15 @@ jobs:
           docker run --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
           "base:latest" \
           ./iree-jax/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${RESULTS_PATH}"
+          cat "${RESULTS_PATH}"
+          gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
+      - name: "Benchmarking HLO/XLA:CPU"
+        run: |
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${HLO_RESULTS_JSON}"
+          docker build --file "oobi/build_tools/docker/dockerfiles/base.Dockerfile" \
+            --tag "base" "oobi/build_tools/docker/context"
+          docker run --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
+          "base:latest" \
+            ./xla-hlo/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${RESULTS_PATH}"
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
