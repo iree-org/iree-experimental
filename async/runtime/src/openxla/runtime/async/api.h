@@ -9,6 +9,6 @@
 #ifndef OPENXLA_RUNTIME_ASYNC_API_H_
 #define OPENXLA_RUNTIME_ASYNC_API_H_
 
-#include "openxla/runtime/async/async_runtime.h"             // IWYU pragma: export
+#include "openxla/runtime/async/async_runtime.h"  // IWYU pragma: export
 
-#endif  // OPENXLA_RUNTIME_ASYNC_API_H_
+#endif  // OPENXLA_RUNTIME_ASYNC_API_H_  

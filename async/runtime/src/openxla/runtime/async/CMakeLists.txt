@@ -26,24 +26,7 @@ iree_cc_library(
     "async_runtime.cpp"
   DEPS
     ::defs
-    tfrt::async_value
-    absl::base
-    absl::status
-    iree::base
-    iree::vm
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    async_runtime_test
-  HDRS
-    "async_runtime_test.h"
-  SRCS  
-    "async_runtime_test.cpp"
-  DEPS
-    ::defs
-    tfrt::async_value
+    tsl::async_value
     absl::base
     absl::status
     iree::base
@@ -64,15 +47,12 @@ iree_cc_library(
     ::defs
     ::loop_async
     ::async_runtime
-    ::async_runtime_test
     iree::base
     iree::base::tracing
     iree::hal
     iree::vm
   PUBLIC
 )
-
-
 
 iree_cc_library(
   NAME

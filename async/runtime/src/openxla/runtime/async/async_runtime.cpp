@@ -10,9 +10,9 @@
 #include <optional>
 
 #include "openxla/runtime/async/async_runtime_cc.h"
-#include "tfrt/concurrency/async_value.h"
-#include "tfrt/concurrency/async_value_ref.h"
-#include "tfrt/concurrency/chain.h"
+#include "tensorflow/tsl/concurrency/async_value.h"
+#include "tensorflow/tsl/concurrency/async_value_ref.h"
+#include "tensorflow/tsl/concurrency/chain.h"
 
 using openxla::runtime::async::AsyncValue;
 
@@ -51,10 +51,6 @@ IREE_API_EXPORT void iree_async_value_destroy(iree_async_value_t *value) {
   AsyncValue *val = reinterpret_cast<AsyncValue *>(value);
   IREE_ASSERT_ARGUMENT(val);
   delete val;
-}
-
-IREE_API_EXPORT uint32_t iree_async_value_offsetof_counter() {
-  return AsyncValue::offsetof_counter();
 }
 
 IREE_API_EXPORT void iree_async_value_release(iree_async_value_t *value) {

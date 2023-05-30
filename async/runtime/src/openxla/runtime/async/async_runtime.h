@@ -63,7 +63,6 @@ IREE_API_EXPORT iree_status_t iree_async_value_wait_source_ctl(
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT void iree_async_value_destroy(iree_async_value_t *value);
-IREE_API_EXPORT uint32_t iree_async_value_offsetof_counter();
 
 // Registers the custom types used by the full async module.
 // WARNING: not thread-safe; call at startup before using.

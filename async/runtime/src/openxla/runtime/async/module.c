@@ -9,7 +9,6 @@
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "openxla/runtime/async/api.h"
-#include "openxla/runtime/async/async_runtime_test.h"
 
 #define IREE_ASYNC_RUNTIME_MODULE_VERSION_0_0 0x00000000u
 #define IREE_ASYNC_RUNTIME_MODULE_VERSION_LATEST \
@@ -200,18 +199,6 @@ IREE_VM_ABI_EXPORT(iree_async_runtime_module_async_value_await_i32,  //
   }
 
   return status;
-}
-
-//===----------------------------------------------------------------------===//
-// Test function definitions
-//===----------------------------------------------------------------------===//
-
-IREE_VM_ABI_EXPORT(iree_async_runtime_module_test_async_value,  //
-                   iree_async_runtime_module_state_t,           //
-                   v, r) {
-  iree_async_value_t *val = async_runtime_test();
-  rets->r0 = iree_async_value_move_ref(val);
-  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//

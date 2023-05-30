@@ -7,10 +7,13 @@
 #ifndef OPENXLA_RUNTIME_ASYNC_ASYNCRUNTIME_CC_H_
 #define OPENXLA_RUNTIME_ASYNC_ASYNCRUNTIME_CC_H_
 
+#include "iree/base/status_cc.h"
 #include "iree/vm/ref_cc.h"
-#include "tfrt/concurrency/async_value.h"
-#include "tfrt/concurrency/async_value_ref.h"
-#include "tfrt/concurrency/chain.h"
+#include "tensorflow/tsl/concurrency/async_value.h"
+#include "tensorflow/tsl/concurrency/async_value_ref.h"
+#include "tensorflow/tsl/concurrency/chain.h"
+
+struct iree_async_value_t;
 
 namespace openxla::runtime::async {
 
@@ -89,8 +92,11 @@ class AsyncValue : public iree::vm::RefObject<AsyncValue> {
 };
 
 template <typename T>
-static AsyncValue *AsValue(tsl::AsyncValueRef<T> value) {
-  return new AsyncValue(std::move(value));
+iree::StatusOr<iree::vm::ref<iree_async_value_t>> AsValue(
+    tsl::AsyncValueRef<T> value) {
+   AsyncValue *val = new AsyncValue(std::move(value));
+   return iree::vm::ref<iree_async_value_t>(
+       reinterpret_cast<iree_async_value_t *>(val));
 }
 
 }  // namespace openxla::runtime::async

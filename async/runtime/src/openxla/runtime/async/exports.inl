@@ -6,9 +6,6 @@
 
 // clang-format off
 
-//Test function
-EXPORT_FN("test.value", iree_async_runtime_module_test_async_value, v, r)
-
 //Async function
 EXPORT_FN("value.await.i32", iree_async_runtime_module_async_value_await_i32, r, i)
 EXPORT_FN("value.await.token", iree_async_runtime_module_async_value_await_token, r, v)
