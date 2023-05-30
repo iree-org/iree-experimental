@@ -21,14 +21,18 @@ if [ "${DEVICE}" = "gpu" ]; then
     --action_env LD_LIBRARY_PATH="/usr/local/cuda-${CUDA_VERSION}/lib64:" \
     --action_env CUDA_TOOLKIT_PATH="/usr/local/cuda-${CUDA_VERSION}" \
     --copt=-Wno-switch \
-    xla/tools:run_hlo_module
+    xla/tools/multihost_hlo_runner:hlo_runner_main
+
+  RUN_HLO_MODULE_PATH=$(realpath "bazel-bin/xla/tools/multihost_hlo_runner/hlo_runner_main")
 else
   bazel build -c opt --copt=-Wno-switch \
     --action_env GCC_HOST_COMPILER_PATH="/usr/bin/x86_64-linux-gnu-gcc-11" \
     xla/tools:run_hlo_module
+
+  RUN_HLO_MODULE_PATH=$(realpath "bazel-bin/xla/tools/run_hlo_module")
 fi
 
-RUN_HLO_MODULE_PATH=$(realpath "bazel-bin/xla/tools/run_hlo_module")
+
 XLA_SHA=$(git rev-parse --short=8 HEAD)
 
 popd
@@ -108,16 +112,18 @@ declare -a cpu_benchmark_ids=(
   "${MODEL_T5_LARGE_FP32_JAX}-batch32"
 )
 
-# Since each iteration includes both compilation and inference, we keep the
-# total iterations small because of the amount of time it takes to do both.
-# Std deviation is <1ms.
 if [ "${DEVICE}" = "gpu" ]; then
     BENCHMARK_IDS=("${gpu_benchmark_ids[@]}")
-    ITERATIONS=10
+    ITERATIONS=50
 else
+    # Since each iteration includes both compilation and inference, we keep the
+    # total iterations small because of the amount of time it takes to do both.
+    # Std deviation is <1ms.
     BENCHMARK_IDS=("${cpu_benchmark_ids[@]}")
     ITERATIONS=5
 fi
+
+CACHE_DIR="$(pwd)/.cache/oobi/models"
 
 # Create json file and populate with global information.
 rm "${OUTPUT_PATH}"
@@ -130,6 +136,7 @@ for benchmark_id in "${BENCHMARK_IDS[@]}"; do
     --output_path="${OUTPUT_PATH}"
     --iterations="${ITERATIONS}"
     --hlo_benchmark_path="${RUN_HLO_MODULE_PATH}"
+    --cache_dir="${CACHE_DIR}"
   )
 
   python "${TD}/benchmark_model.py" "${args[@]}"
