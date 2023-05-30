@@ -8,4 +8,4 @@ set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(IREE_PACKAGE_ROOT_PREFIX "")
 set(IREE_COMPILER_TABLEGEN_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}")
 
-add_subdirectory(openxla/runtime/async)
+add_subdirectory(openxla/runtime/async) 

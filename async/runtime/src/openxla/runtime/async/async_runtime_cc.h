@@ -94,9 +94,9 @@ class AsyncValue : public iree::vm::RefObject<AsyncValue> {
 template <typename T>
 iree::StatusOr<iree::vm::ref<iree_async_value_t>> AsValue(
     tsl::AsyncValueRef<T> value) {
-   AsyncValue *val = new AsyncValue(std::move(value));
-   return iree::vm::ref<iree_async_value_t>(
-       reinterpret_cast<iree_async_value_t *>(val));
+  AsyncValue *val = new AsyncValue(std::move(value));
+  return iree::vm::ref<iree_async_value_t>(
+      reinterpret_cast<iree_async_value_t *>(val));
 }
 
 }  // namespace openxla::runtime::async

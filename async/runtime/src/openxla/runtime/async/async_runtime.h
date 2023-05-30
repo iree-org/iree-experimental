@@ -43,7 +43,7 @@ IREE_API_EXPORT void iree_async_value_fail(iree_async_value_t *value);
 IREE_API_EXPORT iree_status_t iree_async_value_wait(iree_async_value_t *value,
                                                     iree_timeout_t timeout);
 
-// Releases |token| and destroys it if the caller is the last owner.
+// Releases |value| and destroys it if the caller is the last owner.
 IREE_API_EXPORT void iree_async_value_release(iree_async_value_t *value);
 
 IREE_API_EXPORT iree_status_t iree_async_value_and_then(

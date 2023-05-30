@@ -8,4 +8,4 @@
 
 [submodule "third_party/eigen"]
 	path = third_party/eigen
-	url = git@gitlab.com:libeigen/eigen.git
+	url = git@gitlab.com:libeigen/eigen.git 
