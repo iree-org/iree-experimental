@@ -3,7 +3,7 @@ import input_data_definitions
 import tf_output_data_definitions
 import unique_ids
 
-PARENT_GCS_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681767794"
+PARENT_GCS_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1685428719"
 
 # Meta models.
 RESNET50_FP32_TF = data_types.MetaModel(
@@ -51,7 +51,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH1 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_1/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_1/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -59,7 +59,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH1 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_1/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_1/stablehlo.mlirbc",
         ),
     ],
 )
@@ -75,7 +75,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH8 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_8/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_8/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -83,7 +83,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH8 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_8/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_8/stablehlo.mlirbc",
         ),
     ],
 )
@@ -99,7 +99,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH64 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_64/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_64/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -107,7 +107,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH64 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_64/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_64/stablehlo.mlirbc",
         ),
     ],
 )
@@ -123,7 +123,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH128 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_128/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_128/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -131,7 +131,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH128 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_128/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_128/stablehlo.mlirbc",
         ),
     ],
 )
@@ -147,7 +147,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH256 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_256/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_256/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -155,7 +155,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH256 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_256/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_256/stablehlo.mlirbc",
         ),
     ],
 )
@@ -171,7 +171,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH2048 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_2048/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_2048/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -179,7 +179,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH2048 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_2048/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/RESNET50/batch_2048/stablehlo.mlirbc",
         ),
     ],
 )
@@ -199,7 +199,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH1 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -207,7 +207,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH1 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1/stablehlo.mlirbc",
         ),
     ],
 )
@@ -223,7 +223,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH16 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_16/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_16/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -231,7 +231,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH16 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_16/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_16/stablehlo.mlirbc",
         ),
     ],
 )
@@ -247,7 +247,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH24 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_24/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_24/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -255,7 +255,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH24 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_24/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_24/stablehlo.mlirbc",
         ),
     ],
 )
@@ -271,7 +271,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH32 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_32/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_32/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -279,7 +279,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH32 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_32/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_32/stablehlo.mlirbc",
         ),
     ],
 )
@@ -295,7 +295,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH48 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_48/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_48/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -303,7 +303,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH48 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_48/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_48/stablehlo.mlirbc",
         ),
     ],
 )
@@ -319,7 +319,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH64 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_64/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_64/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -327,7 +327,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH64 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_64/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_64/stablehlo.mlirbc",
         ),
     ],
 )
@@ -343,7 +343,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH512 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_512/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_512/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -351,7 +351,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH512 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_512/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_512/stablehlo.mlirbc",
         ),
     ],
 )
@@ -368,7 +368,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH1024 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1024/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1024/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -376,7 +376,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH1024 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1024/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1024/stablehlo.mlirbc",
         ),
     ],
 )
@@ -393,7 +393,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH1280 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1280/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1280/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -401,7 +401,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH1280 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1280/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/BERT_LARGE/batch_1280/stablehlo.mlirbc",
         ),
     ],
 )
@@ -420,7 +420,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH1 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_1/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_1/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -428,7 +428,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH1 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_1/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_1/stablehlo.mlirbc",
         ),
     ],
 )
@@ -444,7 +444,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH16 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_16/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_16/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -452,7 +452,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH16 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_16/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_16/stablehlo.mlirbc",
         ),
     ],
 )
@@ -468,7 +468,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH24 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_24/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_24/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -476,7 +476,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH24 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_24/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_24/stablehlo.mlirbc",
         ),
     ],
 )
@@ -492,7 +492,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH32 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_32/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_32/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -500,7 +500,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH32 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_32/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_32/stablehlo.mlirbc",
         ),
     ],
 )
@@ -516,7 +516,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH48 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_48/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_48/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -524,7 +524,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH48 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_48/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_48/stablehlo.mlirbc",
         ),
     ],
 )
@@ -540,7 +540,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH64 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_64/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_64/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -548,7 +548,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH64 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_64/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_64/stablehlo.mlirbc",
         ),
     ],
 )
@@ -564,7 +564,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH512 = data_types.Model(
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_512/hlo.tar.gz",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_512/hlo/inference_forward.before_optimizations.txt",
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_SAVEDMODEL_V2,
@@ -572,7 +572,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH512 = data_types.Model(
         ),
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
-            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_512/hlo.mlirbc",
+            source_url=f"{PARENT_GCS_DIR}/T5_LARGE/batch_512/stablehlo.mlirbc",
         ),
     ],
 )
