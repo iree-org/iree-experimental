@@ -58,7 +58,7 @@ def compare_mlir_module(
     torch.testing.assert_close(result1, result2, rtol=1e-03, atol=4.1e-02)
 
 
-def compare_vmfbs(vmfb1, vmfb2, function_name, runtime_device, inputs):
+def compare_vmfbs(vmfb1, vmfb2, function_name, runtime_device, inputs, rtol=1e-03, atol=4.1e-02):
     iree_output1 = run_vmfb(vmfb1, function_name, runtime_device, inputs)
     iree_output2 = run_vmfb(vmfb2, function_name, runtime_device, inputs)
 
@@ -66,7 +66,7 @@ def compare_vmfbs(vmfb1, vmfb2, function_name, runtime_device, inputs):
     result2 = torch.from_numpy(iree_output2)
 
     # TODO make tolerances configurable.
-    torch.testing.assert_close(result1, result2, rtol=1e-03, atol=4.1e-02)
+    torch.testing.assert_close(result1, result2, rtol=rtol, atol=atol)
 
 
 if __name__ == "__main__":
