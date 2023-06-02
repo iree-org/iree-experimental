@@ -236,3 +236,8 @@ Add         556654.794  0.00145     0.00148     0.00147
 Triad       556770.252  0.00145     0.00148     0.00147
 Dot         574513.619  0.00093     0.00096     0.00094
 ```
+
+## Python Scripts
+
+The `python` directory includes a few additional useful scripts for common verification
+flows of individual dispatches. Setup/usage details can be found there.
