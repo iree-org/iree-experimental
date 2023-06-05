@@ -3,23 +3,62 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import os
+import sys
+import re
 
-from models import bert_large, resnet50, t5_large
+from dataclasses import dataclass
+
 from multiprocessing import Process
-from typing import Any
+from typing import Any, Dict, Iterable
 
-_MODEL_NAME_TO_MODEL_CONFIG = {
+
+@dataclass
+class ModelGenerationConfig:
+    model_path: str
+    model_class_name: str
+    batch_sizes: Iterable[int]
+    dtype: jnp.dtype = jnp.float32
+
+    def GetModelClass(self):
+        import importlib
+        class_def = getattr(importlib.import_module(self.model_path), self.model_class_name)
+        return class_def
+    
+
+_MODEL_NAME_TO_MODEL_CONFIG: Dict[str, ModelGenerationConfig] = {
     # Batch sizes taken from MLPerf A100 Configs: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/resnet50
-    "RESNET50": (resnet50.ResNet50, [1, 8, 64, 128, 256, 2048]),
+    "RESNET50": ModelGenerationConfig('models.resnet50', 'ResNet50', 
+                                       batch_sizes=[1, 8, 64, 128, 256, 2048],
+                                       dtype=jnp.float32
+                                       ),
     # Batch sizes based on MLPerf config: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/bert
     "BERT_LARGE":
-        (bert_large.BertLarge, [1, 16, 24, 32, 48, 64, 512, 1024, 1280]),
+        ModelGenerationConfig('models.bert_large', 'BertLarge', 
+                              batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280],
+                              dtype=jnp.float32),
     # Uses the same batch sizes as Bert-Large.
-    "T5_LARGE": (t5_large.T5Large, [1, 16, 24, 32, 48, 64, 512]),
+    "T5_LARGE": ModelGenerationConfig('models.t5_large', 'T5Large', 
+                                      batch_sizes=[1, 16, 24, 32, 48, 64, 512],
+                                      dtype=jnp.float32),
+
+    # BF16 variants
+    # Batch sizes taken from MLPerf A100 Configs: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/resnet50
+    "RESNET50_BF16": ModelGenerationConfig('models.resnet50', 'ResNet50', 
+                                           batch_sizes=[1, 8, 64, 128, 256, 2048],
+                                             dtype=jnp.bfloat16
+                                       ),
+    # Batch sizes based on MLPerf config: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/bert
+    "BERT_LARGE_BF16":
+        ModelGenerationConfig('models.bert_large', 'BertLarge', 
+                              batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280],
+                              dtype=jnp.bfloat16),
+    # Uses the same batch sizes as Bert-Large.
+    "T5_LARGE_BF16": ModelGenerationConfig('models.t5_large', 'T5Large', 
+                                           batch_sizes=[1, 16, 24, 32, 48, 64, 512],
+                                           dtype=jnp.bfloat16),
 }
 
-
-def generate_artifacts(model_name: str, model_class: Any, batch_size: int,
+def generate_artifacts(model_name: str, model_config: ModelGenerationConfig, batch_size: int,
                        save_dir: str):
   try:
     # Configure to dump hlo.
@@ -28,8 +67,9 @@ def generate_artifacts(model_name: str, model_class: Any, batch_size: int,
     # Only dump hlo for the inference function `jit_model_jitted`.
     os.environ[
         "XLA_FLAGS"] = f"--xla_dump_to={hlo_dir} --xla_dump_hlo_module_re=.*jit_forward.*"
-
-    model = model_class()
+    
+    model_class = model_config.GetModelClass()
+    model = model_class(dtype=model_config.dtype)
     inputs = model.generate_inputs(batch_size)
 
     jit_inputs = jax.device_put(inputs)
@@ -63,20 +103,27 @@ if __name__ == "__main__":
                          "--output_dir",
                          default="/tmp",
                          help="Path to save model artifacts")
+  argParser.add_argument("-f", 
+                         "--filter", 
+                         default=".*", 
+                         help="Regexp filter to match benchmark names")
   args = argParser.parse_args()
 
   for model_name, model_config in _MODEL_NAME_TO_MODEL_CONFIG.items():
     print(f"\n\n--- {model_name} -------------------------------------")
-    model_class, batch_sizes = model_config
+
+    if not re.match(args.filter, model_name, re.IGNORECASE):
+      print("Skipped by filter")
+      continue
 
     model_dir = os.path.join(args.output_dir, model_name)
     os.makedirs(model_dir, exist_ok=True)
 
-    for batch_size in batch_sizes:
+    for batch_size in model_config.batch_sizes:
       save_dir = os.path.join(model_dir, f"batch_{batch_size}")
       os.makedirs(save_dir, exist_ok=True)
 
       p = Process(target=generate_artifacts,
-                  args=(model_name, model_class, batch_size, save_dir))
+                  args=(model_name, model_config, batch_size, save_dir))
       p.start()
       p.join()

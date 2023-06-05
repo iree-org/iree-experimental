@@ -21,7 +21,7 @@ mkdir "${OUTPUT_DIR}"
 
 pip list > "${OUTPUT_DIR}/models_version_info.txt"
 
-python generate_model_artifacts.py -o "${OUTPUT_DIR}"
+python generate_model_artifacts.py -o "${OUTPUT_DIR}" "${@:2}"
 
 pushd ${OUTPUT_DIR}
 for model_dir in */; do

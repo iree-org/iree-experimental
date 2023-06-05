@@ -1,4 +1,5 @@
 import jax
+import jax.numpy as jnp
 
 from functools import partial
 from transformers import BertTokenizer, FlaxBertModel
@@ -8,8 +9,12 @@ _SEQUENCE_LENGTH = 384
 
 class BertLarge():
 
-  def __init__(self):
-    self.model = FlaxBertModel.from_pretrained("bert-large-uncased")
+  def __init__(self, dtype=jnp.float32):
+    self.model = FlaxBertModel.from_pretrained("bert-large-uncased", dtype=dtype)
+    if dtype == jnp.float16:
+      self.model.params = self.model.to_fp16(self.model.params)
+    elif dtype == jnp.bfloat16:
+      self.model.params = self.model.to_bf16(self.model.params)
 
   def generate_inputs(self, batch_size=1):
     tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
