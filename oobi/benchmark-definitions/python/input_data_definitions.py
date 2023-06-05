@@ -28,7 +28,7 @@ IMAGENET_APPLES_224X224X3XF32_BATCH_TEMPLATE = data_types_builder.ModelDataTempl
         )
     ])
 IMAGENET_APPLES_224X224X3XF32_BATCHES = data_types_builder.build_batch_model_data(
-    IMAGENET_APPLES_224X224X3XF32_BATCH_TEMPLATE,
+    template=IMAGENET_APPLES_224X224X3XF32_BATCH_TEMPLATE,
     batch_sizes=[1, 8, 64, 128, 256, 2048])
 
 BERT_LARGE_SEQLEN384_I32_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
@@ -54,7 +54,7 @@ BERT_LARGE_SEQLEN384_I32_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
         ),
     ])
 BERT_LARGE_SEQLEN384_I32_BATCHES = data_types_builder.build_batch_model_data(
-    BERT_LARGE_SEQLEN384_I32_BATCH_TEMPLATE,
+    template=BERT_LARGE_SEQLEN384_I32_BATCH_TEMPLATE,
     batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280])
 
 T5_LARGE_SEQLEN512_I32_BATCH_TEMPALTE = data_types_builder.ModelDataTemplate(
@@ -82,5 +82,5 @@ T5_LARGE_SEQLEN512_I32_BATCH_TEMPALTE = data_types_builder.ModelDataTemplate(
     ],
 )
 T5_LARGE_SEQLEN512_I32_BATCHES = data_types_builder.build_batch_model_data(
-    T5_LARGE_SEQLEN512_I32_BATCH_TEMPALTE,
+    template=T5_LARGE_SEQLEN512_I32_BATCH_TEMPALTE,
     batch_sizes=[1, 16, 24, 32, 48, 64, 512])
