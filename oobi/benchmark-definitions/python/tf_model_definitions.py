@@ -46,7 +46,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH1 = data_types.Model(
     meta_model=RESNET50_FP32_TF,
     input_batch_size=1,
     inputs=input_data_definitions.IMAGENET_APPLES_224X224X3XF32_BATCHES[1],
-    outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCH1,
+    outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCHES[1],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -71,7 +71,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH8 = data_types.Model(
     meta_model=RESNET50_FP32_TF,
     input_batch_size=8,
     inputs=input_data_definitions.IMAGENET_APPLES_224X224X3XF32_BATCHES[8],
-    outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCH8,
+    outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCHES[8],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -96,7 +96,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH64 = data_types.Model(
     meta_model=RESNET50_FP32_TF,
     input_batch_size=64,
     inputs=input_data_definitions.IMAGENET_APPLES_224X224X3XF32_BATCHES[64],
-    outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCH64,
+    outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCHES[64],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -121,7 +121,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH128 = data_types.Model(
     meta_model=RESNET50_FP32_TF,
     input_batch_size=128,
     inputs=input_data_definitions.IMAGENET_APPLES_224X224X3XF32_BATCHES[128],
-    outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCH128,
+    outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCHES[128],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -146,7 +146,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH256 = data_types.Model(
     meta_model=RESNET50_FP32_TF,
     input_batch_size=256,
     inputs=input_data_definitions.IMAGENET_APPLES_224X224X3XF32_BATCHES[256],
-    outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCH256,
+    outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCHES[256],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -171,7 +171,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH2048 = data_types.Model(
     meta_model=RESNET50_FP32_TF,
     input_batch_size=2048,
     inputs=input_data_definitions.IMAGENET_APPLES_224X224X3XF32_BATCHES[2048],
-    outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCH2048,
+    outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCHES[2048],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -199,7 +199,8 @@ BERT_LARGE_FP32_TF_384XI32_BATCH1 = data_types.Model(
     meta_model=BERT_LARGE_FP32_TF,
     input_batch_size=1,
     inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES[1],
-    outputs=tf_output_data_definitions.BERT_LARGE_FP32_TF_384X1024XF32_BATCH1,
+    outputs=tf_output_data_definitions.
+    BERT_LARGE_FP32_TF_384X1024XF32_BATCHES[1],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -224,7 +225,8 @@ BERT_LARGE_FP32_TF_384XI32_BATCH16 = data_types.Model(
     meta_model=BERT_LARGE_FP32_TF,
     input_batch_size=16,
     inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES[16],
-    outputs=tf_output_data_definitions.BERT_LARGE_FP32_TF_384X1024XF32_BATCH16,
+    outputs=tf_output_data_definitions.
+    BERT_LARGE_FP32_TF_384X1024XF32_BATCHES[16],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -249,7 +251,8 @@ BERT_LARGE_FP32_TF_384XI32_BATCH24 = data_types.Model(
     meta_model=BERT_LARGE_FP32_TF,
     input_batch_size=24,
     inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES[24],
-    outputs=tf_output_data_definitions.BERT_LARGE_FP32_TF_384X1024XF32_BATCH24,
+    outputs=tf_output_data_definitions.
+    BERT_LARGE_FP32_TF_384X1024XF32_BATCHES[24],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -274,7 +277,8 @@ BERT_LARGE_FP32_TF_384XI32_BATCH32 = data_types.Model(
     meta_model=BERT_LARGE_FP32_TF,
     input_batch_size=32,
     inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES[32],
-    outputs=tf_output_data_definitions.BERT_LARGE_FP32_TF_384X1024XF32_BATCH32,
+    outputs=tf_output_data_definitions.
+    BERT_LARGE_FP32_TF_384X1024XF32_BATCHES[32],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -299,7 +303,8 @@ BERT_LARGE_FP32_TF_384XI32_BATCH48 = data_types.Model(
     meta_model=BERT_LARGE_FP32_TF,
     input_batch_size=48,
     inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES[48],
-    outputs=tf_output_data_definitions.BERT_LARGE_FP32_TF_384X1024XF32_BATCH48,
+    outputs=tf_output_data_definitions.
+    BERT_LARGE_FP32_TF_384X1024XF32_BATCHES[48],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -324,7 +329,8 @@ BERT_LARGE_FP32_TF_384XI32_BATCH64 = data_types.Model(
     meta_model=BERT_LARGE_FP32_TF,
     input_batch_size=64,
     inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES[64],
-    outputs=tf_output_data_definitions.BERT_LARGE_FP32_TF_384X1024XF32_BATCH64,
+    outputs=tf_output_data_definitions.
+    BERT_LARGE_FP32_TF_384X1024XF32_BATCHES[64],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -349,7 +355,8 @@ BERT_LARGE_FP32_TF_384XI32_BATCH512 = data_types.Model(
     meta_model=BERT_LARGE_FP32_TF,
     input_batch_size=512,
     inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES[512],
-    outputs=tf_output_data_definitions.BERT_LARGE_FP32_TF_384X1024XF32_BATCH512,
+    outputs=tf_output_data_definitions.
+    BERT_LARGE_FP32_TF_384X1024XF32_BATCHES[512],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -375,7 +382,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH1024 = data_types.Model(
     input_batch_size=1024,
     inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES[1024],
     outputs=tf_output_data_definitions.
-    BERT_LARGE_FP32_TF_384X1024XF32_BATCH1024,
+    BERT_LARGE_FP32_TF_384X1024XF32_BATCHES[1024],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -402,7 +409,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH1280 = data_types.Model(
     input_batch_size=1280,
     inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES[1280],
     outputs=tf_output_data_definitions.
-    BERT_LARGE_FP32_TF_384X1024XF32_BATCH1280,
+    BERT_LARGE_FP32_TF_384X1024XF32_BATCHES[1280],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -431,7 +438,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH1 = data_types.Model(
     meta_model=T5_LARGE_FP32_TF,
     input_batch_size=1,
     inputs=input_data_definitions.T5_LARGE_SEQLEN512_I32_BATCHES[1],
-    outputs=tf_output_data_definitions.T5_LARGE_FP32_TF_512X1024XF32_BATCH1,
+    outputs=tf_output_data_definitions.T5_LARGE_FP32_TF_512X1024XF32_BATCHES[1],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -456,7 +463,8 @@ T5_LARGE_FP32_TF_512XI32_BATCH16 = data_types.Model(
     meta_model=T5_LARGE_FP32_TF,
     input_batch_size=16,
     inputs=input_data_definitions.T5_LARGE_SEQLEN512_I32_BATCHES[16],
-    outputs=tf_output_data_definitions.T5_LARGE_FP32_TF_512X1024XF32_BATCH16,
+    outputs=tf_output_data_definitions.
+    T5_LARGE_FP32_TF_512X1024XF32_BATCHES[16],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -481,7 +489,8 @@ T5_LARGE_FP32_TF_512XI32_BATCH24 = data_types.Model(
     meta_model=T5_LARGE_FP32_TF,
     input_batch_size=24,
     inputs=input_data_definitions.T5_LARGE_SEQLEN512_I32_BATCHES[24],
-    outputs=tf_output_data_definitions.T5_LARGE_FP32_TF_512X1024XF32_BATCH24,
+    outputs=tf_output_data_definitions.
+    T5_LARGE_FP32_TF_512X1024XF32_BATCHES[24],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -506,7 +515,8 @@ T5_LARGE_FP32_TF_512XI32_BATCH32 = data_types.Model(
     meta_model=T5_LARGE_FP32_TF,
     input_batch_size=32,
     inputs=input_data_definitions.T5_LARGE_SEQLEN512_I32_BATCHES[32],
-    outputs=tf_output_data_definitions.T5_LARGE_FP32_TF_512X1024XF32_BATCH32,
+    outputs=tf_output_data_definitions.
+    T5_LARGE_FP32_TF_512X1024XF32_BATCHES[32],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -531,7 +541,8 @@ T5_LARGE_FP32_TF_512XI32_BATCH48 = data_types.Model(
     meta_model=T5_LARGE_FP32_TF,
     input_batch_size=48,
     inputs=input_data_definitions.T5_LARGE_SEQLEN512_I32_BATCHES[48],
-    outputs=tf_output_data_definitions.T5_LARGE_FP32_TF_512X1024XF32_BATCH48,
+    outputs=tf_output_data_definitions.
+    T5_LARGE_FP32_TF_512X1024XF32_BATCHES[48],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -556,7 +567,8 @@ T5_LARGE_FP32_TF_512XI32_BATCH64 = data_types.Model(
     meta_model=T5_LARGE_FP32_TF,
     input_batch_size=64,
     inputs=input_data_definitions.T5_LARGE_SEQLEN512_I32_BATCHES[64],
-    outputs=tf_output_data_definitions.T5_LARGE_FP32_TF_512X1024XF32_BATCH64,
+    outputs=tf_output_data_definitions.
+    T5_LARGE_FP32_TF_512X1024XF32_BATCHES[64],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
@@ -581,7 +593,8 @@ T5_LARGE_FP32_TF_512XI32_BATCH512 = data_types.Model(
     meta_model=T5_LARGE_FP32_TF,
     input_batch_size=512,
     inputs=input_data_definitions.T5_LARGE_SEQLEN512_I32_BATCHES[512],
-    outputs=tf_output_data_definitions.T5_LARGE_FP32_TF_512X1024XF32_BATCH512,
+    outputs=tf_output_data_definitions.
+    T5_LARGE_FP32_TF_512X1024XF32_BATCHES[512],
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.TF_HLO_DUMP,
