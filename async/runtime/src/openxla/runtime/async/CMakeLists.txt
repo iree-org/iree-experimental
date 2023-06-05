@@ -85,6 +85,3 @@ iree_cc_test(
     openxla::runtime::async::test::module_test_module_c
     openxla::runtime::async_test::async_test
 )
-
-
-
