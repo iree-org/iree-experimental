@@ -124,6 +124,7 @@ else
 fi
 
 CACHE_DIR="$(pwd)/.cache/oobi/models"
+python "${TD}/download_artifacts.py" -o "${CACHE_DIR}" -bids "${BENCHMARK_IDS[@]}"
 
 # Create json file and populate with global information.
 rm "${OUTPUT_PATH}"
