@@ -23,15 +23,6 @@ TIME_REGEXP = re.compile(r"time: (\d+\.?\d*) (%s)" % "|".join(TIME_UNITS))
 SIZE_REGEXP = re.compile(r" (\d+) bytes")
 
 
-def benchmark_lookup(unique_id: str):
-  if unique_id not in model_dictionary.MODEL_DICT:
-    id_list = '\n  '.join(model_dictionary.MODEL_DICT.keys())
-    raise ValueError(f"Id {unique_id} does not exist in model suite. Expected "
-                     f"one of:\n  {id_list}")
-
-  return model_dictionary.MODEL_DICT[unique_id]
-
-
 def dump_result(file_path: str, result: dict) -> None:
   with open(file_path, "r") as f:
     dictObj = json.load(f)
@@ -230,7 +221,7 @@ if __name__ == "__main__":
 
   args = argParser.parse_args()
 
-  model_definition = benchmark_lookup(args.benchmark_id)
+  model_definition = model_dictionary.get_model_definition(args.benchmark_id)
   print(f"\n\n--- {args.benchmark_id} -------------------------------------")
 
   benchmark_definition = {
