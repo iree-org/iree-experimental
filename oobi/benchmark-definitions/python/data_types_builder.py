@@ -26,6 +26,27 @@ class ModelDataTemplate:
   source_url: List[string.Template]
 
 
+@dataclass(frozen=True)
+class ModelArtifactTemplate:
+  """ModelArtifact template."""
+  artifact_type: data_types.ModelArtifactType
+  source_url: string.Template
+
+
+@dataclass(frozen=True)
+class ModelTemplate:
+  """Model template."""
+  id: string.Template
+  name: string.Template
+  tags: List[Union[str, string.Template]]
+  meta_model: data_types.MetaModel
+  # Inputs with multiple batch sizes.
+  inputs: Dict[int, data_types.ModelData]
+  # Ouptuts with multiple batch sizes.
+  outputs: Dict[int, data_types.ModelData]
+  artifacts: List[ModelArtifactTemplate]
+
+
 def _substitute_template(value: Union[str, string.Template],
                          **substitutions) -> str:
   if isinstance(value, string.Template):
@@ -66,3 +87,39 @@ def build_batch_model_data(
     batch_model_data[batch_size] = model_data
 
   return batch_model_data
+
+
+def build_batch_models(
+    template: ModelTemplate,
+    batch_sizes: Sequence[int]) -> Dict[int, data_types.Model]:
+  """Build model with batch sizes by replacing `${batch_size}` in the template.
+
+  Args:
+    template: model template with "${batch_size}" to replace.
+    batch_sizes: list of batch sizes to generate.
+
+  Returns:
+    Map of batch size to model.
+  """
+
+  batch_models = {}
+  for batch_size in batch_sizes:
+    substitute = lambda value: _substitute_template(value=value,
+                                                    batch_size=batch_size)
+    artifacts = []
+    for artifact_template in template.artifacts:
+      artifacts.append(
+          data_types.ModelArtifact(
+              artifact_type=artifact_template.artifact_type,
+              source_url=substitute(artifact_template.source_url)))
+    model = data_types.Model(id=substitute(template.id),
+                             name=substitute(template.name),
+                             tags=[substitute(tag) for tag in template.tags],
+                             meta_model=template.meta_model,
+                             input_batch_size=batch_size,
+                             inputs=template.inputs[batch_size],
+                             outputs=template.outputs[batch_size],
+                             artifacts=artifacts)
+    batch_models[batch_size] = model
+
+  return batch_models
