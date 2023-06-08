@@ -31,9 +31,9 @@ def benchmark_lookup(unique_id: str):
                      f"one of:\n  {id_list}")
 
   model_definition = pytorch_model_definitions.PT_MODELS_DICT[unique_id]
-  if unique_id.startswith(unique_ids.MODEL_RESNET50_FP32_PT):
+  if unique_id.startswith(unique_ids.MODEL_RESNET50_FP32_PT) or unique_id.startswith(unique_ids.MODEL_RESNET50_FP16_PT):
     return ("RESNET50", resnet50.ResNet50, model_definition)
-  elif unique_id.startswith(unique_ids.MODEL_BERT_LARGE_FP32_PT):
+  elif unique_id.startswith(unique_ids.MODEL_BERT_LARGE_FP32_PT) or unique_id.startswith(unique_ids.MODEL_BERT_LARGE_FP16_PT):
     return ("BERT_LARGE", bert_large.BertLarge, model_definition)
   else:
     raise ValueError(f"Model definition not supported")
@@ -57,30 +57,47 @@ def bytes_to_mb_str(bytes: Optional[int]) -> str:
 
 
 def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
-                            warmup_iterations: int, benchmark_iterations: int,
+                            data_type: data_types.DataType, warmup_iterations: int, benchmark_iterations: int,
                             backend: str, shared_dict) -> None:
   try:
-    if backend == "gpu":
-      torch.set_default_tensor_type(torch.cuda.FloatTensor)
-      torch.backends.cuda.matmul.allow_tf32 = True
-      synchronize = True
-    else:
-      torch.set_default_tensor_type(torch.FloatTensor)
-      synchronize = False
+    torch_dtype = torch.float16 if data_type == data_types.DataType.FP16 else torch.float32
 
-    torch_device = torch.device("cuda:0" if backend == "gpu" else "cpu")
+    if backend == "gpu":
+      if torch_dtype == torch.float16:
+        torch.set_default_tensor_type(torch.cuda.HalfTensor)
+        torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = True
+      elif torch_dtype == torch.float32:
+        torch.set_default_tensor_type(torch.cuda.FloatTensor)
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+      else:
+        raise ValueError(f"Datatype {data_type} not supported.")
+    elif backend == "cpu":
+      if torch_dtype != torch.float32:
+        raise ValueError(f"Datatype other than FP32 is not supported on CPU.")
+      torch.set_default_tensor_type(torch.FloatTensor)
+    else:
+      raise ValueError(f"Backend {backend} not supported.")
 
     model = model_class()
-    model.to(torch_device)
+    model = model.to(dtype=torch_dtype)
 
-    inputs = model.generate_inputs(batch_size)
-    for input in inputs:
-      input.to(torch_device)
+    inputs = model.generate_inputs(batch_size=batch_size, dtype=torch_dtype)
+    if backend == "gpu":
+      model.cuda()
+      inputs = [input.cuda() for input in inputs]
 
-    model = torch.compile(model, mode="max-autotune", backend="inductor")
+    if torch_dtype == torch.float16:
+      # Autotuning not supported with FP16 datatypes.
+      model = torch.compile(model, backend="inductor")
+      autotuning_enabled = False
+    else:
+      model = torch.compile(model, mode="max-autotune", backend="inductor")
+      autotuning_enabled = True
 
     # Run warmup.
     warmup_latencies = []
+    synchronize = True if backend == "gpu" else False
     for i in range(warmup_iterations):
       start = time.perf_counter()
       output = model.forward(*inputs)
@@ -132,6 +149,8 @@ def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
             benchmark_iterations,
         "compile_time_s":
             compile_time_s,
+        "autotuning_enabled":
+            autotuning_enabled,
     }
     shared_dict.update(result_dict)
 
@@ -203,12 +222,12 @@ if __name__ == "__main__":
     shared_dict = manager.dict()
 
     if args.run_in_process:
-      run_framework_benchmark(model_name, model_class, batch_size,
+      run_framework_benchmark(model_name, model_class, batch_size, model_definition.meta_model.data_type,
                               args.warmup_iterations, args.iterations,
                               args.device, shared_dict)
     else:
       p = multiprocessing.Process(target=run_framework_benchmark,
-                                  args=(model_name, model_class, batch_size,
+                                  args=(model_name, model_class, batch_size, model_definition.meta_model.data_type,
                                         args.warmup_iterations, args.iterations,
                                         args.device, shared_dict))
       p.start()

@@ -27,8 +27,26 @@ RESNET50_FP32_PT_2048X7X7XF32_BATCH_TEMPLATE = data_types_builder.ModelDataTempl
             "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_${batch_size}/output_0.npy"
         )
     ])
-RESNET50_FP32_PT_2048X7X7XF322_BATCHES = data_types_builder.build_batch_model_data(
+RESNET50_FP32_PT_2048X7X7XF32_BATCHES = data_types_builder.build_batch_model_data(
     template=RESNET50_FP32_PT_2048X7X7XF32_BATCH_TEMPLATE,
+    batch_sizes=[1, 8, 64, 128, 256, 2048])
+
+RESNET50_FP16_PT_2048X7X7XF16_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
+    id=BATCH_ID(unique_ids.OUTPUT_DATA_RESNET50_FP16_PT_2048X7X7XF16),
+    name=BATCH_NAME("RESNET50_FP16_PT_2048X7X7XF16"),
+    tags=["output-data", BATCH_TAG],
+    data_format=data_types.DataFormat.NUMPY_NPY,
+    model_id=BATCH_MODEL_ID(unique_ids.MODEL_RESNET50_FP16_PT_3X224X224XF16),
+    source_info="",
+    tensor_names=["output_0"],
+    tensor_dimensions=[BATCH_TENSOR_DIMS("2048x7x7xf16")],
+    source_url=[
+        string.Template(
+            "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_${batch_size}/output_0.npy"
+        )
+    ])
+RESNET50_FP16_PT_2048X7X7XF16_BATCHES = data_types_builder.build_batch_model_data(
+    template=RESNET50_FP16_PT_2048X7X7XF16_BATCH_TEMPLATE,
     batch_sizes=[1, 8, 64, 128, 256, 2048])
 
 # Bert-Large Outputs.
@@ -49,4 +67,23 @@ BERT_LARGE_FP32_PT_384X1024XF32_BATCH_TEMPLATE = data_types_builder.ModelDataTem
 )
 BERT_LARGE_FP32_PT_384X1024XF32_BATCHES = data_types_builder.build_batch_model_data(
     template=BERT_LARGE_FP32_PT_384X1024XF32_BATCH_TEMPLATE,
+    batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280])
+
+BERT_LARGE_FP16_PT_384X1024XF16_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
+    id=BATCH_ID(unique_ids.OUTPUT_DATA_BERT_LARGE_FP16_PT_384X1024XF16),
+    name=BATCH_NAME("BERT_LARGE_FP16_PT_384X1024XF16"),
+    tags=["output-data", BATCH_TAG],
+    data_format=data_types.DataFormat.NUMPY_NPY,
+    model_id=BATCH_MODEL_ID(unique_ids.MODEL_BERT_LARGE_FP16_PT_384XI32),
+    source_info="",
+    tensor_names=["output_0"],
+    tensor_dimensions=[BATCH_TENSOR_DIMS("384x1024xf16")],
+    source_url=[
+        string.Template(
+            "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_${batch_size}/output_0.npy"
+        )
+    ],
+)
+BERT_LARGE_FP16_PT_384X1024XF16_BATCHES = data_types_builder.build_batch_model_data(
+    template=BERT_LARGE_FP16_PT_384X1024XF16_BATCH_TEMPLATE,
     batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280])
