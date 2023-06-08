@@ -45,25 +45,11 @@ iree_cc_library(
     "module.c"
   DEPS
     ::defs
-    ::loop_async
     ::async_runtime
     iree::base
     iree::base::tracing
     iree::hal
     iree::vm
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    loop_async
-  HDRS
-    "loop_async.h"
-  SRCS
-    "loop_async.c"
-  DEPS
-    ::defs
-    iree::base
   PUBLIC
 )
 
@@ -75,9 +61,9 @@ iree_cc_test(
   DEPS
     ::defs
     ::async
-    ::loop_async
     iree::base
     iree::base::internal::wait_handle
+    iree::base::loop_sync
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm

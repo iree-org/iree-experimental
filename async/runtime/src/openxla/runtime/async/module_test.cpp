@@ -10,13 +10,12 @@
 #include <vector>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/wait_handle.h"
+#include "iree/base/loop_sync.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/module.h"
-#include "openxla/runtime/async/loop_async.h"
 #include "openxla/runtime/async/test/module_test_module_c.h"
 #include "openxla/runtime/async_test/module.h"
 
@@ -26,10 +25,44 @@ iree_status_t async_callback(void* user_data, iree_loop_t loop,
     fprintf(stdout, "Async invocation finished\n");
     fflush(stdout);
   }
-  iree_event_t* async_call_finished = (iree_event_t*)user_data;
-  iree_event_set(async_call_finished);
 
   return iree_ok_status();
+}
+
+void AllocateLoop(iree_status_t* out_status, iree_allocator_t allocator,
+                  iree_loop_t* out_loop) {
+  iree_loop_sync_options_t options = {0};
+  options.max_queue_depth = 128;
+  options.max_wait_count = 32;
+
+  iree_loop_sync_t* loop_sync = NULL;
+  IREE_CHECK_OK(iree_loop_sync_allocate(options, allocator, &loop_sync));
+
+  iree_loop_sync_scope_t* scope = NULL;
+  IREE_CHECK_OK(
+      iree_allocator_malloc(allocator, sizeof(*scope), (void**)&scope));
+  iree_loop_sync_scope_initialize(
+      loop_sync,
+      +[](void* user_data, iree_status_t status) {
+        iree_status_t* status_ptr = (iree_status_t*)user_data;
+        if (iree_status_is_ok(*status_ptr)) {
+          *status_ptr = status;
+        } else {
+          iree_status_ignore(status);
+        }
+      },
+      out_status, scope);
+  *out_loop = iree_loop_sync_scope(scope);
+}
+
+void FreeLoop(iree_allocator_t allocator, iree_loop_t loop) {
+  iree_loop_sync_scope_t* scope = (iree_loop_sync_scope_t*)loop.self;
+  iree_loop_sync_t* loop_sync = scope->loop_sync;
+
+  iree_loop_sync_scope_deinitialize(scope);
+  iree_allocator_free(allocator, scope);
+
+  iree_loop_sync_free(loop_sync);
 }
 
 template <size_t N>
@@ -134,19 +167,16 @@ class AsyncRuntimeModuleTest : public ::testing::Test {
 
     iree_vm_async_invoke_state_t state = {};
 
-    iree_loop_async_storage_t storage = {{0xCD}, iree_ok_status()};
-    iree_loop_t loop = iree_loop_async_initialize(&storage);
+    iree_loop_t loop;
+    iree_status_t loop_status;
+    AllocateLoop(&loop_status, iree_allocator_system(), &loop);
 
-    iree_event_t async_call_finished;
+    iree_vm_async_invoke(loop, &state, context_, function,
+                         IREE_VM_INVOCATION_FLAG_NONE,
+                         /*policy=*/NULL, input_list.get(), output_list.get(),
+                         iree_allocator_system(), async_callback, &state);
 
-    iree_event_initialize(/*initial_state=*/false, &async_call_finished);
-
-    iree_vm_async_invoke(
-        loop, &state, context_, function, IREE_VM_INVOCATION_FLAG_NONE,
-        /*policy=*/NULL, input_list.get(), output_list.get(),
-        iree_allocator_system(), async_callback, &async_call_finished);
-
-    iree_wait_one(&async_call_finished, IREE_TIME_INFINITE_FUTURE);
+    iree_loop_drain(loop, iree_infinite_timeout());
 
     std::vector<iree_vm_value_t> outputs;
     outputs.resize(iree_vm_list_size(output_list.get()));
@@ -154,7 +184,8 @@ class AsyncRuntimeModuleTest : public ::testing::Test {
       IREE_RETURN_IF_ERROR(
           iree_vm_list_get_value(output_list.get(), i, &outputs[i]));
     }
-    iree_loop_async_deinitialize(&storage);
+
+    FreeLoop(iree_allocator_system(), loop);
     return outputs;
   }
 
