@@ -121,9 +121,10 @@ def run_compiler_benchmark_gpu(hlo_benchmark_tool_path: str,
       "--logtostderr",
   ]
 
-  # Timings are logged under VLOG so we need to enable this.
-  os.environ["TF_CPP_MIN_VLOG_LEVEL"] = "0"
-  os.environ["TF_CPP_MAX_VLOG_LEVEL"] = "2"
+  # Timings are logged under VLOG so we need to enable this for the modules we are intereated in.
+  os.environ["TF_CPP_MIN_LOG_LEVEL"] = "0"
+  os.environ[
+      "TF_CPP_VMODULE"] = "nvptx_compiler=1,gpu_compiler=1,parse_flags_from_env=1,bfc_allocator=2,functional_hlo_runner=1"
 
   result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
   result_text = result.stdout
