@@ -7,15 +7,16 @@ import iree.runtime as ireert
 from iree.runtime import get_driver, get_device
 import iree.compiler as ireec
 
-
-def run_vmfb(vmfb, function_name, runtime_device, inputs):
+def prepare_fun(compiled_str, function_name, runtime_device):
     config = ireert.Config(driver_name=runtime_device)
-    vm_module = ireert.VmModule.from_flatbuffer(config.vm_instance, vmfb)
+    vm_module = ireert.VmModule.from_flatbuffer(config.vm_instance, compiled_str)
     ctx = ireert.SystemContext(config=config)
     ctx.add_vm_module(vm_module)
-    forward = ctx.modules.module[function_name]
-    return forward(*inputs).to_host()
+    return ctx.modules.module[function_name]
 
+def run_vmfb(compiled_str, function_name, runtime_device, inputs):
+    fun = prepare_fun(compiled_str, function_name, runtime_device)
+    return fun(*inputs).to_host()
 
 def compare_mlir_module(
     module,

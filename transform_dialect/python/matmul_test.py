@@ -1,85 +1,60 @@
-# python matmul.py
+# Instructions
+#   Build IREE in `IREE_BUILD_DIR` with python bindings
+#   source ${IREE_BUILD_DIR}/.env && export PYTHONPATH
+#   export PATH=${PATH}:${IREE_BUILD_DIR}/tools
+#
+# Debug TD stuff by appending: --td-repro=1
 
-import torch
-torch.manual_seed(0)
+# python matmul_test.py
 
-import iree.runtime as ireert
-from iree.runtime import get_driver, get_device
-import iree.compiler as ireec
-iree_device = "cuda"
-iree_runtime_device = "cuda"
-
-import compile_and_compare as cc
-import matmul_config as config
-import sys
-
-ones_initialization_fn = lambda x, y: torch.ones(x, y)
-linspace_initialization_fn = lambda x, y: torch.linspace(0, x*y, 1).reshape(x, y)
-randn_initialization_fn = lambda x, y: torch.randn(x, y)
-def make_fill_matmul_f32_tensors(M, N, K, initialization_fn=lambda x, y: torch.randn(x, y)):
-  return initialization_fn(M, K), initialization_fn(K, N)
-
-n_iters = 5
 problem_sizes = [
-  [514, 130, 500],
-  [515, 131, 501],
+  # Partially aligned
+  [133, 133, 128],
+  [167, 171, 128],
+  [167, 196, 128],
+  [167, 197, 128],
+  [167, 170, 128],
+  [167, 172, 128],
+  [167, 130, 128],
+  [330, 330, 128],
+  [512, 132, 515],
+  [515, 128, 513],
+  [515, 130, 512],
+  [515, 131, 512],
   [515, 132, 512],
+  [515, 133, 512],
+  [516, 130, 512],
+  [516, 131, 512],
+  [516, 132, 512],
+  [516, 133, 512],
+
+  # Unaligned
+  [514, 130, 500],
+  [512, 512, 512],
   [515, 131, 501],
+
+  # Fully aligned
+  [512, 256, 128],
+  [512, 512, 512],
+  [1024, 1024, 1024],
 ]
 
 td_configurations = [
-  {'bx': 128, 'by': 128, 'bz': 1, 'tx': 64, 'ty': 2, 'tz': 1, 'wx': 2, 'wy': 2, 'wz': 1, 'pipe_depth': 1, 'red_sz': 16, 'async_cp': "false", 'mma_sync': "false"},
-  {'bx': 128, 'by': 128, 'bz': 1, 'tx': 64, 'ty': 2, 'tz': 1, 'wx': 2, 'wy': 2, 'wz': 1, 'pipe_depth': 1, 'red_sz': 16, 'async_cp': "true", 'mma_sync': "true"},
-  {'bx': 128, 'by': 128, 'bz': 1, 'tx': 64, 'ty': 2, 'tz': 1, 'wx': 2, 'wy': 2, 'wz': 1, 'pipe_depth': 2, 'red_sz': 16, 'async_cp': "false", 'mma_sync': "true"},
-  {'bx': 128, 'by': 128, 'bz': 1, 'tx': 64, 'ty': 2, 'tz': 1, 'wx': 2, 'wy': 2, 'wz': 1, 'pipe_depth': 3, 'red_sz': 16, 'async_cp': "true", 'mma_sync': "true"},
-  {'bx': 128, 'by': 128, 'bz': 1, 'tx': 64, 'ty': 2, 'tz': 1, 'wx': 2, 'wy': 2, 'wz': 1, 'pipe_depth': 3, 'red_sz': 16, 'async_cp': "true", 'mma_sync': "false"},
-  {'bx': 128, 'by': 128, 'bz': 1, 'tx': 64, 'ty': 2, 'tz': 1, 'wx': 2, 'wy': 2, 'wz': 1, 'pipe_depth': 4, 'red_sz': 16, 'async_cp': "true", 'mma_sync': "false"},
-  {'bx': 128, 'by': 128, 'bz': 1, 'tx': 64, 'ty': 2, 'tz': 1, 'wx': 2, 'wy': 2, 'wz': 1, 'pipe_depth': 5, 'red_sz': 16, 'async_cp': "true", 'mma_sync': "true"},
-  {'bx': 16, 'by': 16, 'bz': 1, 'tx': 32, 'ty': 1, 'tz': 1, 'wx': 1, 'wy': 1, 'wz': 1, 'pipe_depth': 3, 'red_sz': 16, 'async_cp': "true", 'mma_sync': "false"},
-  {'bx': 16, 'by': 16, 'bz': 1, 'tx': 32, 'ty': 1, 'tz': 1, 'wx': 1, 'wy': 1, 'wz': 1, 'pipe_depth': 3, 'red_sz': 16, 'async_cp': "true", 'mma_sync': "true"},
+  {'blk': '128,128,1', 'tds': '64,2,1', 'wps': '2,2,1', 'p': 1, 'r': 16, 'acp': "0", 'mma': "0"},
+  {'blk': '128,128,1', 'tds': '64,2,1', 'wps': '2,2,1', 'p': 1, 'r': 16, 'acp': "1", 'mma': "1"},
+  {'blk': '128,128,1', 'tds': '64,2,1', 'wps': '2,2,1', 'p': 3, 'r': 16, 'acp': "1", 'mma': "0"},
+  {'blk': '128,128,1', 'tds': '64,2,1', 'wps': '2,2,1', 'p': 5, 'r': 16, 'acp': "1", 'mma': "1"},
+  {'blk': '32,32,1', 'tds': '32,1,1', 'wps': '1,1,1', 'p': 1, 'r': 16, 'acp': "0", 'mma': "1"},
+  {'blk': '32,32,1', 'tds': '64,1,1', 'wps': '2,1,1', 'p': 3, 'r': 16, 'acp': "1", 'mma': "1"},
+  {'blk': '32,32,1', 'tds': '64,1,1', 'wps': '1,2,1', 'p': 3, 'r': 16, 'acp': "1", 'mma': "1"},
+  {'blk': '16,16,1', 'tds': '32,1,1', 'wps': '1,1,1', 'p': 3, 'r': 16, 'acp': "1", 'mma': "0"},
+  {'blk': '16,16,1', 'tds': '32,1,1', 'wps': '1,1,1', 'p': 7, 'r': 16, 'acp': "1", 'mma': "1"},
 ]
 
-for M, N, K in problem_sizes:
-  ir_str, fn_name = config.make_fill_matmul_f32_problem(M, N, K)
-  # print(ir_str)
-  for td_config in td_configurations:
-    lhs, rhs = make_fill_matmul_f32_tensors(M, N, K)
-    # print(f"td_config: {td_config}")
+import matmul_runner as runner
+import td_argparse
+args = td_argparse.parse_args()
 
-    td_vmfb = ireec.compile_str(
-      ir_str,
-      target_backends=[iree_device],
-      extra_args=config.make_iree_td_options(td_config),
-    )
-    td_result_0 = torch.from_numpy(
-      cc.run_vmfb(td_vmfb, fn_name, iree_runtime_device, [lhs, rhs]))
-
-    baseline_vmfb = ireec.compile_str(
-      ir_str,
-      target_backends=[iree_device],
-      extra_args=config.make_iree_baseline_options(),
-    )
-    baseline_result_0 = torch.from_numpy(
-      cc.run_vmfb(baseline_vmfb, fn_name, iree_runtime_device, [lhs, rhs]))
-
-    # Cross-impl test: this is tricky as we may have a TF32 vs F32 situation.
-    # TODO: compute a tighter tolerance with proper numerical accuracy.
-    torch_result = torch.mm(lhs.cuda(), rhs.cuda())
-    torch.testing.assert_close(
-      td_result_0.cuda(), torch_result, rtol=1e-03, atol=4.1e-02)
-    torch.testing.assert_close(
-      baseline_result_0.cuda(), torch_result, rtol=1e-03, atol=4.1e-02)
-
-    for iter in range(n_iters):
-      lhs, rhs = make_fill_matmul_f32_tensors(M, N, K)
-      # Test against self, this should be bitwise accurate.
-      cc.compare_vmfbs(
-        td_vmfb, td_vmfb, fn_name, iree_runtime_device, [lhs, rhs], rtol=1e-07, atol=1e-07)
-      # Test against self, this should be bitwise accurate.
-      cc.compare_vmfbs(
-        baseline_vmfb, baseline_vmfb, fn_name, iree_runtime_device, [lhs, rhs], rtol=1e-07, atol=1e-07)
-      # Cross-impl test: this is tricky as we may have a TF32 vs F32 situation.
-      cc.compare_vmfbs(
-        td_vmfb, baseline_vmfb, fn_name, iree_runtime_device, [lhs, rhs], rtol=1e-03, atol=4.1e-02)
-
-print("\nSuccess!")
+n_iters = 5
+check_results = True
+runner.run(problem_sizes, td_configurations, args, n_iters, check_results)
