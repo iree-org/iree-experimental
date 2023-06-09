@@ -1,41 +1,8 @@
 #!/bin/bash
 
 DEVICE=$1
-OUTPUT_PATH=$2
-CUDA_VERSION=${3:-"11.8"}
-
-TD="$(cd $(dirname $0) && pwd)"
-VENV_DIR="hlo-benchmarks.venv"
-
-VENV_DIR="${VENV_DIR}" ${TD}/setup_venv.sh
-source ${VENV_DIR}/bin/activate
-
-# Clone and build `openxla/xla` at head.
-git clone https://github.com/openxla/xla.git
-pushd xla
-
-if [ "${DEVICE}" = "gpu" ]; then
-  bazel build -c opt --config=cuda \
-    --action_env TF_CUDA_COMPUTE_CAPABILITIES="8.0" \
-    --action_env GCC_HOST_COMPILER_PATH="/usr/bin/x86_64-linux-gnu-gcc-11" \
-    --action_env LD_LIBRARY_PATH="/usr/local/cuda-${CUDA_VERSION}/lib64:" \
-    --action_env CUDA_TOOLKIT_PATH="/usr/local/cuda-${CUDA_VERSION}" \
-    --copt=-Wno-switch \
-    xla/tools/multihost_hlo_runner:hlo_runner_main
-
-  RUN_HLO_MODULE_PATH=$(realpath "bazel-bin/xla/tools/multihost_hlo_runner/hlo_runner_main")
-else
-  bazel build -c opt --copt=-Wno-switch \
-    --action_env GCC_HOST_COMPILER_PATH="/usr/bin/x86_64-linux-gnu-gcc-11" \
-    xla/tools:run_hlo_module
-
-  RUN_HLO_MODULE_PATH=$(realpath "bazel-bin/xla/tools/run_hlo_module")
-fi
-
-
-XLA_SHA=$(git rev-parse --short=8 HEAD)
-
-popd
+HLO_BENCHMARK_PATH=$2
+OUTPUT_PATH=$3
 
 MODEL_RESNET50_FP32_TF="aff75509-4420-40a8-844e-dbfc48494fe6-MODEL_RESNET50-fp32-TF-224x224x3xf32"
 MODEL_BERT_LARGE_FP32_TF="47cb0d3a-5eb7-41c7-9d7c-97aae7023ecf-MODEL_BERT_LARGE-fp32-TF-384xi32"
@@ -123,6 +90,12 @@ else
     ITERATIONS=5
 fi
 
+TD="$(cd $(dirname $0) && pwd)"
+VENV_DIR="hlo-benchmarks.venv"
+
+VENV_DIR="${VENV_DIR}" ${TD}/setup_venv.sh
+source ${VENV_DIR}/bin/activate
+
 CACHE_DIR="$(pwd)/.cache/oobi/models"
 python "${TD}/download_artifacts.py" -o "${CACHE_DIR}" -bids "${BENCHMARK_IDS[@]}"
 
@@ -136,7 +109,7 @@ for benchmark_id in "${BENCHMARK_IDS[@]}"; do
     --device="${DEVICE}"
     --output_path="${OUTPUT_PATH}"
     --iterations="${ITERATIONS}"
-    --hlo_benchmark_path="${RUN_HLO_MODULE_PATH}"
+    --hlo_benchmark_path="${HLO_BENCHMARK_PATH}"
     --cache_dir="${CACHE_DIR}"
   )
 

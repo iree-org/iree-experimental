@@ -14,9 +14,56 @@ on:
     - cron: '0 09,21 * * *'
   workflow_dispatch:
 
+env:
+  GCS_DIR: gs://iree-samples-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+
 jobs:
+  build_gpu:
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=presubmit
+      - environment=testing
+      - cpu
+      - os-family=Linux
+    env:
+      CUDA_VERSION: 11.8
+      BENCHMARK_DEVICE: gpu
+      BUILD_DIR: xla-build
+    outputs:
+      build-dir: ${{ env.BUILD_DIR }}
+      build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
+      build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out PR repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791  # v2.5.0
+      - name: "Building XLA"
+        run: |
+          docker build --file "oobi/build_tools/docker/dockerfiles/cuda11.8-cudnn8.9.Dockerfile" \
+            --tag "cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
+          
+          mkdir "${BUILD_DIR}"
+          docker run --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
+            "cuda11.8-cudnn8.9:latest" \
+            ./xla-hlo/benchmark/build_xla_tools.sh "${BENCHMARK_DEVICE}" "${BUILD_DIR}" "${CUDA_VERSION}"
+      - name: "Creating build dir archive"
+        id: archive
+        env:
+          BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.zst
+        run: |
+          tar -I 'zstd -T0' \
+            -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+          echo "build-dir-archive=${BUILD_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading build dir archive"
+        id: upload
+        env:
+          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
+        run: |
+          gcloud storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
+          echo "build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+
   benchmark_gpu:
-    timeout-minutes: 720
+    needs: [build_gpu]
     runs-on:
       - self-hosted  # must come first
       - runner-group=presubmit
@@ -25,7 +72,6 @@ jobs:
       - os-family=Linux
     env:
       TF_VERSION: 2.12.0
-      CUDA_VERSION: 11.8
       LOCAL_OUTPUT_DIR: results-dir
       TF_RESULTS_JSON: tf-xla.json
       JAX_RESULTS_JSON: jax-xla.json
@@ -33,6 +79,9 @@ jobs:
       PT_RESULTS_JSON: pt-inductor.json
       BENCHMARK_DEVICE: gpu
       GCS_UPLOAD_ROOT_DIR: "gs://comparative-benchmark-artifacts"
+      BUILD_DIR: ${{ needs.build_gpu.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_gpu.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_gpu.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out PR repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791  # v2.5.0
@@ -40,21 +89,26 @@ jobs:
         run: |
           echo "GCS_UPLOAD_DIR=${GCS_UPLOAD_ROOT_DIR}/${BENCHMARK_DEVICE}_$(date +'%Y-%m-%d').$(date +'%s')" >> $GITHUB_ENV
           mkdir "${LOCAL_OUTPUT_DIR}"
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Benchmarking HLO/XLA:GPU"
         run: |
-          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${HLO_RESULTS_JSON}"
           docker build --file "oobi/build_tools/docker/dockerfiles/cuda11.8-cudnn8.9.Dockerfile" \
             --tag "cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
+          
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${HLO_RESULTS_JSON}"
           docker run --gpus all --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
             "cuda11.8-cudnn8.9:latest" \
-            ./xla-hlo/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${RESULTS_PATH}" "${CUDA_VERSION}"
+            ./xla-hlo/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${BUILD_DIR}/hlo_runner_main" "${RESULTS_PATH}"
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
       - name: "Benchmarking PyTorch/Inductor:GPU"
         run: |
-          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${PT_RESULTS_JSON}"
           docker build --file "oobi/build_tools/docker/dockerfiles/cuda11.8-cudnn8.9.Dockerfile" \
             --tag "cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${PT_RESULTS_JSON}"
           docker run --gpus all --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
             "cuda11.8-cudnn8.9:latest" \
             ./iree-torch/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${RESULTS_PATH}"
@@ -62,9 +116,9 @@ jobs:
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
       - name: "Benchmarking TF/XLA:GPU"
         run: |
-          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${TF_RESULTS_JSON}"
           docker build --file "oobi/build_tools/docker/dockerfiles/cuda11.8-cudnn8.9.Dockerfile" \
             --tag "cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${TF_RESULTS_JSON}"
           docker run --gpus all --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
             "cuda11.8-cudnn8.9:latest" \
             ./iree-tf/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${TF_VERSION}" "${RESULTS_PATH}"
@@ -72,18 +126,16 @@ jobs:
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
       - name: "Benchmarking JAX/XLA:GPU"
         run: |
-          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${JAX_RESULTS_JSON}"
           docker build --file "oobi/build_tools/docker/dockerfiles/cuda11.8-cudnn8.9.Dockerfile" \
             --tag "cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${JAX_RESULTS_JSON}"
           docker run --gpus all --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
             "cuda11.8-cudnn8.9:latest" \
             ./iree-jax/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${RESULTS_PATH}"
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
 
-  
   benchmark_cpu:
-    timeout-minutes: 360
     runs-on:
       - self-hosted  # must come first
       - runner-group=presubmit
@@ -91,6 +143,7 @@ jobs:
       - machine-type=c2-standard-16
       - os-family=Linux
     env:
+      BUILD_DIR: xla-build
       TF_VERSION: 2.12.0
       LOCAL_OUTPUT_DIR: results-dir
       TF_RESULTS_JSON: tf-xla.json
@@ -108,19 +161,23 @@ jobs:
           mkdir "${LOCAL_OUTPUT_DIR}"
       - name: "Benchmarking HLO/XLA:CPU"
         run: |
-          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${HLO_RESULTS_JSON}"
           docker build --file "oobi/build_tools/docker/dockerfiles/base.Dockerfile" \
             --tag "base" "oobi/build_tools/docker/context"
+          mkdir "${BUILD_DIR}"
           docker run --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
           "base:latest" \
-            ./xla-hlo/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${RESULTS_PATH}"
+            ./xla-hlo/benchmark/build_xla_tools.sh "${BENCHMARK_DEVICE}" "${BUILD_DIR}"        
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${HLO_RESULTS_JSON}"
+          docker run --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
+          "base:latest" \
+            ./xla-hlo/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${BUILD_DIR}/run_hlo_module" "${RESULTS_PATH}"
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
       - name: "Benchmarking PyTorch/Inductor:CPU"
         run: |
-          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${PT_RESULTS_JSON}"
           docker build --file "oobi/build_tools/docker/dockerfiles/base.Dockerfile" \
             --tag "base" "oobi/build_tools/docker/context"
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${PT_RESULTS_JSON}"
           docker run --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
           "base:latest" \
           ./iree-torch/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${RESULTS_PATH}"
@@ -128,9 +185,9 @@ jobs:
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
       - name: "Benchmarking TF/XLA:CPU"
         run: |
-          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${TF_RESULTS_JSON}"
           docker build --file "oobi/build_tools/docker/dockerfiles/base.Dockerfile" \
             --tag "base" "oobi/build_tools/docker/context"
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${TF_RESULTS_JSON}"
           docker run --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
           "base:latest" \
             ./iree-tf/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${TF_VERSION}" "${RESULTS_PATH}"
@@ -138,9 +195,9 @@ jobs:
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
       - name: "Benchmarking JAX/XLA:CPU"
         run: |
-          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${JAX_RESULTS_JSON}"
           docker build --file "oobi/build_tools/docker/dockerfiles/base.Dockerfile" \
             --tag "base" "oobi/build_tools/docker/context"
+          RESULTS_PATH="${LOCAL_OUTPUT_DIR}/${JAX_RESULTS_JSON}"
           docker run --mount="type=bind,src="${PWD}",target=/work" --workdir="/work" \
           "base:latest" \
           ./iree-jax/benchmark/benchmark_all.sh "${BENCHMARK_DEVICE}" "${RESULTS_PATH}"
