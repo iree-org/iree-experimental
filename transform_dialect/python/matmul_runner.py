@@ -47,7 +47,7 @@ def run(problem_sizes, td_configurations, argparse, n_iters, check_results=False
       extra_args=config.append_td_graph_script(
         config.make_iree_baseline_options(argparse.td_repro), \
         argparse.td_graph_script)
-      print(f"compile baseline {extra_args}")
+      # print(f"compile baseline {extra_args}")
       baseline_vmfb_str = ireec.compile_str(
         ir_str,
         target_backends=[iree_device],
@@ -63,7 +63,7 @@ def run(problem_sizes, td_configurations, argparse, n_iters, check_results=False
           config.make_iree_td_options(td_config, \
                                       argparse.td_repro), \
           argparse.td_graph_script)
-      print(f"compile td {extra_args}")
+      # print(f"compile td {extra_args}")
       td_vmfb_str = ireec.compile_str(
         td_ir_str,
         target_backends=[iree_device],
