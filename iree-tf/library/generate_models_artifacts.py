@@ -20,7 +20,8 @@ def generate_artifacts(model_name: str, model_class: type[tf.Module], batch_size
         # Configure to dump hlo.
         hlo_dir = os.path.join(save_dir, "hlo")
         os.makedirs(save_dir, exist_ok=True)
-        os.environ["XLA_FLAGS"] = f"--xla_dump_to={hlo_dir}"
+        # Only dump hlo for forward function.
+        os.environ["XLA_FLAGS"] = f"--xla_dump_to={hlo_dir} --xla_dump_hlo_module_re=.*inference_forward.*"
 
         model = model_class()
         inputs = model.generate_inputs(batch_size)

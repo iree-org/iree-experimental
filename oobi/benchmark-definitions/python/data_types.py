@@ -34,6 +34,7 @@ class DataType(Enum):
   INT8 = "int8"
   UINT8 = "uint8"
 
+
 class DataFormat(Enum):
   """Model input data format."""
   ZEROS = "zeros"
@@ -49,6 +50,7 @@ class ModelData(object):
   name: str
   # Tags that describe the data characteristics.
   tags: List[str]
+  # Data format.
   data_format: DataFormat
   # If applicable, the model id that generated the data.
   model_id: str
@@ -105,3 +107,9 @@ class Model(object):
 
   def __str__(self):
     return self.name
+
+  def get_artifact(self, artifact_type: ModelFrameworkType) -> ModelArtifact:
+    for artifact in self.artifacts:
+      if artifact.artifact_type == artifact_type:
+        return artifact
+    return None
