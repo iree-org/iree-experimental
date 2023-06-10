@@ -1,3 +1,22 @@
+// Example invocation:
+// ===================
+// export IREE_DIR=${HOME}/github/iree && \
+// export IREE_SAMPLES_DIR=${HOME}/github/iree-samples && \
+// M=123 && N=456 && K=12345 && FUN_NAME=fill_matmul_static && \
+// cat ${IREE_SAMPLES_DIR}/transform_dialect/examples/matmul.mlir | \
+// sed -e "s/\${M}/${M}/g" -e "s/\${N}/${N}/g" -e "s/\${K}/${K}/g" | \
+// sed "s/private @${FUN_NAME}(/@${FUN_NAME}(/g" | \
+// ${LLVM_BUILD_DIR}/bin/mlir-opt -symbol-dce |
+// ${IREE_DIR}/build/tools/iree-compile - \
+//   --iree-hal-benchmark-dispatch-repeat-count=5 \
+//   --debug-only=transform-dialect-save-repro --mlir-disable-threading \
+//   --iree-hal-target-backends=cuda --iree-hal-cuda-llvm-target-arch=sm_80 | \
+// /usr/local/cuda/bin/nsys profile --stats=true \
+// ${IREE_DIR}/build/tools/iree-run-module \
+// --trace_execution=true \
+// --module=- --function=${FUN_NAME} --device=cuda \
+// --input=${M}x${K}xf32=1 --input=${K}x${N}xf32=1 --input=${M}x${N}xf32=0
+
 !A_t = tensor<${M}x${K}xf32>
 !B_t = tensor<${K}x${N}xf32>
 !C_t = tensor<${M}x${N}xf32>
