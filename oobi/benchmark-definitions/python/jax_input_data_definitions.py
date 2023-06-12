@@ -28,8 +28,49 @@ IMAGENET_APPLES_JAX_3X224X224XF32_BATCH_TEMPLATE = data_types_builder.ModelDataT
             "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_${batch_size}/input_0.npy"
         )
     ])
+
+IMAGENET_APPLES_JAX_3X224X224XF16_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
+    id=BATCH_ID(unique_ids.INPUT_DATA_IMAGENET_APPLES_JAX_3X224X224XF16),
+    name=BATCH_NAME("IMAGENET_APPLES_JAX_3X224X224XF16"),
+    tags=["input-data", "imagenet", BATCH_TAG],
+    data_format=data_types.DataFormat.NUMPY_NPY,
+    model_id=BATCH_MODEL_ID(unique_ids.MODEL_RESNET50_FP16_JAX_3X224X224XF16),
+    source_info=
+    "Original image: https://storage.googleapis.com/iree-model-artifacts/ILSVRC2012_val_00000023.JPEG",
+    tensor_names=["pixel_values"],
+    tensor_dimensions=[BATCH_TENSOR_DIMS(dims="3x224x224xf16")],
+    source_url=[
+        string.Template(
+            "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_${batch_size}/input_0.npy"
+        )
+    ])
+
+IMAGENET_APPLES_JAX_3X224X224XBF16_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
+    id=BATCH_ID(unique_ids.INPUT_DATA_IMAGENET_APPLES_JAX_3X224X224XBF16),
+    name=BATCH_NAME("IMAGENET_APPLES_JAX_3X224X224XBF16"),
+    tags=["input-data", "imagenet", BATCH_TAG],
+    data_format=data_types.DataFormat.NUMPY_NPY,
+    model_id=BATCH_MODEL_ID(unique_ids.MODEL_RESNET50_BF16_JAX_3X224X224XBF16),
+    source_info=
+    "Original image: https://storage.googleapis.com/iree-model-artifacts/ILSVRC2012_val_00000023.JPEG",
+    tensor_names=["pixel_values"],
+    tensor_dimensions=[BATCH_TENSOR_DIMS(dims="3x224x224xbf16")],
+    source_url=[
+        string.Template(
+            "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/RESNET50/batch_${batch_size}/input_0.npy"
+        )
+    ])
+
 IMAGENET_APPLES_JAX_3X224X224XF32_BATCHES = data_types_builder.build_batch_model_data(
     template=IMAGENET_APPLES_JAX_3X224X224XF32_BATCH_TEMPLATE,
+    batch_sizes=[1, 8, 64, 128, 256, 2048])
+
+IMAGENET_APPLES_JAX_3X224X224XF16_BATCHES = data_types_builder.build_batch_model_data(
+    template=IMAGENET_APPLES_JAX_3X224X224XF16_BATCH_TEMPLATE,
+    batch_sizes=[1, 8, 64, 128, 256, 2048])
+
+IMAGENET_APPLES_JAX_3X224X224XBF16_BATCHES = data_types_builder.build_batch_model_data(
+    template=IMAGENET_APPLES_JAX_3X224X224XBF16_BATCH_TEMPLATE,
     batch_sizes=[1, 8, 64, 128, 256, 2048])
 
 
@@ -53,6 +94,7 @@ BERT_LARGE_JAX_SEQLEN384_I32_BATCH_TEMPLATE = data_types_builder.ModelDataTempla
             "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752/BERT_LARGE/batch_${batch_size}/input_1.npy"
         ),
     ])
+
 BERT_LARGE_JAX_SEQLEN384_I32_BATCHES = data_types_builder.build_batch_model_data(
     template=BERT_LARGE_JAX_SEQLEN384_I32_BATCH_TEMPLATE,
     batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280])
@@ -80,6 +122,7 @@ T5_LARGE_JAX_SEQLEN512_I32_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate
         ),
     ],
 )
+
 T5_LARGE_JAX_SEQLEN512_I32_BATCHES = data_types_builder.build_batch_model_data(
     template=T5_LARGE_JAX_SEQLEN512_I32_BATCH_TEMPLATE,
     batch_sizes=[1, 16, 24, 32, 48, 64, 512])
