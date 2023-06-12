@@ -80,9 +80,9 @@ ENV PATH="/usr/local/cuda-11.8/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda-11.8/lib64:${LD_LIBRARY_PATH}"
 
 # Install CuDNN. Instructions from https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html.
-RUN wget "https://storage.googleapis.com/iree-shared-files/cudnn-local-repo-ubuntu2204-8.9.0.131_1.0-1_amd64.deb" \
-  && dpkg --install "cudnn-local-repo-ubuntu2204-8.9.0.131_1.0-1_amd64.deb" \
-  && cp /var/cudnn-local-repo-ubuntu2204-8.9.0.131/cudnn-*-keyring.gpg /usr/share/keyrings/ \
+RUN wget "https://storage.googleapis.com/iree-shared-files/cudnn-local-repo-ubuntu2204-8.6.0.163_1.0-1_amd64.deb" \
+  && dpkg --install "cudnn-local-repo-ubuntu2204-8.6.0.163_1.0-1_amd64.deb" \
+  && cp /var/cudnn-local-repo-ubuntu2204-8.6.0.163/cudnn-*-keyring.gpg /usr/share/keyrings/ \
   && apt-get update \
   && apt-get -y install libcudnn8 \
   && apt-get -y install libcudnn8-dev \

@@ -84,37 +84,59 @@ def run_framework_benchmark(model_name: str, model_class: Any,
                             backend: str, shared_dict) -> None:
   try:
     with jax.default_device(jax.devices(backend)[0]):
+      print(f"Creating model {model_name}.")
       model = model_class(dtype=jax_dtype)
+      print(f"Created model.")
 
       # Create jits.
       start = time.perf_counter()
+      print("Placing input date to device.")
       jit_inputs = jax.device_put(input_data)
+      print("Completed placing input date to device.")
       end = time.perf_counter()
       input_data_transfer_ms = 1000 * (end - start)
 
+      print("Jitting function.")
       jit_function = jax.jit(model.forward)
+      print("Completed jitting function.")
 
       # Run warmup.
+      print("Starting warmup.")
       warmup_latencies = []
       for i in range(warmup_iterations):
         start = time.perf_counter()
+        print("Running jitted function.")
         outputs = jit_function(*jit_inputs)
+        print("Completed running jitted function.")
+        print("Blocking on outputs.")
         outputs.block_until_ready()
+        print("Completed blocking on outputs.")
         end = time.perf_counter()
         latency = 1000 * (end - start)
+        print(f"Accessing outputs[0]: {outputs[0]}")
+        print("Comparing results.")
         utils.compare_results(outputs, expected_outputs[0])
+        print("Completed comparing results.")
         if i == 0:
           compile_time_s = latency / 1000
         warmup_latencies.append(latency)
+      print("Completed warmup.")
 
       # Run benchmark.
       latencies = []
       for i in range(benchmark_iterations):
         start = time.perf_counter()
+        print("Running jitted function.")
         outputs = jit_function(*jit_inputs)
+        print("Completed running jitted function.")
+        print("Blocking on outputs.")
         outputs.block_until_ready()
+        print("Completed blocking on outputs.")
         end = time.perf_counter()
+        print(f"Accessing outputs[0]: {outputs[0]}")
+        print("Comparing results.")
         utils.compare_results(outputs, expected_outputs[0])
+        print("Completed comparing results.")
         latencies.append(1000 * (end - start))
 
       # Save results.
@@ -165,7 +187,7 @@ if __name__ == "__main__":
       "-d",
       "--device",
       default="gpu",
-      help="The device to run on. Currently `cpu` and `gpu` are supported.")
+      help="The device to run on. Supported devices: `cpu` and `gpu` for xla and `iree_cpu` and `iree_cuda` for pjrt.")
   argParser.add_argument(
       "--run_in_process",
       action="store_true",
@@ -185,6 +207,8 @@ if __name__ == "__main__":
       f"\n\n--- {model_name} {args.benchmark_id} -------------------------------------"
   )
 
+  compiler = "iree" if args.device.startswith("iree") else "xla"
+
   benchmark_definition = {
       "benchmark_id": args.benchmark_id,
       "benchmark_name": model_definition.name,
@@ -193,7 +217,7 @@ if __name__ == "__main__":
       "batch_size": model_definition.input_batch_size,
       "inputs": model_definition.inputs.tensor_dimensions,
       "outputs": model_definition.outputs.tensor_dimensions,
-      "compiler": "xla",
+      "compiler": compiler,
       "device": args.device,
       "tags": model_definition.meta_model.tags + model_definition.tags,
   }
