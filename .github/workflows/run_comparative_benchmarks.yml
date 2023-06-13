@@ -94,6 +94,7 @@ jobs:
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Benchmarking HLO/XLA:GPU"
+        timeout-minutes: 360
         run: |
           docker build --file "oobi/build_tools/docker/dockerfiles/cuda11.8-cudnn8.9.Dockerfile" \
             --tag "cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
@@ -105,6 +106,7 @@ jobs:
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
       - name: "Benchmarking PyTorch/Inductor:GPU"
+        timeout-minutes: 360
         run: |
           docker build --file "oobi/build_tools/docker/dockerfiles/cuda11.8-cudnn8.9.Dockerfile" \
             --tag "cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
@@ -115,6 +117,7 @@ jobs:
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
       - name: "Benchmarking TF/XLA:GPU"
+        timeout-minutes: 360
         run: |
           docker build --file "oobi/build_tools/docker/dockerfiles/cuda11.8-cudnn8.9.Dockerfile" \
             --tag "cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
@@ -125,6 +128,7 @@ jobs:
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
       - name: "Benchmarking JAX/XLA:GPU"
+        timeout-minutes: 360
         run: |
           docker build --file "oobi/build_tools/docker/dockerfiles/cuda11.8-cudnn8.9.Dockerfile" \
             --tag "cuda11.8-cudnn8.9" "oobi/build_tools/docker/context"
@@ -160,6 +164,7 @@ jobs:
           echo "GCS_UPLOAD_DIR=${GCS_UPLOAD_ROOT_DIR}/${BENCHMARK_DEVICE}_$(date +'%Y-%m-%d').$(date +'%s')" >> $GITHUB_ENV
           mkdir "${LOCAL_OUTPUT_DIR}"
       - name: "Benchmarking HLO/XLA:CPU"
+        timeout-minutes: 360
         run: |
           docker build --file "oobi/build_tools/docker/dockerfiles/base.Dockerfile" \
             --tag "base" "oobi/build_tools/docker/context"
@@ -174,6 +179,7 @@ jobs:
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
       - name: "Benchmarking PyTorch/Inductor:CPU"
+        timeout-minutes: 360
         run: |
           docker build --file "oobi/build_tools/docker/dockerfiles/base.Dockerfile" \
             --tag "base" "oobi/build_tools/docker/context"
@@ -184,6 +190,7 @@ jobs:
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
       - name: "Benchmarking TF/XLA:CPU"
+        timeout-minutes: 360
         run: |
           docker build --file "oobi/build_tools/docker/dockerfiles/base.Dockerfile" \
             --tag "base" "oobi/build_tools/docker/context"
@@ -194,6 +201,7 @@ jobs:
           cat "${RESULTS_PATH}"
           gcloud storage cp "${RESULTS_PATH}" "${GCS_UPLOAD_DIR}/"
       - name: "Benchmarking JAX/XLA:CPU"
+        timeout-minutes: 360
         run: |
           docker build --file "oobi/build_tools/docker/dockerfiles/base.Dockerfile" \
             --tag "base" "oobi/build_tools/docker/context"

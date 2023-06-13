@@ -63,8 +63,14 @@ def parse_latencies(raw_output: bytes, expected_iterations: int) -> list[float]:
   stop_regex = re.compile(rb".+HloRunner: ExecuteOnDevices succeeded")
   stop_matches = re.findall(stop_regex, raw_output)
 
-  assert len(start_matches) == len(
-      stop_matches) == expected_iterations, "Unable to parse output."
+  if len(start_matches) != len(stop_matches):
+    print(f"Error: Unequal number of start and stop logs. {len(start_matches)} start logs != {len(stop_matches)} stop logs.")
+    return []
+
+  if len(start_matches) != expected_iterations:
+    print(f"Error: Number of iterations not equal to the number of expected iteration. Expected {expected_iterations}. Found {len(start_matches)}.")
+    return []
+
   latencies = [
       parse_log_elapsed_time(t1, t2)
       for t1, t2 in zip(start_matches, stop_matches)
