@@ -53,7 +53,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH_TEMPLATE = data_types_builder.ModelTemplate
     name=BATCH_NAME("RESNET50_FP32_TF_224X224X3XF32"),
     tags=[BATCH_TAG],
     meta_model=RESNET50_FP32_TF,
-    inputs=input_data_definitions.IMAGENET_APPLES_224X224X3XF32_BATCHES,
+    inputs=input_data_definitions.IMAGENET_APPLES_TF_224X224X3XF32_BATCHES,
     outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCHES,
     artifacts=[
         data_types_builder.ModelArtifactTemplate(

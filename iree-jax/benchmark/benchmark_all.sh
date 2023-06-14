@@ -62,12 +62,16 @@ fi
 rm "${OUTPUT_PATH}"
 echo "{\"trigger\": { \"timestamp\": \"$(date +'%s')\" }, \"benchmarks\": []}" > "${OUTPUT_PATH}"
 
+CACHE_DIR="${OOBI_CACHE_DIR:-/tmp/oobi/cache}"
+mkdir -p "${CACHE_DIR}"
+
 for benchmark_id in "${BENCHMARK_IDS[@]}"; do
   declare -a args=(
     --benchmark_id="${benchmark_id}"
     --device="${DEVICE}"
     --output_path="${OUTPUT_PATH}"
     --iterations="${ITERATIONS}"
+    --cache_dir="${CACHE_DIR}"
   )
 
   python "${TD}/benchmark_model.py" "${args[@]}"

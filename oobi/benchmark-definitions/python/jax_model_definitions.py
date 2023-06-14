@@ -3,7 +3,7 @@ import string
 
 import data_types
 import data_types_builder
-import input_data_definitions
+import jax_input_data_definitions
 import jax_output_data_definitions
 import unique_ids
 
@@ -53,7 +53,7 @@ RESNET50_FP32_JAX_3X224X224XF32_BATCH_TEMPLATE = data_types_builder.ModelTemplat
     name=BATCH_NAME("RESNET50_FP32_JAX_3X224X224XF32"),
     tags=[BATCH_TAG],
     meta_model=RESNET50_FP32_JAX,
-    inputs=input_data_definitions.IMAGENET_APPLES_224X224X3XF32_BATCHES,
+    inputs=jax_input_data_definitions.IMAGENET_APPLES_JAX_3X224X224XF32_BATCHES,
     outputs=jax_output_data_definitions.RESNET50_FP32_JAX_2048X7X7XF32_BATCHES,
     artifacts=[
         data_types_builder.ModelArtifactTemplate(
@@ -82,9 +82,8 @@ BERT_LARGE_FP32_JAX_384XI32_BATCH_TEMPALTE = data_types_builder.ModelTemplate(
     name=BATCH_NAME("BERT_LARGE_JAX_384XI32"),
     tags=[BATCH_TAG],
     meta_model=BERT_LARGE_FP32_JAX,
-    inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES,
-    outputs=jax_output_data_definitions.
-    BERT_LARGE_FP32_JAX_384X1024XF32_BATCHES,
+    inputs=jax_input_data_definitions.BERT_LARGE_JAX_SEQLEN384_I32_BATCHES,
+    outputs=jax_output_data_definitions.BERT_LARGE_FP32_JAX_384X1024XF32_BATCHES,
     artifacts=[
         data_types_builder.ModelArtifactTemplate(
             artifact_type=data_types.ModelArtifactType.MLIR_STABLEHLO,
@@ -112,7 +111,7 @@ T5_LARGE_FP32_JAX_512XI32_BATCH_TEMPLATE = data_types_builder.ModelTemplate(
     name=BATCH_NAME("T5_LARGE_FP32_JAX_512XI32"),
     tags=[BATCH_TAG],
     meta_model=T5_LARGE_FP32_JAX,
-    inputs=input_data_definitions.T5_LARGE_SEQLEN512_I32_BATCHES,
+    inputs=jax_input_data_definitions.T5_LARGE_JAX_SEQLEN512_I32_BATCHES,
     outputs=jax_output_data_definitions.T5_LARGE_FP32_JAX_512X1024XF32_BATCHES,
     artifacts=[
         data_types_builder.ModelArtifactTemplate(

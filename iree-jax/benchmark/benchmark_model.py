@@ -1,8 +1,12 @@
 import argparse
 import jax
+import jax.numpy as jnp
 import json
 import multiprocessing
+import numpy as np
+import os
 import pathlib
+import requests
 import statistics
 import sys
 import time
@@ -52,18 +56,42 @@ def dump_result(file_path: str, result: dict) -> None:
 def bytes_to_mb_str(bytes: Optional[int]) -> str:
   return "n/a" if bytes is None else f"{bytes / 1e6:.6f}"
 
+def retrieve_data(model_data: data_types.ModelData, cache_dir: str) -> tuple[Any, ...]:
+  data = ()
+  for url in model_data.source_url:
+    assert url.startswith("https://storage.googleapis.com/iree-model-artifacts/")
+    relative_path = url.removeprefix("https://storage.googleapis.com/iree-model-artifacts/")
+    local_path = cache_dir / relative_path
 
-def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
+    if not os.path.exists(local_path):
+      pathlib.Path(os.path.dirname(local_path)).mkdir(parents=True, exist_ok=True)
+      with requests.get(url, stream=True) as response:
+        with open(local_path, "wb") as f:
+          for chunk in response.iter_content(chunk_size=1024):
+            f.write(chunk)
+
+    array = np.load(local_path)
+    data = data + (array, )
+  return data
+
+def compare_results(a: np.array, b: np.array, atol=0.5):
+  is_equal = np.allclose(a, b, atol=atol)
+  if not is_equal:
+    max_diff = np.max(np.abs(b - a))
+    raise RuntimeError(f"Outputs do not match expected. Max diff: {max_diff}")
+
+def run_framework_benchmark(model_name: str, model_class: Any,
+                            input_data: tuple[np.array, ...],
+                            expected_outputs: tuple[np.array, ...],
                             warmup_iterations: int, benchmark_iterations: int,
                             backend: str, shared_dict) -> None:
   try:
     with jax.default_device(jax.devices(backend)[0]):
       model = model_class()
-      inputs = model.generate_inputs(batch_size)
 
       # Create jits.
       start = time.perf_counter()
-      jit_inputs = jax.device_put(inputs)
+      jit_inputs = jax.device_put(input_data)
       end = time.perf_counter()
       input_data_transfer_ms = 1000 * (end - start)
 
@@ -73,9 +101,11 @@ def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
       warmup_latencies = []
       for i in range(warmup_iterations):
         start = time.perf_counter()
-        jax.block_until_ready(jit_function(*jit_inputs))
+        outputs = jit_function(*jit_inputs)
+        outputs.block_until_ready()
         end = time.perf_counter()
         latency = 1000 * (end - start)
+        compare_results(outputs, expected_outputs[0])
         if i == 0:
           compile_time_s = latency / 1000
         warmup_latencies.append(latency)
@@ -84,9 +114,12 @@ def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
       latencies = []
       for i in range(benchmark_iterations):
         start = time.perf_counter()
-        jax.block_until_ready(jit_function(*jit_inputs))
+        outputs = jit_function(*jit_inputs)
+        outputs.block_until_ready()
         end = time.perf_counter()
+        compare_results(outputs, expected_outputs[0])
         latencies.append(1000 * (end - start))
+
 
       # Save results.
       result_dict = {
@@ -146,6 +179,10 @@ if __name__ == "__main__":
       help=
       "Whether to run the benchmark under the same process. Set this to true when profiling a single workload"
   )
+  argParser.add_argument("--cache_dir",
+                         required=True,
+                         type=pathlib.Path,
+                         help="Directory to download artifacts to.")
 
   args = argParser.parse_args()
 
@@ -155,13 +192,12 @@ if __name__ == "__main__":
       f"\n\n--- {model_name} {args.benchmark_id} -------------------------------------"
   )
 
-  batch_size = model_definition.input_batch_size
   benchmark_definition = {
       "benchmark_id": args.benchmark_id,
       "benchmark_name": model_definition.name,
       "framework": str(model_definition.meta_model.framework_type),
       "data_type": str(model_definition.meta_model.data_type),
-      "batch_size": batch_size,
+      "batch_size": model_definition.input_batch_size,
       "inputs": model_definition.inputs.tensor_dimensions,
       "outputs": model_definition.outputs.tensor_dimensions,
       "compiler": "xla",
@@ -169,18 +205,20 @@ if __name__ == "__main__":
       "tags": model_definition.meta_model.tags + model_definition.tags,
   }
 
+  inputs = retrieve_data(model_definition.inputs, args.cache_dir)
+  expected_outputs = retrieve_data(model_definition.outputs, args.cache_dir)
+
   framework_metrics = {}
   # Retrieve framework-level benchmarks.
   with multiprocessing.Manager() as manager:
     shared_dict = manager.dict()
 
     if args.run_in_process:
-      run_framework_benchmark(model_name, model_class, batch_size,
-                              args.warmup_iterations, args.iterations,
-                              args.device, shared_dict)
+      run_framework_benchmark(model_name, model_class, inputs, expected_outputs, args.warmup_iterations,
+                              args.iterations, args.device, shared_dict)
     else:
       p = multiprocessing.Process(target=run_framework_benchmark,
-                                  args=(model_name, model_class, batch_size,
+                                  args=(model_name, model_class, inputs, expected_outputs,
                                         args.warmup_iterations, args.iterations,
                                         args.device, shared_dict))
       p.start()

@@ -4,7 +4,7 @@ import data_types
 import data_types_builder
 import unique_ids
 
-PARENT_GCS_DIR = "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684283564"
+PARENT_GCS_DIR = "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.10_1684396752"
 
 # Constants and functions help build batch templates.
 BATCH_ID = lambda data_id: string.Template(data_id + "-batch${batch_size}")
