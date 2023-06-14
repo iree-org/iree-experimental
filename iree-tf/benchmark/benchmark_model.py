@@ -20,8 +20,7 @@ from models import resnet50, bert_large, t5_large
 
 # Add benchmark definitions to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent / "oobi" / "benchmark-definitions" / "python"))
-import tf_model_definitions, unique_ids
-from utils import execution_environment
+import tf_model_definitions, unique_ids, utils
 
 
 _HLO_DUMP_DIR = "/tmp/hlo_dump"
@@ -51,7 +50,7 @@ def dump_result(file_path: str, result: dict) -> None:
     dictObj = json.load(f)
 
   dictObj["execution_environment"] = {
-      "python_environment": execution_environment.get_python_environment_info()
+      "python_environment": utils.get_python_environment_info()
   }
   dictObj["benchmarks"].append(result)
 
