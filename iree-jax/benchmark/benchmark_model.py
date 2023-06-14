@@ -1,12 +1,9 @@
 import argparse
 import jax
-import jax.numpy as jnp
 import json
 import multiprocessing
 import numpy as np
-import os
 import pathlib
-import requests
 import statistics
 import sys
 import time
@@ -20,8 +17,7 @@ from models import bert_large, resnet50, t5_large
 
 # Add benchmark definitions to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent / "oobi" / "benchmark-definitions" / "python"))
-import data_types, jax_model_definitions, unique_ids
-from utils import execution_environment
+import data_types, jax_model_definitions, unique_ids, utils
 
 def benchmark_lookup(unique_id: str):
   if unique_id not in jax_model_definitions.JAX_MODELS_DICT:
@@ -45,40 +41,15 @@ def dump_result(file_path: str, result: dict) -> None:
     dictObj = json.load(f)
 
   dictObj["execution_environment"] = {
-      "python_environment": execution_environment.get_python_environment_info()
+      "python_environment": utils.get_python_environment_info()
   }
   dictObj["benchmarks"].append(result)
 
   with open(file_path, "w") as f:
     json.dump(dictObj, f)
 
-
 def bytes_to_mb_str(bytes: Optional[int]) -> str:
   return "n/a" if bytes is None else f"{bytes / 1e6:.6f}"
-
-def retrieve_data(model_data: data_types.ModelData, cache_dir: str) -> tuple[Any, ...]:
-  data = ()
-  for url in model_data.source_url:
-    assert url.startswith("https://storage.googleapis.com/iree-model-artifacts/")
-    relative_path = url.removeprefix("https://storage.googleapis.com/iree-model-artifacts/")
-    local_path = cache_dir / relative_path
-
-    if not os.path.exists(local_path):
-      pathlib.Path(os.path.dirname(local_path)).mkdir(parents=True, exist_ok=True)
-      with requests.get(url, stream=True) as response:
-        with open(local_path, "wb") as f:
-          for chunk in response.iter_content(chunk_size=1024):
-            f.write(chunk)
-
-    array = np.load(local_path)
-    data = data + (array, )
-  return data
-
-def compare_results(a: np.array, b: np.array, atol=0.5):
-  is_equal = np.allclose(a, b, atol=atol)
-  if not is_equal:
-    max_diff = np.max(np.abs(b - a))
-    raise RuntimeError(f"Outputs do not match expected. Max diff: {max_diff}")
 
 def run_framework_benchmark(model_name: str, model_class: Any,
                             input_data: tuple[np.array, ...],
@@ -105,7 +76,7 @@ def run_framework_benchmark(model_name: str, model_class: Any,
         outputs.block_until_ready()
         end = time.perf_counter()
         latency = 1000 * (end - start)
-        compare_results(outputs, expected_outputs[0])
+        utils.compare_results(outputs, expected_outputs[0])
         if i == 0:
           compile_time_s = latency / 1000
         warmup_latencies.append(latency)
@@ -117,7 +88,7 @@ def run_framework_benchmark(model_name: str, model_class: Any,
         outputs = jit_function(*jit_inputs)
         outputs.block_until_ready()
         end = time.perf_counter()
-        compare_results(outputs, expected_outputs[0])
+        utils.compare_results(outputs, expected_outputs[0])
         latencies.append(1000 * (end - start))
 
 
@@ -205,8 +176,8 @@ if __name__ == "__main__":
       "tags": model_definition.meta_model.tags + model_definition.tags,
   }
 
-  inputs = retrieve_data(model_definition.inputs, args.cache_dir)
-  expected_outputs = retrieve_data(model_definition.outputs, args.cache_dir)
+  inputs = utils.retrieve_model_data(model_definition.inputs, args.cache_dir)
+  expected_outputs = utils.retrieve_model_data(model_definition.outputs, args.cache_dir)
 
   framework_metrics = {}
   # Retrieve framework-level benchmarks.

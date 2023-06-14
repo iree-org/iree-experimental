@@ -20,8 +20,7 @@ sys.path.insert(
     str(
         pathlib.Path(__file__).parent.parent.parent / "oobi" /
         "benchmark-definitions" / "python"))
-import data_types, pytorch_model_definitions, unique_ids
-from utils import execution_environment
+import data_types, pytorch_model_definitions, unique_ids, utils
 
 
 def benchmark_lookup(unique_id: str):
@@ -44,7 +43,7 @@ def dump_result(file_path: str, result: dict) -> None:
     dictObj = json.load(f)
 
   dictObj["execution_environment"] = {
-      "python_environment": execution_environment.get_python_environment_info()
+      "python_environment": utils.get_python_environment_info()
   }
   dictObj["benchmarks"].append(result)
 

@@ -13,16 +13,7 @@ sys.path.insert(
     str(
         pathlib.Path(__file__).parent.parent.parent / "oobi" /
         "benchmark-definitions" / "python"))
-import data_types, jax_model_definitions, model_dictionary, tf_model_definitions, unique_ids
-
-
-def download_file(source_url: str, save_path: str):
-  pathlib.Path(os.path.dirname(save_path)).mkdir(parents=True, exist_ok=True)
-  with requests.get(source_url, stream=True) as response:
-    with open(save_path, "wb") as f:
-      for chunk in response.iter_content(chunk_size=1024):
-        f.write(chunk)
-  print(f"Downloaded {source_url} to {save_path}")
+import data_types, jax_model_definitions, model_dictionary, tf_model_definitions, unique_ids, utils
 
 
 if __name__ == "__main__":
@@ -61,7 +52,7 @@ if __name__ == "__main__":
 
   with ProcessPoolExecutor(8) as exe:
     futures = [
-        exe.submit(download_file, source_url, local_path)
+        exe.submit(utils.download_file, source_url, local_path)
         for source_url, local_path in artifacts
     ]
     wait(futures)
