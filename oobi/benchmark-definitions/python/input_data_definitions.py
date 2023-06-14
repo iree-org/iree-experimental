@@ -12,9 +12,9 @@ BATCH_MODEL_ID = lambda model_id: string.Template(model_id +
                                                   "-batch${batch_size}")
 BATCH_TENSOR_DIMS = lambda dims: string.Template("${batch_size}x" + dims)
 
-IMAGENET_APPLES_224X224X3XF32_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
-    id=BATCH_ID(unique_ids.INPUT_DATA_IMAGENET_APPLES_224X224X3XF32),
-    name=BATCH_NAME("IMAGENET_APPLES_224X224X3XF32"),
+IMAGENET_APPLES_TF_224X224X3XF32_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
+    id=BATCH_ID(unique_ids.INPUT_DATA_IMAGENET_APPLES_TF_224X224X3XF32),
+    name=BATCH_NAME("IMAGENET_APPLES_TF_224X224X3XF32"),
     tags=["input-data", "imagenet", BATCH_TAG],
     data_format=data_types.DataFormat.NUMPY_NPY,
     model_id=BATCH_MODEL_ID(unique_ids.MODEL_RESNET50_FP32_TF_224X224X3XF32),
@@ -27,13 +27,13 @@ IMAGENET_APPLES_224X224X3XF32_BATCH_TEMPLATE = data_types_builder.ModelDataTempl
             "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681767794/RESNET50/batch_${batch_size}/input_0.npy"
         )
     ])
-IMAGENET_APPLES_224X224X3XF32_BATCHES = data_types_builder.build_batch_model_data(
-    template=IMAGENET_APPLES_224X224X3XF32_BATCH_TEMPLATE,
+IMAGENET_APPLES_TF_224X224X3XF32_BATCHES = data_types_builder.build_batch_model_data(
+    template=IMAGENET_APPLES_TF_224X224X3XF32_BATCH_TEMPLATE,
     batch_sizes=[1, 8, 64, 128, 256, 2048])
 
-IMAGENET_APPLES_3X224X224XF32_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
-    id=BATCH_ID(unique_ids.INPUT_DATA_IMAGENET_APPLES_3X224X224XF32),
-    name=BATCH_NAME("IMAGENET_APPLES_3X224X224XF32"),
+IMAGENET_APPLES_3X224X224XF32_PT_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
+    id=BATCH_ID(unique_ids.INPUT_DATA_IMAGENET_APPLES_PT_3X224X224XF32),
+    name=BATCH_NAME("IMAGENET_APPLES_PT_3X224X224XF32"),
     tags=["input-data", "imagenet", BATCH_TAG],
     data_format=data_types.DataFormat.NUMPY_NPY,
     model_id=BATCH_MODEL_ID(unique_ids.MODEL_RESNET50_FP32_PT_3X224X224XF32),
@@ -46,8 +46,8 @@ IMAGENET_APPLES_3X224X224XF32_BATCH_TEMPLATE = data_types_builder.ModelDataTempl
             "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230401.795_1680469670/RESNET50/batch_${batch_size}/input_0.npy"
         )
     ])
-IMAGENET_APPLES_3X224X224XF32_BATCHES = data_types_builder.build_batch_model_data(
-    template=IMAGENET_APPLES_3X224X224XF32_BATCH_TEMPLATE,
+IMAGENET_APPLES_PT_3X224X224XF32_BATCHES = data_types_builder.build_batch_model_data(
+    template=IMAGENET_APPLES_3X224X224XF32_PT_BATCH_TEMPLATE,
     batch_sizes=[1, 8, 64, 128, 256, 2048])
 
 IMAGENET_APPLES_3X224X224XF16_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(

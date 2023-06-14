@@ -63,7 +63,7 @@ RESNET50_FP32_PT_3X224X224XF32_BATCH_TEMPLATE = data_types_builder.ModelTemplate
     name=BATCH_NAME("RESNET50_FP32_PT_3X224X224XF32"),
     tags=[BATCH_TAG],
     meta_model=RESNET50_FP32_PT,
-    inputs=input_data_definitions.IMAGENET_APPLES_3X224X224XF32_BATCHES,
+    inputs=input_data_definitions.IMAGENET_APPLES_PT_3X224X224XF32_BATCHES,
     outputs=pytorch_output_data_definitions.RESNET50_FP32_PT_2048X7X7XF32_BATCHES,
     artifacts=[
         data_types.ModelArtifact(
