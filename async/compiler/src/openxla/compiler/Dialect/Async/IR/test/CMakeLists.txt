@@ -10,7 +10,8 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "ops.mlir"
+    "async_ops.mlir"
+    "async_verify.mlir"
   TOOLS
     FileCheck
     iree-opt

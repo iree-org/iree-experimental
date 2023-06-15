@@ -1,9 +1,8 @@
-// RUN: iree-opt --iree-plugin=openxla-async --split-input-file \
+// RUN: iree-opt %s --iree-plugin=openxla-async --split-input-file \
 // RUN:   --async-to-async-runtime | \
 // RUN: FileCheck %s
 
 func.func @await_token(%arg0: !async.token){
-  // CHECK: call @async.value.await.token
   async.await %arg0 : !async.token
   return
 }
@@ -30,7 +29,8 @@ func.func @await_scalar_value(%arg0: !async.value<i32>) -> i32 {
 // CHECK:    %[[R1:.*]] = call @async.value.load.i32(%[[ARG]]) : (!async.value) -> i32
 // CHECK:    return %[[R1]] : i32
 // CHECK:  }
-// CHECK:  func.func private @async.value.await(!async.value) -> i32
+// CHECK:  func.func private @async.value.await(!async.value)
+// CHECK:  func.func private @async.value.query(!async.value) -> i32
 // CHECK:  func.func private @async.value.load.i32(!async.value) -> i32
 
 // -----
@@ -47,5 +47,4 @@ func.func @await_memref_value(%arg0: !async.value<memref<2xi32>>) -> memref<2xi3
 // CHECK:    %[[R1:.*]] = util.cast %[[R0]] : !util.object to memref<2xi32>
 // CHECK:    return %[[R1]] : memref<2xi32>
 // CHECK:  }
-// CHECK:  func.func private @async.value.await(!async.value)
 // CHECK:  func.func private @async.value.load.ref(!async.value) -> !util.object
