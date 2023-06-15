@@ -6,12 +6,14 @@
 
 cmake_minimum_required(VERSION 3.21...3.24)
 
-project(ASYNC)
+project(OPENXLA_ASYNC)
+
+include(CMakeDependentOption)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(OPENXLA_ASYNC_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -22,36 +24,94 @@ endif()
 
 set(IREE_CXX_STANDARD ${CMAKE_CXX_STANDARD})
 
-# Customize defaults.
-option(IREE_BUILD_COMPILER "Disable compiler for runtime-library build" ON)
-option(IREE_BUILD_SAMPLES "Disable samples for runtime-library build" OFF)
-option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables shared libraries in the compiler by default" ON)
+# Enable testing before any subdirectories are added.
+enable_testing()
+
+#-------------------------------------------------------------------------------
+# Project settings (for standalone builds)
+#-------------------------------------------------------------------------------
+
+option(OPENXLA_ASYNC_BUILD_COMPILER "Build ASYNC compiler components" ON)
+
+# Runtime components.
+option(OPENXLA_ASYNC_BUILD_RUNTIME "Builds runtime components (can be individually enabled)" ON)
+
+#-------------------------------------------------------------------------------
+# Customize IREE compiler defaults.
+#-------------------------------------------------------------------------------
+
+cmake_dependent_option(IREE_BUILD_COMPILER "Builds the IREE compiler" ON ${OPENXLA_ASYNC_BUILD_COMPILER} OFF)
+if(OPENXLA_NVGPU_BUILD_COMPILER)
+  option(IREE_BUILD_COMPILER "Enable IREE compiler build" ON)
+  option(IREE_BUILD_SAMPLES "Disable IREE samples build" OFF)
+  option(IREE_TARGET_BACKEND_LLVM_CPU "Enables the 'llvm-cpu' target backend" ON)
+  # Since the standalone build is primarily targeted for development mode,
+  # enabled shared library builds, which enable better plugin flows
+  # (but are not how we typically package for deployment).
+  option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables shared libraries in the compiler by default" ON)
+endif()
+
+#-------------------------------------------------------------------------------
+# Customize IREE runtime defaults.
+#-------------------------------------------------------------------------------
+
+cmake_dependent_option(IREE_BUILD_RUNTIME "Builds IREE runtime components" ON ${OPENXLA_ASYNC_BUILD_RUNTIME} OFF)
+
+#-------------------------------------------------------------------------------
+# Add OpenXLA Async compiler plugin to IREE compiler tools.
+#-------------------------------------------------------------------------------
 
 set(IREE_COMPILER_PLUGIN_PATHS "${CMAKE_CURRENT_SOURCE_DIR}" CACHE STRING "async plugins")
-add_subdirectory("${IREE_ROOT_DIR}" "iree_core")
 
-find_package(Protobuf REQUIRED)
+add_subdirectory("${IREE_ROOT_DIR}" "iree_core")
 
 # Handle various global definitions that need to be set at the global
 # toolchain level.
 iree_setup_toolchain()
 
 #-------------------------------------------------------------------------------
+# Absl/Tsl project dependency
+#-------------------------------------------------------------------------------
+if(OPENXLA_ASYNC_BUILD_RUNTIME)
+
+message(STATUS "Fetching absl/tsl repo (this may take a few minutes)...")
+
+include(FetchContent)
+
+FetchContent_Declare(
+  absl
+  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+  GIT_TAG 20230125.3
+  GIT_SUBMODULES_RECURSE OFF
+  GIT_SHALLOW OFF
+  GIT_PROGRESS ON
+  USES_TERMINAL_DOWNLOAD ON
+)
+
+FetchContent_Declare(
+  tsl
+  URL https://github.com/google/tsl/archive/refs/heads/main.zip
+)
+
+FetchContent_MakeAvailable(absl)
+FetchContent_MakeAvailable(tsl)
+
+endif()
+
+#-------------------------------------------------------------------------------
 # Async Runtime.
 #
+# Integration of libraries with IREE runtime via custom VM modules
 #-------------------------------------------------------------------------------
 
-add_subdirectory(runtime)
-
-#-------------------------------------------------------------------------------
-# Absl dependencies
-#-------------------------------------------------------------------------------
-
-add_subdirectory(third_party/abseil-cpp)
+if(OPENXLA_ASYNC_BUILD_RUNTIME)
+  add_subdirectory(runtime)
+endif()
 
 #-------------------------------------------------------------------------------
 # Google tsl dependencies
 #-------------------------------------------------------------------------------
 
-add_subdirectory(build_tools/third_party/tsl EXCLUDE_FROM_ALL)
-
+if(OPENXLA_ASYNC_BUILD_RUNTIME)
+  add_subdirectory(build_tools/third_party/tsl EXCLUDE_FROM_ALL)
+endif()

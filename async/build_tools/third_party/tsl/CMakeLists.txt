@@ -4,8 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set(TSL_ROOT "${OPENXLA_ASYNC_ROOT_DIR}/third_party/tsl/")
-set(TSL_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/../../")
+set(TSL_ROOT "${CMAKE_CURRENT_BINARY_DIR}/../../../_deps/tsl-src/")
+set(TSL_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/../../../_deps/tsl-build/")
 
 external_cc_library(
   PACKAGE
@@ -31,7 +31,7 @@ external_cc_library(
   NAME
     concurrent_vector
   ROOT
-    ${TSL_ROOT}
+    ${TSL_ROOT} 
   INCLUDES
     "${TSL_ROOT}/"
     "${TSL_BINARY_DIR}/"
