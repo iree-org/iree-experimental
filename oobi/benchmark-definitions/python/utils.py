@@ -23,6 +23,7 @@ def get_python_environment_info():
       package_dict[split[0]] = split[1]
   return package_dict
 
+
 def download_file(source_url: str, save_path: str):
   """ Downloads `source_url` to `saved_path`."""
   save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -32,8 +33,12 @@ def download_file(source_url: str, save_path: str):
         f.write(chunk)
   print(f"Downloaded {source_url} to {save_path}")
 
-def retrieve_model_data(model_data: data_types.ModelData, cache_dir: str,
-                        url_prefix: str = "https://storage.googleapis.com/iree-model-artifacts/") -> tuple[Any, ...]:
+
+def retrieve_model_data(
+    model_data: data_types.ModelData,
+    cache_dir: str,
+    url_prefix: str = "https://storage.googleapis.com/iree-model-artifacts/"
+) -> tuple[Any, ...]:
   """ Downloads all artifacts listed in `model_data` into `cache_dir`.
 
   Replicates relative path of source URL into `cache_dir`.
@@ -48,8 +53,9 @@ def retrieve_model_data(model_data: data_types.ModelData, cache_dir: str,
       download_file(url, local_path)
 
     array = np.load(local_path)
-    data = data + (array, )
+    data = data + (array,)
   return data
+
 
 def compare_results(a: np.array, b: np.array, atol=0.5):
   is_equal = np.allclose(a, b, atol=atol)

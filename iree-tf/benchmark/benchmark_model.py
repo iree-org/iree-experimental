@@ -1,13 +1,11 @@
 import argparse
-import glob
 import json
 import multiprocessing
+import numpy as np
 import os
 import pathlib
-import re
 import shutil
 import statistics
-import subprocess
 import sys
 import tensorflow as tf
 import time
@@ -63,37 +61,35 @@ def bytes_to_mb(bytes: Optional[int]) -> Optional[float]:
 
 
 def run_framework_benchmark(model_name: str, model_class: type[tf.Module],
-                            batch_size: int, warmup_iterations: int,
-                            benchmark_iterations: int, tf_device: str,
-                            hlo_dump_dir: str, dump_hlo: bool, shared_dict) -> None:
+                            input_data: tuple[np.array, ...],
+                            expected_outputs: tuple[np.array, ...],
+                            warmup_iterations: int, benchmark_iterations: int,
+                            tf_device: str, shared_dict) -> None:
   try:
     with tf.device(tf_device):
-      if dump_hlo:
-        # Configure to dump hlo.
-        os.environ["XLA_FLAGS"] = f"--xla_dump_to={hlo_dump_dir}"
-
       if tf_device == _TF_GPU_DEVICE:
         tf.config.experimental.reset_memory_stats(tf_device)
 
       model = model_class()
-      inputs = model.generate_inputs(batch_size)
 
       # Run warmup.
       warmup_latencies = []
       for i in range(warmup_iterations):
         start = time.perf_counter()
-        model.forward(*inputs)
+        outputs = model.forward(*input_data)
         tf.test.experimental.sync_devices()
         latency = 1000 * (time.perf_counter() - start)
+        utils.compare_results(outputs, expected_outputs[0])
         warmup_latencies.append(latency)
 
       # Run benchmark.
       latencies = []
       for i in range(benchmark_iterations):
         start = time.perf_counter()
-        model.forward(*inputs)
+        outputs = model.forward(*input_data)
         tf.test.experimental.sync_devices()
         latency = 1000 * (time.perf_counter() - start)
+        utils.compare_results(outputs, expected_outputs[0])
         latencies.append(latency)
 
       # Retrieve memory stats.
@@ -131,49 +127,6 @@ def run_framework_benchmark(model_name: str, model_class: type[tf.Module],
     print(f"Failed to benchmark model {model_name}. Exception: {e}")
 
 
-def run_compiler_benchmark(hlo_benchmark_tool_path: str, hlo_dir: str,
-                           benchmark_iterations: int, device: str,
-                           shared_dict) -> None:
-  hlo_file = glob.glob(f"{hlo_dir}/*.before_optimizations.txt")
-  assert (len(hlo_file) == 1)
-
-  cmd = [
-      hlo_benchmark_tool_path,
-      "--input_format=hlo",
-      f"--platform={device}",
-      "--reference_platform=",
-      "--logtostderr",
-      f"--input_module={hlo_file[0]}",
-      f"--iterations={benchmark_iterations}",
-  ]
-  result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-  result_text = result.stdout.decode("utf-8")
-
-  regex = re.compile(r"... compiled and ran in (.*)s.")
-  matches = re.findall(regex, result_text)
-  # Take the first iteration compile-time latency. Profiles show that this is
-  # where tuning and other initialization occurs. Subsequent calls to compile
-  # in the same process will reuse these results.
-  compile_time_latency = float(matches[0]) if matches else None
-
-  regex = re.compile(r"execution time for runner [A-Za-z]*: (.*)s.")
-  matches = re.findall(regex, result_text)
-  assert len(matches) == benchmark_iterations, (
-      f"Expected to find {benchmark_iterations} latencies but found "
-      f"{len(matches)} instead:\n{result_text}")
-  latencies = [float(match) * 1000 for match in matches]
-
-  shared_dict.update({
-      "compile_time_s": compile_time_latency,
-      "min_latency_ms": min(latencies, default=None),
-      "max_latency_ms": max(latencies, default=None),
-      "mean_latency_ms": statistics.mean(latencies) if latencies else None,
-      "median_latency_ms": statistics.median(latencies) if latencies else None,
-      "stddev_latency_ms": statistics.stdev(latencies) if latencies else None,
-      "benchmark_iterations": benchmark_iterations,
-  })
-
-
 if __name__ == "__main__":
   argParser = argparse.ArgumentParser()
   argParser.add_argument(
@@ -200,18 +153,14 @@ if __name__ == "__main__":
       "--device",
       default="gpu",
       help="The device to run on. Currently `cpu` and `gpu` are supported.")
-  argParser.add_argument("--hlo_benchmark_path",
-                         default=None,
-                         help="The path to `run_hlo_module`.")
-  argParser.add_argument(
-      "--hlo_iterations",
-      type=int,
-      default=100,
-      help="The number of iterations to run compiler-level benchmarks.")
   argParser.add_argument(
       "--run_in_process",
       action="store_true",
       help="Whether to run the benchmark under the same process. Set this to true when profiling a single workload")
+  argParser.add_argument("--cache_dir",
+                         required=True,
+                         type=pathlib.Path,
+                         help="Directory to download artifacts to.")
 
   args = argParser.parse_args()
 
@@ -239,52 +188,35 @@ if __name__ == "__main__":
       "tags": model_definition.meta_model.tags + model_definition.tags,
   }
 
+  inputs = utils.retrieve_model_data(model_definition.inputs, args.cache_dir)
+  expected_outputs = utils.retrieve_model_data(model_definition.outputs,
+                                               args.cache_dir)
+
   framework_metrics = {}
-  # Retrieve framework-level benchmarks.
   tf_device = _TF_GPU_DEVICE if args.device == "gpu" else _TF_CPU_DEVICE
-  dump_hlo = False if args.hlo_benchmark_path is None else True
+
   with multiprocessing.Manager() as manager:
     shared_dict = manager.dict()
 
     if args.run_in_process:
-      run_framework_benchmark(model_name, model_class, batch_size, args.warmup_iterations,
-                              args.iterations, tf_device, _HLO_DUMP_DIR, dump_hlo,
-                              shared_dict)
+      run_framework_benchmark(model_name, model_class, inputs, expected_outputs,
+                              args.warmup_iterations, args.iterations,
+                              tf_device, shared_dict)
     else:
       p = multiprocessing.Process(target=run_framework_benchmark,
-                                  args=(model_name, model_class, batch_size,
+                                  args=(model_name, model_class, inputs,
+                                        expected_outputs,
                                         args.warmup_iterations, args.iterations,
-                                        tf_device, _HLO_DUMP_DIR, dump_hlo,
-                                        shared_dict))
+                                        tf_device, shared_dict))
       p.start()
       p.join()
 
     framework_metrics.update(shared_dict)
 
-  # Retrieve compiler-level benchmarks.
-  compiler_metrics = {}
-  if args.hlo_benchmark_path is not None:
-    with multiprocessing.Manager() as manager:
-      shared_dict = manager.dict()
-
-      if args.run_in_process:
-        run_compiler_benchmark(args.hlo_benchmark_path, _HLO_DUMP_DIR, args.hlo_iterations,
-                              "cuda" if args.device == "gpu" else "cpu", shared_dict)
-      else:
-        p = multiprocessing.Process(
-            target=run_compiler_benchmark,
-            args=(args.hlo_benchmark_path, _HLO_DUMP_DIR, args.hlo_iterations,
-                  "cuda" if args.device == "gpu" else "cpu", shared_dict))
-        p.start()
-        p.join()
-
-      compiler_metrics.update(shared_dict)
-
   result = {
       "definition": benchmark_definition,
       "metrics": {
           "framework_level": framework_metrics,
-          "compiler_level": compiler_metrics,
       },
   }
   print(json.dumps(result, indent=2))

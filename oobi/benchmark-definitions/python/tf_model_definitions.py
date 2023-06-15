@@ -3,7 +3,7 @@ import string
 
 import data_types
 import data_types_builder
-import input_data_definitions
+import tf_input_data_definitions
 import tf_output_data_definitions
 import unique_ids
 
@@ -53,7 +53,7 @@ RESNET50_FP32_TF_224X224X3XF32_BATCH_TEMPLATE = data_types_builder.ModelTemplate
     name=BATCH_NAME("RESNET50_FP32_TF_224X224X3XF32"),
     tags=[BATCH_TAG],
     meta_model=RESNET50_FP32_TF,
-    inputs=input_data_definitions.IMAGENET_APPLES_TF_224X224X3XF32_BATCHES,
+    inputs=tf_input_data_definitions.IMAGENET_APPLES_TF_224X224X3XF32_BATCHES,
     outputs=tf_output_data_definitions.RESNET50_FP32_TF_1000XF32_BATCHES,
     artifacts=[
         data_types_builder.ModelArtifactTemplate(
@@ -88,7 +88,7 @@ BERT_LARGE_FP32_TF_384XI32_BATCH_TEMPLATE = data_types_builder.ModelTemplate(
     name=BATCH_NAME("BERT_LARGE_FP32_TF_384XI32"),
     tags=[BATCH_TAG],
     meta_model=BERT_LARGE_FP32_TF,
-    inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES,
+    inputs=tf_input_data_definitions.BERT_LARGE_TF_SEQLEN384_I32_BATCHES,
     outputs=tf_output_data_definitions.BERT_LARGE_FP32_TF_384X1024XF32_BATCHES,
     artifacts=[
         data_types_builder.ModelArtifactTemplate(
@@ -123,7 +123,7 @@ T5_LARGE_FP32_TF_512XI32_BATCH_TEMPLATE = data_types_builder.ModelTemplate(
     name=BATCH_NAME("T5_LARGE_FP32_TF_512XI32"),
     tags=[BATCH_TAG],
     meta_model=T5_LARGE_FP32_TF,
-    inputs=input_data_definitions.T5_LARGE_SEQLEN512_I32_BATCHES,
+    inputs=tf_input_data_definitions.T5_LARGE_TF_SEQLEN512_I32_BATCHES,
     outputs=tf_output_data_definitions.T5_LARGE_FP32_TF_512X1024XF32_BATCHES,
     artifacts=[
         data_types_builder.ModelArtifactTemplate(
