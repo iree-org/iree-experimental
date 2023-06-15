@@ -82,7 +82,10 @@ def run(problem_sizes, td_configurations, argparse, n_iters, check_results=False
 
       if argparse.dump_full_tensor:
         torch.set_printoptions(threshold=10_000)
+        print(f"lhs: {lhs_torch}")
+        print(f"rhs: {rhs_torch}")
         print(f"torch_result: {torch_result}")
+        print(f"td_result_0: {td_result_0.cuda()}")
         print(f"torch - baseline_result_0: {torch_result - baseline_result_0.cuda()}")
         print(f"torch - td_result_0: {torch_result - td_result_0.cuda()}")
 

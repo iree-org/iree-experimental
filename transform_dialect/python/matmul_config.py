@@ -89,6 +89,8 @@ def make_iree_td_options(config, td_repro=False, benchmark=False):
     f'--iree-flow-enable-pad-handling',
     f'--iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy'
   ]
+  if 'wmma' in config:
+    res.append(f"--td-matmul-strategy-use-wmma={config['wmma']}")
   return append_td_repro_options(res, td_repro)
 
 def append_td_graph_script(l, filename=None):

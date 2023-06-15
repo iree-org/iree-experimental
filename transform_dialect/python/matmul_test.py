@@ -55,6 +55,15 @@ import matmul_runner as runner
 import td_argparse
 args = td_argparse.parse_args()
 
+# Minimal reproducer for an issue related to lowering with cp.async zfill for vector sizes > 1.
+# This is maximally reduced by using async copies and fma operations (i.e. 'mma': "0", 'wmma': '0').
+problem_sizes_bug_repro = [
+  [2, 1, 7],
+]
+td_configurations_bug_repro = [
+  {'blk': '1,1,1', 'tds': '32,1,1', 'wps': '1,1,1', 'p': 1, 'r': 2, 'acp': "1", 'mma': "0", 'wmma': '0'},
+]
+
 n_iters = 5
 check_results = True
-runner.run(problem_sizes, td_configurations, args, n_iters, check_results)
+runner.run(problem_sizes_bug_repro, td_configurations_bug_repro, args, n_iters, check_results)
