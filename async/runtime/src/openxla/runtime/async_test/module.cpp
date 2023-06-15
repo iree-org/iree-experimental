@@ -7,18 +7,18 @@
 #include "openxla/runtime/async_test/module.h"
 
 #include <chrono>
-#include <iostream>
 #include <thread>
 #include <vector>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/threading.h"
 #include "iree/base/status.h"
+#include "iree/hal/api.h"
 #include "iree/vm/dynamic/api.h"
 #include "iree/vm/native_module_cc.h"
 #include "iree/vm/ref_cc.h"
-#include "openxla/runtime/async/api.h"
-#include "openxla/runtime/async/async_runtime_cc.h"
-#include "tensorflow/tsl/concurrency/async_value_ref.h"
+#include "openxla/runtime/async/async_runtime_util.h"
+#include "tsl/concurrency/async_value_ref.h"
 
 namespace openxla::runtime::asynctest {
 
@@ -37,6 +37,8 @@ class AsyncTestModuleState {
   StatusOr<vm::ref<iree_async_value_t>> ReturnDelayedToken();
   StatusOr<vm::ref<iree_async_value_t>> ReturnAvailableScalar();
   StatusOr<vm::ref<iree_async_value_t>> ReturnDelayedScalar();
+  StatusOr<vm::ref<iree_async_value_t>> ReturnDelayedMemref();
+  StatusOr<vm::ref<iree_async_value_t>> ReturnTokenError();
 
  private:
   std::vector<iree_thread_t *> threads_;
@@ -54,30 +56,8 @@ StatusOr<vm::ref<iree_async_value_t>>
 AsyncTestModuleState::ReturnAvailableScalar() {
   tsl::AsyncValueRef<int32_t> value =
       tsl::MakeAvailableAsyncValueRef<int32_t>(42);
-  return openxla::runtime::async::AsValue<int32_t>(value);
-}
-
-StatusOr<vm::ref<iree_async_value_t>>
-AsyncTestModuleState::ReturnDelayedScalar() {
-  tsl::AsyncValueRef<int32_t> value =
-      tsl::MakeConstructedAsyncValueRef<int32_t>(42);
-
-  iree_thread_entry_t entry_fn = +[](void *arg) -> int {
-    IREE_TRACE_SCOPE();
-    auto *ptr = reinterpret_cast<tsl::AsyncValue *>(arg);
-    std::this_thread::sleep_for(std::chrono::milliseconds(150));
-    ptr->SetStateConcrete();
-    return 0;
-  };
-  iree_thread_t *thread = nullptr;
-  // Default parameters:
-  iree_thread_create_params_t params;
-  memset(&params, 0, sizeof(params));
-  iree_thread_create(entry_fn, value.GetAsyncValue(), params,
-                     iree_allocator_system(), &thread);
-  threads_.push_back(thread);
-
-  return openxla::runtime::async::AsValue<int32_t>(value);
+  return openxla::runtime::async::AsScalarValue<int32_t>(
+      value, iree_allocator_system());
 }
 
 StatusOr<vm::ref<iree_async_value_t>>
@@ -100,7 +80,90 @@ AsyncTestModuleState::ReturnDelayedToken() {
                      iree_allocator_system(), &thread);
   threads_.push_back(thread);
 
-  return openxla::runtime::async::AsValue<tsl::Chain>(value);
+  return openxla::runtime::async::AsTokenValue(value, iree_allocator_system());
+}
+
+StatusOr<vm::ref<iree_async_value_t>>
+AsyncTestModuleState::ReturnDelayedScalar() {
+  tsl::AsyncValueRef<int32_t> value =
+      tsl::MakeConstructedAsyncValueRef<int32_t>(42);
+
+  iree_thread_entry_t entry_fn = +[](void *arg) -> int {
+    IREE_TRACE_SCOPE();
+    auto *ptr = reinterpret_cast<tsl::AsyncValue *>(arg);
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    ptr->SetStateConcrete();
+    return 0;
+  };
+  iree_thread_t *thread = nullptr;
+  // Default parameters:
+  iree_thread_create_params_t params;
+  memset(&params, 0, sizeof(params));
+  iree_thread_create(entry_fn, value.GetAsyncValue(), params,
+                     iree_allocator_system(), &thread);
+  threads_.push_back(thread);
+
+  return openxla::runtime::async::AsScalarValue<int32_t>(
+      value, iree_allocator_system());
+}
+
+StatusOr<vm::ref<iree_async_value_t>>
+AsyncTestModuleState::ReturnDelayedMemref() {
+  iree_hal_buffer_view_t *input_view;
+  const std::string buffer_value = "2xf32=1.0 2.0";
+  iree_hal_allocator_t *device_allocator;
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_create_heap(
+      iree_make_cstring_view("host_local"), iree_allocator_system(),
+      iree_allocator_system(), &device_allocator));
+
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
+      iree_string_view_t{buffer_value.data(), buffer_value.size()},
+      device_allocator, &input_view));
+
+  iree_vm_ref_t input_view_ref = iree_hal_buffer_view_retain_ref(input_view);
+
+  tsl::AsyncValueRef<iree_vm_ref_t> value =
+      tsl::MakeConstructedAsyncValueRef<iree_vm_ref_t>(
+          std::move(input_view_ref));
+
+  iree_thread_entry_t entry_fn = +[](void *arg) -> int {
+    IREE_TRACE_SCOPE();
+    auto *ptr = reinterpret_cast<tsl::AsyncValue *>(arg);
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    ptr->SetStateConcrete();
+    return 0;
+  };
+  iree_thread_t *thread = nullptr;
+  // Default parameters:
+  iree_thread_create_params_t params;
+  memset(&params, 0, sizeof(params));
+  iree_thread_create(entry_fn, value.GetAsyncValue(), params,
+                     iree_allocator_system(), &thread);
+  threads_.push_back(thread);
+
+  return openxla::runtime::async::AsRefValue(value, iree_allocator_system());
+}
+
+StatusOr<vm::ref<iree_async_value_t>> AsyncTestModuleState::ReturnTokenError() {
+  tsl::AsyncValueRef<tsl::Chain> value =
+      tsl::MakeConstructedAsyncValueRef<tsl::Chain>();
+
+  iree_thread_entry_t entry_fn = +[](void *arg) -> int {
+    IREE_TRACE_SCOPE();
+    auto *ptr = reinterpret_cast<tsl::AsyncValue *>(arg);
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    ptr->SetError(absl::InternalError("async runtime error"));
+    return 0;
+  };
+  iree_thread_t *thread = nullptr;
+  // Default parameters:
+  iree_thread_create_params_t params;
+  memset(&params, 0, sizeof(params));
+  iree_thread_create(entry_fn, value.GetAsyncValue(), params,
+                     iree_allocator_system(), &thread);
+  threads_.push_back(thread);
+
+  return openxla::runtime::async::AsTokenValue(value, iree_allocator_system());
 }
 
 //===----------------------------------------------------------------------===//
@@ -116,6 +179,8 @@ static const vm::NativeFunction<State> kAsyncTestModuleFunctions[] = {
     MakeNativeFunction("return.available.scalar",
                        &State::ReturnAvailableScalar),
     MakeNativeFunction("return.delayed.scalar", &State::ReturnDelayedScalar),
+    MakeNativeFunction("return.token.error", &State::ReturnTokenError),
+    MakeNativeFunction("return.delayed.memref", &State::ReturnDelayedMemref),
 };
 
 //===----------------------------------------------------------------------===//
