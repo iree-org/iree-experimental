@@ -22,9 +22,9 @@
 #include "openxla/compiler/Dialect/Async/IR/Async.h"
 
 namespace openxla::compiler::async {
-namespace IREE = mlir::iree_compiler::IREE;
 
 using namespace mlir;
+using namespace mlir::iree_compiler;
 
 namespace {
 
@@ -34,19 +34,18 @@ namespace {
 
 class AsyncAPI {
  public:
-  // Imports `@async.token.await` into the module
-  func::FuncOp getTokenAwait(PatternRewriter &rewriter, ModuleOp module);
-  // Imports `@async.value.await.i32` into the module
-  func::FuncOp getValueAwaitI32(PatternRewriter &rewriter, ModuleOp module);
-  // Imports `@async.value.await.ref` into the module
-  func::FuncOp getValueAwaitRef(PatternRewriter &rewriter, ModuleOp module);
+  // Import `@async.token.await` into the module
+  func::FuncOp getValueAwait(PatternRewriter &rewriter, ModuleOp module);
+  // Import `@async.value.query` into the module
+  func::FuncOp getValueQuery(PatternRewriter &rewriter, ModuleOp module);
+  // Import `@async.value.load.i32` into the module
+  func::FuncOp getValueLoadI32(PatternRewriter &rewriter, ModuleOp module);
+  // Import `@async.value.load.ref` into the module
+  func::FuncOp getValueLoadRef(PatternRewriter &rewriter, ModuleOp module);
 
   SymbolTable &symTable(ModuleOp module);
 
-  bool isScalarType(Type type) {
-    return type.isInteger(32) || type.isInteger(64) || type.isF32() ||
-           type.isF64();
-  }
+  bool isScalarType(Type type) { return type.isIntOrIndexOrFloat(); }
 
  private:
   func::FuncOp addDecl(PatternRewriter &rewriter, ModuleOp module,
@@ -72,73 +71,49 @@ func::FuncOp AsyncAPI::addDecl(PatternRewriter &rewriter, ModuleOp module,
   return fn;
 }
 
-func::FuncOp AsyncAPI::getTokenAwait(PatternRewriter &rewriter,
+func::FuncOp AsyncAPI::getValueQuery(PatternRewriter &rewriter,
+                                     ModuleOp module) {
+  MLIRContext *ctx = module->getContext();
+  SmallVector<Type> args{ValueType::get(ctx)};
+  SmallVector<Type> rets{IntegerType::get(ctx, 32)};
+
+  auto functionType = FunctionType::get(ctx, args, rets);
+
+  return addDecl(rewriter, module, StringAttr::get(ctx, "async.value.query"),
+                 functionType);
+}
+
+func::FuncOp AsyncAPI::getValueAwait(PatternRewriter &rewriter,
                                      ModuleOp module) {
   MLIRContext *ctx = module->getContext();
   SmallVector<Type> args{ValueType::get(ctx)};
   auto functionType = FunctionType::get(ctx, args, /*rets=*/{});
 
-  return addDecl(rewriter, module,
-                 StringAttr::get(ctx, "async.value.await.token"), functionType);
+  return addDecl(rewriter, module, StringAttr::get(ctx, "async.value.await"),
+                 functionType);
 }
 
-func::FuncOp AsyncAPI::getValueAwaitI32(PatternRewriter &rewriter,
-                                        ModuleOp module) {
+func::FuncOp AsyncAPI::getValueLoadI32(PatternRewriter &rewriter,
+                                       ModuleOp module) {
   MLIRContext *ctx = module->getContext();
   SmallVector<Type> args{ValueType::get(ctx)};
   SmallVector<Type> rets{IntegerType::get(ctx, 32)};
   auto functionType = FunctionType::get(ctx, args, rets);
 
-  return addDecl(rewriter, module,
-                 StringAttr::get(ctx, "async.value.await.i32"), functionType);
+  return addDecl(rewriter, module, StringAttr::get(ctx, "async.value.load.i32"),
+                 functionType);
 }
 
-func::FuncOp AsyncAPI::getValueAwaitRef(PatternRewriter &rewriter,
-                                        ModuleOp module) {
+func::FuncOp AsyncAPI::getValueLoadRef(PatternRewriter &rewriter,
+                                       ModuleOp module) {
   MLIRContext *ctx = module->getContext();
   SmallVector<Type> args{ValueType::get(ctx)};
   SmallVector<Type> rets{IREE::Util::ObjectType::get(ctx)};
   auto functionType = FunctionType::get(ctx, args, rets);
 
-  return addDecl(rewriter, module,
-                 StringAttr::get(ctx, "async.value.await.ref"), functionType);
+  return addDecl(rewriter, module, StringAttr::get(ctx, "async.value.load.ref"),
+                 functionType);
 }
-
-class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      func::FuncOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    FunctionType type = op.getFunctionType();
-    // Convert the original function arguments.
-    TypeConverter::SignatureConversion result(type.getNumInputs());
-    for (unsigned i = 0; i < type.getNumInputs(); ++i) {
-      if (failed(getTypeConverter()->convertSignatureArg(i, type.getInput(i),
-                                                         result))) {
-        return failure();
-      }
-    }
-    // Convert the original function results.
-    SmallVector<Type, 1> converted_results;
-    if (failed(getTypeConverter()->convertTypes(type.getResults(),
-                                                converted_results))) {
-      return failure();
-    }
-    if (failed(rewriter.convertRegionTypes(&op.getBody(), *getTypeConverter(),
-                                           &result))) {
-      return failure();
-    }
-
-    // Update the function signature.
-    rewriter.updateRootInPlace(op, [&] {
-      op.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
-                                   converted_results));
-    });
-
-    return success();
-  }
-};
 
 //===----------------------------------------------------------------------===//
 // Base class for all Async op conversions
@@ -157,7 +132,7 @@ struct AsyncOpConversionPattern : public OpConversionPattern<T> {
 // Lowering for `async.await` with a token operand.
 //===----------------------------------------------------------------------===//
 
-struct ConvertTokenOp : public AsyncOpConversionPattern<AwaitOp> {
+struct ConvertTokenAwaitOp : public AsyncOpConversionPattern<AwaitOp> {
   using AsyncOpConversionPattern::AsyncOpConversionPattern;
 
   LogicalResult matchAndRewrite(
@@ -169,9 +144,16 @@ struct ConvertTokenOp : public AsyncOpConversionPattern<AwaitOp> {
     ModuleOp module = op->getParentOfType<ModuleOp>();
     ImplicitLocOpBuilder b(op->getLoc(), rewriter);
 
-    auto funcOp = api->getTokenAwait(rewriter, module);
-    rewriter.replaceOpWithNewOp<func::CallOp>(
-        op, funcOp.getSymName(), TypeRange{}, adaptor.getOperands());
+    auto awaitFuncOp = api->getValueAwait(rewriter, module);
+    b.create<func::CallOp>(awaitFuncOp.getSymName(), TypeRange{},
+                           adaptor.getOperands());
+    auto queryFuncOp = api->getValueQuery(rewriter, module);
+    auto queryOp = b.create<func::CallOp>(queryFuncOp.getSymName(),
+                                          queryFuncOp.getResultTypes(),
+                                          adaptor.getOperands());
+    b.create<IREE::Util::StatusCheckOkOp>(queryOp.getResult(0),
+                                          "failed to wait on async token");
+    rewriter.eraseOp(op);
     return success();
   }
 };
@@ -180,7 +162,7 @@ struct ConvertTokenOp : public AsyncOpConversionPattern<AwaitOp> {
 // Lowering for `async.await` with a async scalar value operand.
 //===----------------------------------------------------------------------===//
 
-struct ConvertValueScalarOp : public AsyncOpConversionPattern<AwaitOp> {
+struct ConvertScalarAwaitOp : public AsyncOpConversionPattern<AwaitOp> {
   using AsyncOpConversionPattern::AsyncOpConversionPattern;
 
   LogicalResult matchAndRewrite(
@@ -193,12 +175,18 @@ struct ConvertValueScalarOp : public AsyncOpConversionPattern<AwaitOp> {
     auto resultType = op.getResultType();
     ImplicitLocOpBuilder b(op->getLoc(), rewriter);
     if (resultType->isInteger(32)) {
-      auto funcOp = api->getValueAwaitI32(rewriter, module);
-      // auto callOp = b.create<func::CallOp>(funcOp.getSymName(), *resultType,
-      //                                      adaptor.getOperands());
-      // rewriter.replaceOp(op, callOp.getResult(0));
+      auto awaitFuncOp = api->getValueAwait(rewriter, module);
+      b.create<func::CallOp>(awaitFuncOp.getSymName(), TypeRange{},
+                             adaptor.getOperands());
+      auto queryFuncOp = api->getValueQuery(rewriter, module);
+      auto queryOp = b.create<func::CallOp>(queryFuncOp.getSymName(),
+                                            queryFuncOp.getResultTypes(),
+                                            adaptor.getOperands());
+      b.create<IREE::Util::StatusCheckOkOp>(queryOp.getResult(0),
+                                            "failed to wait on async value");
+      auto loadFuncOp = api->getValueLoadI32(rewriter, module);
       rewriter.replaceOpWithNewOp<func::CallOp>(
-          op, funcOp.getSymName(), *resultType, adaptor.getOperands());
+          op, loadFuncOp.getSymName(), *resultType, adaptor.getOperands());
     } else {
       return rewriter.notifyMatchFailure(op,
                                          "unsupported awaitable scalar type");
@@ -212,7 +200,7 @@ struct ConvertValueScalarOp : public AsyncOpConversionPattern<AwaitOp> {
 // Lowering for `async.await` with a async value of custom type operand.
 //===----------------------------------------------------------------------===//
 
-struct ConvertValueRefOp : public AsyncOpConversionPattern<AwaitOp> {
+struct ConvertObjectAwaitOp : public AsyncOpConversionPattern<AwaitOp> {
   using AsyncOpConversionPattern::AsyncOpConversionPattern;
 
   LogicalResult matchAndRewrite(
@@ -228,8 +216,17 @@ struct ConvertValueRefOp : public AsyncOpConversionPattern<AwaitOp> {
     ModuleOp module = op->getParentOfType<ModuleOp>();
     MLIRContext *ctx = rewriter.getContext();
     ImplicitLocOpBuilder b(op->getLoc(), rewriter);
-    auto funcOp = api->getValueAwaitRef(rewriter, module);
-    auto callOp = b.create<func::CallOp>(funcOp.getSymName(),
+    auto awaitFuncOp = api->getValueAwait(rewriter, module);
+    b.create<func::CallOp>(awaitFuncOp.getSymName(), TypeRange{},
+                           adaptor.getOperands());
+    auto queryFuncOp = api->getValueQuery(rewriter, module);
+    auto queryOp = b.create<func::CallOp>(queryFuncOp.getSymName(),
+                                          queryFuncOp.getResultTypes(),
+                                          adaptor.getOperands());
+    b.create<IREE::Util::StatusCheckOkOp>(queryOp.getResult(0),
+                                          "failed to wait on async value");
+    auto loadFuncOp = api->getValueLoadRef(rewriter, module);
+    auto callOp = b.create<func::CallOp>(loadFuncOp.getSymName(),
                                          IREE::Util::ObjectType::get(ctx),
                                          adaptor.getOperands());
     rewriter.replaceOpWithNewOp<IREE::Util::CastOp>(op, op.getResultTypes(),
@@ -244,10 +241,9 @@ void populateAsyncToRuntimePatterns(mlir::TypeConverter &typeConverter,
   MLIRContext *ctx = patterns.getContext();
   auto api = std::make_shared<AsyncAPI>();
 
-  patterns.insert<FuncOpConversion>(typeConverter, ctx);
-  patterns.insert<ConvertTokenOp>(typeConverter, ctx, api);
-  patterns.insert<ConvertValueScalarOp>(typeConverter, ctx, api);
-  patterns.insert<ConvertValueRefOp>(typeConverter, ctx, api);
+  patterns.insert<ConvertTokenAwaitOp>(typeConverter, ctx, api);
+  patterns.insert<ConvertScalarAwaitOp>(typeConverter, ctx, api);
+  patterns.insert<ConvertObjectAwaitOp>(typeConverter, ctx, api);
 }
 
 }  // namespace openxla::compiler::async

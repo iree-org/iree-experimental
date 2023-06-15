@@ -15,6 +15,8 @@ include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 
+include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
+
 include "openxla/compiler/Dialect/Async/IR/AsyncDialect.td"
 include "openxla/compiler/Dialect/Async/IR/AsyncTypes.td"
 
@@ -23,14 +25,15 @@ include "openxla/compiler/Dialect/Async/IR/AsyncTypes.td"
 //===----------------------------------------------------------------------===//
 
 // Base class for the operation in this dialect
-class Async_Op<string mnemonic, list<Trait> traits = []> :
+class Async_Op<string mnemonic, list<Trait> traits = [Util_YieldPoint]> :
     Op<AsyncDialect, mnemonic, traits>;
 
 def Async_AwaitOp : Async_Op<"await"> {
   let summary = "waits for the argument to become ready";
   let description = [{
-    The `async.await` operation waits until the argument becomes ready, and for
-    the `async.value` arguments it unwraps the underlying value
+    The `async.await` operation yields the caller until its argument 
+    becomes ready, and for the `async.value` arguments it unwraps 
+    the underlying value
 
     Example:
 

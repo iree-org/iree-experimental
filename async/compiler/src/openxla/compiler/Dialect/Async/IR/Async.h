@@ -7,6 +7,7 @@
 #ifndef ASYNC_ASYNC_H_
 #define ASYNC_ASYNC_H_
 
+#include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"

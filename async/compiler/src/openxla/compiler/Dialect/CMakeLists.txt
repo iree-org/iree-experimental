@@ -36,4 +36,3 @@ iree_compiler_register_plugin(
   TARGET
     ::registration
 )
-

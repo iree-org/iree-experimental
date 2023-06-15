@@ -38,8 +38,8 @@ iree_tablegen_library(
   TD_FILE
     "AsyncOps.td"
   OUTS
-    --gen-dialect-decls AsyncDialect.h.inc
-    --gen-dialect-defs AsyncDialect.cpp.inc
+    --gen-dialect-decls --dialect=async AsyncDialect.h.inc
+    --gen-dialect-defs  --dialect=async AsyncDialect.cpp.inc
     --gen-op-decls AsyncOps.h.inc
     --gen-op-defs AsyncOps.cpp.inc
 )
@@ -60,5 +60,5 @@ iree_tablegen_doc(
   TD_FILE
     "AsyncOps.td"
   OUTS
-    --gen-dialect-doc -dialect=async src/async/IR/AsyncDialect.md
+    --gen-dialect-doc --dialect=async src/async/IR/AsyncDialect.md
 )
