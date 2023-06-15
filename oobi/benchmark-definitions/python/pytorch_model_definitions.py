@@ -3,7 +3,7 @@ import string
 
 import data_types
 import data_types_builder
-import input_data_definitions
+import pytorch_input_data_definitions
 import pytorch_output_data_definitions
 import unique_ids
 
@@ -63,8 +63,10 @@ RESNET50_FP32_PT_3X224X224XF32_BATCH_TEMPLATE = data_types_builder.ModelTemplate
     name=BATCH_NAME("RESNET50_FP32_PT_3X224X224XF32"),
     tags=[BATCH_TAG],
     meta_model=RESNET50_FP32_PT,
-    inputs=input_data_definitions.IMAGENET_APPLES_PT_3X224X224XF32_BATCHES,
-    outputs=pytorch_output_data_definitions.RESNET50_FP32_PT_2048X7X7XF32_BATCHES,
+    inputs=pytorch_input_data_definitions.
+    IMAGENET_APPLES_PT_3X224X224XF32_BATCHES,
+    outputs=pytorch_output_data_definitions.
+    RESNET50_FP32_PT_2048X7X7XF32_BATCHES,
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_LINALG,
@@ -81,13 +83,16 @@ RESNET50_FP16_PT_3X224X224XF16_BATCH_TEMPLATE = data_types_builder.ModelTemplate
     name=BATCH_NAME("RESNET50_FP16_PT_3X224X224XF16"),
     tags=[BATCH_TAG],
     meta_model=RESNET50_FP16_PT,
-    inputs=input_data_definitions.IMAGENET_APPLES_3X224X224XF16_BATCHES,
-    outputs=pytorch_output_data_definitions.RESNET50_FP16_PT_2048X7X7XF16_BATCHES,
+    inputs=pytorch_input_data_definitions.
+    IMAGENET_APPLES_PT_3X224X224XF16_BATCHES,
+    outputs=pytorch_output_data_definitions.
+    RESNET50_FP16_PT_2048X7X7XF16_BATCHES,
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_LINALG,
             source_url=string.Template(
-                "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_${batch_size}/linalg.mlir"),
+                "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/RESNET50_FP16/batch_${batch_size}/linalg.mlir"
+            ),
         ),
     ])
 RESNET50_FP16_PT_3X224X224XF16_BATCHES = data_types_builder.build_batch_models(
@@ -102,7 +107,7 @@ BERT_LARGE_FP32_PT_384XI32_BATCH_TEMPLATE = data_types_builder.ModelTemplate(
     name=BATCH_NAME("BERT_LARGE_FP32_PT_384XI32"),
     tags=[BATCH_TAG],
     meta_model=BERT_LARGE_FP32_PT,
-    inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES,
+    inputs=pytorch_input_data_definitions.BERT_LARGE_PT_SEQLEN384_I32_BATCHES,
     outputs=pytorch_output_data_definitions.
     BERT_LARGE_FP32_PT_384X1024XF32_BATCHES,
     artifacts=[
@@ -121,13 +126,15 @@ BERT_LARGE_FP16_PT_384XI32_BATCH_TEMPLATE = data_types_builder.ModelTemplate(
     name=BATCH_NAME("BERT_LARGE_FP16_PT_384XI32"),
     tags=[BATCH_TAG],
     meta_model=BERT_LARGE_FP16_PT,
-    inputs=input_data_definitions.BERT_LARGE_SEQLEN384_I32_BATCHES,
-    outputs=pytorch_output_data_definitions.BERT_LARGE_FP16_PT_384X1024XF16_BATCHES,
+    inputs=pytorch_input_data_definitions.BERT_LARGE_PT_SEQLEN384_I32_BATCHES,
+    outputs=pytorch_output_data_definitions.
+    BERT_LARGE_FP16_PT_384X1024XF16_BATCHES,
     artifacts=[
         data_types.ModelArtifact(
             artifact_type=data_types.ModelArtifactType.MLIR_LINALG,
             source_url=string.Template(
-                "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_${batch_size}/linalg.mlir"),
+                "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684830698/BERT_LARGE_FP16/batch_${batch_size}/linalg.mlir"
+            ),
         ),
     ])
 BERT_LARGE_FP16_PT_384XI32_BATCHES = data_types_builder.build_batch_models(

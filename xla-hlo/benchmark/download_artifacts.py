@@ -1,7 +1,5 @@
 import argparse
-import os
 import pathlib
-import requests
 import sys
 
 from concurrent.futures import ProcessPoolExecutor
@@ -13,7 +11,7 @@ sys.path.insert(
     str(
         pathlib.Path(__file__).parent.parent.parent / "oobi" /
         "benchmark-definitions" / "python"))
-import data_types, jax_model_definitions, model_dictionary, tf_model_definitions, unique_ids, utils
+import data_types, model_dictionary, utils
 
 
 if __name__ == "__main__":

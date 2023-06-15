@@ -59,13 +59,12 @@ else
     ITERATIONS=20
 fi
 
-# Compiler-level benchmarks compile and run an inference per iteration.
-# We keep this number low to reduce total benchmark time.
-HLO_ITERATIONS=3
-
 # Create json file and populate with global information.
 rm "${OUTPUT_PATH}"
 echo "{\"trigger\": { \"timestamp\": \"$(date +'%s')\" }, \"benchmarks\": []}" > "${OUTPUT_PATH}"
+
+CACHE_DIR="${OOBI_CACHE_DIR:-/tmp/oobi/cache}"
+mkdir -p "${CACHE_DIR}"
 
 for benchmark_id in "${BENCHMARK_IDS[@]}"; do
   declare -a args=(
@@ -73,16 +72,8 @@ for benchmark_id in "${BENCHMARK_IDS[@]}"; do
     --device="${DEVICE}"
     --output_path="${OUTPUT_PATH}"
     --iterations="${ITERATIONS}"
-    --hlo_iterations="${HLO_ITERATIONS}"
+    --cache_dir="${CACHE_DIR}"
   )
-
-  if [ -z "${TF_RUN_HLO_MODULE_PATH}" ]; then
-    echo "HLO Benchmark Path not set in environment variable TF_RUN_HLO_MODULE_PATH. Disabling compiler-level benchmarks."
-  else
-    args+=(
-      --hlo_benchmark_path="${TF_RUN_HLO_MODULE_PATH}"
-    )
-  fi
 
   python "${TD}/benchmark_model.py" "${args[@]}"
 done

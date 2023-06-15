@@ -91,7 +91,6 @@ def run_framework_benchmark(model_name: str, model_class: Any,
         utils.compare_results(outputs, expected_outputs[0])
         latencies.append(1000 * (end - start))
 
-
       # Save results.
       result_dict = {
           "min_warmup_latency_ms": min(warmup_latencies, default=None),
@@ -141,9 +140,6 @@ if __name__ == "__main__":
       "--device",
       default="gpu",
       help="The device to run on. Currently `cpu` and `gpu` are supported.")
-  argParser.add_argument("--hlo_benchmark_path",
-                         default=None,
-                         help="The path to `run_hlo_module`.")
   argParser.add_argument(
       "--run_in_process",
       action="store_true",
@@ -177,10 +173,10 @@ if __name__ == "__main__":
   }
 
   inputs = utils.retrieve_model_data(model_definition.inputs, args.cache_dir)
-  expected_outputs = utils.retrieve_model_data(model_definition.outputs, args.cache_dir)
+  expected_outputs = utils.retrieve_model_data(model_definition.outputs,
+                                               args.cache_dir)
 
   framework_metrics = {}
-  # Retrieve framework-level benchmarks.
   with multiprocessing.Manager() as manager:
     shared_dict = manager.dict()
 

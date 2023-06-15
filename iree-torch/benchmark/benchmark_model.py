@@ -3,6 +3,7 @@ import torch
 import torch._dynamo as dynamo
 import json
 import multiprocessing
+import numpy as np
 import pathlib
 import statistics
 import sys
@@ -55,8 +56,11 @@ def bytes_to_mb_str(bytes: Optional[int]) -> str:
   return "n/a" if bytes is None else f"{bytes / 1e6:.6f}"
 
 
-def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
-                            data_type: data_types.DataType, warmup_iterations: int, benchmark_iterations: int,
+def run_framework_benchmark(model_name: str, model_class: Any,
+                            input_data: tuple[np.array, ...],
+                            expected_outputs: tuple[np.array, ...],
+                            data_type: data_types.DataType,
+                            warmup_iterations: int, benchmark_iterations: int,
                             backend: str, shared_dict) -> None:
   try:
     torch_dtype = torch.float16 if data_type == data_types.DataType.FP16 else torch.float32
@@ -81,10 +85,11 @@ def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
     model = model_class()
     model = model.to(dtype=torch_dtype)
 
-    inputs = model.generate_inputs(batch_size=batch_size, dtype=torch_dtype)
+    pt_inputs = [torch.from_numpy(input) for input in input_data]
+
     if backend == "gpu":
       model.cuda()
-      inputs = [input.cuda() for input in inputs]
+      pt_inputs = [input.cuda() for input in pt_inputs]
 
     if torch_dtype == torch.float16:
       # Autotuning not supported with FP16 datatypes.
@@ -99,11 +104,14 @@ def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
     synchronize = True if backend == "gpu" else False
     for i in range(warmup_iterations):
       start = time.perf_counter()
-      output = model.forward(*inputs)
+      outputs = model.forward(*pt_inputs)
       if synchronize:
         torch.cuda.synchronize()
+        outputs = outputs.cpu()
       end = time.perf_counter()
       latency = 1000 * (end - start)
+      outputs = outputs.detach().numpy()
+      utils.compare_results(outputs, expected_outputs[0])
       if i == 0:
         compile_time_s = latency / 1000
       warmup_latencies.append(latency)
@@ -112,10 +120,13 @@ def run_framework_benchmark(model_name: str, model_class: Any, batch_size: int,
     latencies = []
     for i in range(benchmark_iterations):
       start = time.perf_counter()
-      output = model.forward(*inputs)
+      outputs = model.forward(*pt_inputs)
       if synchronize:
         torch.cuda.synchronize()
+        outputs = outputs.cpu()
       end = time.perf_counter()
+      outputs = outputs.detach().numpy()
+      utils.compare_results(outputs, expected_outputs[0])
       latencies.append(1000 * (end - start))
 
     # Save results.
@@ -183,15 +194,16 @@ if __name__ == "__main__":
       "--device",
       default="gpu",
       help="The device to run on. Currently `cpu` and `gpu` are supported.")
-  argParser.add_argument("--hlo_benchmark_path",
-                         default=None,
-                         help="The path to `run_hlo_module`.")
   argParser.add_argument(
       "--run_in_process",
       action="store_true",
       help=
       "Whether to run the benchmark under the same process. Set this to true when profiling a single workload"
   )
+  argParser.add_argument("--cache_dir",
+                         required=True,
+                         type=pathlib.Path,
+                         help="Directory to download artifacts to.")
 
   args = argParser.parse_args()
 
@@ -215,20 +227,25 @@ if __name__ == "__main__":
       "tags": model_definition.meta_model.tags + model_definition.tags,
   }
 
+  inputs = utils.retrieve_model_data(model_definition.inputs, args.cache_dir)
+  expected_outputs = utils.retrieve_model_data(model_definition.outputs,
+                                               args.cache_dir)
+
   framework_metrics = {}
-  # Retrieve framework-level benchmarks.
   with multiprocessing.Manager() as manager:
     shared_dict = manager.dict()
 
     if args.run_in_process:
-      run_framework_benchmark(model_name, model_class, batch_size, model_definition.meta_model.data_type,
+      run_framework_benchmark(model_name, model_class, inputs, expected_outputs,
+                              model_definition.meta_model.data_type,
                               args.warmup_iterations, args.iterations,
                               args.device, shared_dict)
     else:
-      p = multiprocessing.Process(target=run_framework_benchmark,
-                                  args=(model_name, model_class, batch_size, model_definition.meta_model.data_type,
-                                        args.warmup_iterations, args.iterations,
-                                        args.device, shared_dict))
+      p = multiprocessing.Process(
+          target=run_framework_benchmark,
+          args=(model_name, model_class, inputs, expected_outputs,
+                model_definition.meta_model.data_type, args.warmup_iterations,
+                args.iterations, args.device, shared_dict))
       p.start()
       p.join()
 
