@@ -64,7 +64,6 @@ external_cc_library(
     "tsl/concurrency/async_value.cc"
     "tsl/concurrency/async_value_ref.cc"
   DEPS
-    LLVMSupport
     tsl::concurrent_vector
     tsl::ref_count
     absl::base
