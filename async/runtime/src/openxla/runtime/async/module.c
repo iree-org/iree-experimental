@@ -7,8 +7,9 @@
 #include "openxla/runtime/async/module.h"
 
 #include "iree/base/api.h"
+#include "iree/hal/api.h"
+#include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
-#include "openxla/runtime/async/api.h"
 
 #define IREE_ASYNC_RUNTIME_MODULE_VERSION_0_0 0x00000000u
 #define IREE_ASYNC_RUNTIME_MODULE_VERSION_LATEST \
@@ -58,34 +59,7 @@ enum iree_async_runtime_module_await_pc_e {
   IREE_ASYNC_RUNTIME_MODULE_AWAIT_PC_RESUME,
 };
 
-IREE_VM_ABI_EXPORT(iree_async_runtime_module_create_async_token,  //
-                   iree_async_runtime_module_state_t,             //
-                   v, r) {
-  iree_async_value_t *token = NULL;
-  iree_status_t status = iree_async_value_create_token(&token);
-  if (iree_status_is_ok(status)) {
-    rets->r0 = iree_async_value_move_ref(token);
-  } else {
-    iree_async_value_release(token);
-  }
-
-  return status;
-}
-
-IREE_VM_ABI_EXPORT(iree_async_runtime_module_create_async_value_i32,  //
-                   iree_async_runtime_module_state_t,                 //
-                   v, r) {
-  iree_async_value_t *value = NULL;
-  iree_status_t status = iree_async_value_create_i32(&value);
-  if (iree_status_is_ok(status)) {
-    rets->r0 = iree_async_value_move_ref(value);
-  } else {
-    iree_async_value_release(value);
-  }
-
-  return status;
-}
-
+// Query the status of the async value |value|.
 IREE_VM_ABI_EXPORT(iree_async_runtime_module_query_async_value,  //
                    iree_async_runtime_module_state_t,            //
                    r, i) {
@@ -133,15 +107,16 @@ static iree_status_t iree_async_runtime_module_async_value_await_begin(
   return iree_ok_status();
 }
 
-static iree_status_t iree_async_runtime_module_async_value_await(
-    iree_vm_stack_t *stack, const iree_vm_ref_t arg) {
+IREE_VM_ABI_EXPORT(iree_async_runtime_module_async_value_await,  //
+                   iree_async_runtime_module_state_t,            //
+                   r, v) {
   iree_vm_stack_frame_t *current_frame = iree_vm_stack_top(stack);
   iree_zone_id_t zone_id = 0;
   iree_status_t wait_status = iree_ok_status();
 
   if (current_frame->pc == IREE_ASYNC_RUNTIME_MODULE_AWAIT_PC_BEGIN) {
     iree_async_value_t *value = NULL;
-    IREE_RETURN_IF_ERROR(iree_async_value_check_deref(arg, &value));
+    IREE_RETURN_IF_ERROR(iree_async_value_check_deref(args->r0, &value));
     IREE_TRACE_ZONE_BEGIN(z0);
     zone_id = z0;
     iree_status_t status = iree_async_value_query(value);
@@ -166,39 +141,31 @@ static iree_status_t iree_async_runtime_module_async_value_await(
   return wait_status;
 }
 
-IREE_VM_ABI_EXPORT(iree_async_runtime_module_async_value_await_token,  //
-                   iree_async_runtime_module_state_t,                  //
-                   r, v) {
-  iree_status_t wait_status =
-      iree_async_runtime_module_async_value_await(stack, args->r0);
-  if (!iree_status_is_ok(wait_status)) {
-    // either Yielding, resume required; or the invocation failed
-    return wait_status;
-  }
+// Load the int32_t value stored in the async_value |value|
+IREE_VM_ABI_EXPORT(iree_async_runtime_module_load_async_value_i32,  //
+                   iree_async_runtime_module_state_t,               //
+                   r, i) {
+  iree_async_value_t *value = NULL;
+  IREE_RETURN_IF_ERROR(iree_async_value_check_deref(args->r0, &value));
+  int32_t i = 0.0;
+  IREE_RETURN_IF_ERROR(iree_async_value_get_scalar_value(
+      value, IREE_VM_VALUE_TYPE_I32, (char *)&i));
+  rets->i0 = i;
+
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_async_runtime_module_async_value_await_i32,  //
-                   iree_async_runtime_module_state_t,                //
-                   r, i) {
-  iree_status_t wait_status =
-      iree_async_runtime_module_async_value_await(stack, args->r0);
-  iree_status_t status = iree_ok_status();
-  if (iree_status_is_ok(wait_status)) {
-    int32_t i = 0.0;
-    iree_async_value_t *value = NULL;
-    IREE_RETURN_IF_ERROR(iree_async_value_check_deref(args->r0, &value));
-    IREE_RETURN_IF_ERROR(iree_async_value_get_scalar_value(
-        value, IREE_VM_VALUE_TYPE_I32, (char *)&i));
-    rets->i0 = i;
-  } else if (iree_status_is_deferred(wait_status)) {
-    status = wait_status;
-  } else {
-    // Fail the invocation
-    status = wait_status;
-  }
+IREE_VM_ABI_EXPORT(iree_async_runtime_module_load_async_value_ref,  //
+                   iree_async_runtime_module_state_t,               //
+                   r, r) {
+  iree_async_value_t *value = NULL;
+  IREE_RETURN_IF_ERROR(iree_async_value_check_deref(args->r0, &value));
+  iree_vm_ref_t *buffer_view = NULL;
+  IREE_RETURN_IF_ERROR(iree_async_value_get_ref_value(
+      value, IREE_VM_REF_TYPE_ANY, &buffer_view));
+  rets->r0 = *buffer_view;
 
-  return status;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -261,6 +228,8 @@ IREE_API_EXPORT iree_status_t iree_async_runtime_module_create(
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
+
+  IREE_RETURN_IF_ERROR(openxla_async_runtime_module_register_types(instance));
 
   // Setup the interface with the functions we implement ourselves. Any
   // function we omit will be handled by the base native module.

@@ -17,15 +17,31 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    async_runtime
-  HDRS
-    "api.h"
-  SRCS
-    "async_runtime.h"
-    "async_runtime_cc.h"
-    "async_runtime.cpp"
+    tsl_async_value_c_interface
+  HDRS 
+    "tsl_async_value.h"
+  SRCS 
+    "tsl_async_value.cpp"
   DEPS
     ::defs
+    tsl::async_value
+    absl::status
+    iree::base
+    iree::hal
+    iree::modules::hal
+)
+
+iree_cc_library(
+  NAME
+    async_runtime
+  HDRS
+    "async_runtime.h"
+    "async_runtime_util.h"
+  SRCS
+    "async_runtime.c"
+  DEPS
+    ::defs
+    ::tsl_async_value_c_interface
     tsl::async_value
     absl::base
     absl::status
@@ -45,24 +61,30 @@ iree_cc_library(
     "module.c"
   DEPS
     ::defs
-    ::loop_async
     ::async_runtime
     iree::base
     iree::base::tracing
     iree::hal
+    iree::modules::hal
     iree::vm
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
-    loop_async
-  HDRS
-    "loop_async.h"
+    module_test
   SRCS
-    "loop_async.c"
+    "module_test.cpp"
   DEPS
     ::defs
+    ::async
     iree::base
-  PUBLIC
+    iree::base::internal::wait_handle
+    iree::base::loop_sync
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::vm
+    iree::vm::bytecode::module
+    openxla::runtime::async::test::module_test_module_c
+    openxla::runtime::async_test::async_test
 )

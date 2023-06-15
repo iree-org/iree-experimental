@@ -11,7 +11,7 @@
 
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
-#include "openxla/runtime/async/api.h"
+#include "openxla/runtime/async/async_runtime.h"
 
 #ifdef __cplusplus
 extern "C" {

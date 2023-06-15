@@ -42,7 +42,6 @@ iree_setup_toolchain()
 #-------------------------------------------------------------------------------
 
 add_subdirectory(runtime)
-add_subdirectory(tools)
 
 #-------------------------------------------------------------------------------
 # Absl dependencies
@@ -51,7 +50,8 @@ add_subdirectory(tools)
 add_subdirectory(third_party/abseil-cpp)
 
 #-------------------------------------------------------------------------------
-# Tensorflow tsl dependencies
+# Google tsl dependencies
 #-------------------------------------------------------------------------------
 
-add_subdirectory(build_tools/third_party/tensorflow/tsl EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/tsl EXCLUDE_FROM_ALL)
+

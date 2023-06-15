@@ -8,12 +8,13 @@
 #define OPENXLA_RUNTIME_ASYNC_ASYNCRUNTIME_CC_H_
 
 #include "iree/base/status_cc.h"
+#include "iree/hal/api.h"
+#include "iree/modules/hal/module.h"
 #include "iree/vm/ref_cc.h"
-#include "tensorflow/tsl/concurrency/async_value.h"
-#include "tensorflow/tsl/concurrency/async_value_ref.h"
-#include "tensorflow/tsl/concurrency/chain.h"
-
-struct iree_async_value_t;
+#include "openxla/runtime/async/async_runtime.h"
+#include "tsl/concurrency/async_value.h"
+#include "tsl/concurrency/async_value_ref.h"
+#include "tsl/concurrency/chain.h"
 
 namespace openxla::runtime::async {
 
@@ -27,6 +28,11 @@ iree_vm_value_type_t NativeToVMValueType() {
   // below.
   static_assert(!std::is_same<NativeT, NativeT>::value,
                 "Cannot map native type to vm type.");
+  return IREE_VM_VALUE_TYPE_NONE;
+}
+
+template <>
+inline iree_vm_value_type_t NativeToVMValueType<tsl::Chain>() {
   return IREE_VM_VALUE_TYPE_NONE;
 }
 
@@ -60,43 +66,44 @@ inline iree_vm_value_type_t NativeToVMValueType<double>() {
   return IREE_VM_VALUE_TYPE_F64;
 }
 
+// Convert async token to iree VM ref object
+iree::StatusOr<iree::vm::ref<iree_async_value_t>> AsTokenValue(
+    tsl::AsyncValueRef<tsl::Chain> value, iree_allocator_t host_allocator) {
+  iree_async_value_t *val;
+  tsl::AsyncValue *async_value = value.GetAsyncValue();
+  iree_async_value_create(
+      async_value, iree_vm_make_ref_type_def(iree_async_runtime_token_type()),
+      host_allocator, &val);
+  return iree::vm::ref<iree_async_value_t>(val);
+}
+
+// Convert async scalar value to iree VM ref object
 template <typename T>
 using EnableIfScalarType = typename std::enable_if_t<
     std::disjunction_v<std::is_same<T, float>, std::is_same<T, double>,
                        std::is_same<T, int8_t>, std::is_same<T, int16_t>,
                        std::is_same<T, int32_t>, std::is_same<T, int64_t>>>;
 
-class AsyncValue : public iree::vm::RefObject<AsyncValue> {
- public:
-  explicit AsyncValue(tsl::AsyncValueRef<tsl::Chain> &&u)
-      : type_(IREE_VM_VALUE_TYPE_NONE), value_(u.ReleaseRCRef()) {}
+template <typename T, EnableIfScalarType<T> * = nullptr>
+iree::StatusOr<iree::vm::ref<iree_async_value_t>> AsScalarValue(
+    tsl::AsyncValueRef<T> value, iree_allocator_t host_allocator) {
+  iree_async_value_t *val;
+  tsl::AsyncValue *async_value = value.GetAsyncValue();
+  iree_async_value_create(async_value,
+                          iree_vm_make_value_type_def(NativeToVMValueType<T>()),
+                          host_allocator, &val);
+  return iree::vm::ref<iree_async_value_t>(val);
+}
 
-  template <typename T, EnableIfScalarType<T> * = nullptr>
-  explicit AsyncValue(tsl::AsyncValueRef<T> &&u)
-      : type_(NativeToVMValueType<T>()), value_(u.ReleaseRCRef()) {}
-
-  template <typename T>
-  const T &get() {
-    return value_->get<T>();
-  }
-
-  tsl::AsyncValue *GetAsyncValue() { return value_.get(); }
-
-  bool IsError() const { return value_->IsError(); }
-
-  iree_vm_value_type_t GetElementType() const { return type_; }
-
- private:
-  iree_vm_value_type_t type_;
-  tsl::RCReference<tsl::AsyncValue> value_;
-};
-
-template <typename T>
-iree::StatusOr<iree::vm::ref<iree_async_value_t>> AsValue(
-    tsl::AsyncValueRef<T> value) {
-  AsyncValue *val = new AsyncValue(std::move(value));
-  return iree::vm::ref<iree_async_value_t>(
-      reinterpret_cast<iree_async_value_t *>(val));
+// Convert async value with custom type to iree VM ref object
+iree::StatusOr<iree::vm::ref<iree_async_value_t>> AsRefValue(
+    tsl::AsyncValueRef<iree_vm_ref_t> value, iree_allocator_t host_allocator) {
+  iree_async_value_t *val;
+  tsl::AsyncValue *async_value = value.GetAsyncValue();
+  iree_async_value_create(async_value,
+                          iree_vm_make_ref_type_def(IREE_VM_REF_TYPE_ANY),
+                          host_allocator, &val);
+  return iree::vm::ref<iree_async_value_t>(val);
 }
 
 }  // namespace openxla::runtime::async
