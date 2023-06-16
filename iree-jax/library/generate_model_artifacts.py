@@ -41,6 +41,22 @@ _MODEL_NAME_TO_MODEL_CONFIG: Dict[str, ModelGenerationConfig] = {
                                       batch_sizes=[1, 16, 24, 32, 48, 64, 512],
                                       dtype=jnp.float32),
 
+    # FP16 variants
+    # Batch sizes taken from MLPerf A100 Configs: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/resnet50
+    "RESNET50_FP16": ModelGenerationConfig('models.resnet50', 'ResNet50', 
+                                           batch_sizes=[1, 8, 64, 128, 256, 2048],
+                                             dtype=jnp.float16
+                                       ),
+    # Batch sizes based on MLPerf config: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/bert
+    "BERT_LARGE_FP16":
+        ModelGenerationConfig('models.bert_large', 'BertLarge', 
+                              batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280],
+                              dtype=jnp.float16),
+    # Uses the same batch sizes as Bert-Large.
+    "T5_LARGE_FP16": ModelGenerationConfig('models.t5_large', 'T5Large', 
+                                           batch_sizes=[1, 16, 24, 32, 48, 64, 512],
+                                           dtype=jnp.float16),
+
     # BF16 variants
     # Batch sizes taken from MLPerf A100 Configs: https://github.com/mlcommons/inference_results_v2.1/tree/master/closed/NVIDIA/configs/resnet50
     "RESNET50_BF16": ModelGenerationConfig('models.resnet50', 'ResNet50', 
