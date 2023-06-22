@@ -22,14 +22,14 @@ transform.sequence failures(propagate) {
   // TODO: we need better filters here to build a simple heuristic:
   //   Case 1. only match unaligned matmuls and align them to the next 32x32x16.
   //   Case 2. match matmuls with large K (e.g. > 4K) that is not divisible by 
-  //   1726 (108 * 16) on ampere and align them to the next 32x32x1726.
+  //   1728 (108 * 16) on ampere and align them to the next 32x32x1728.
   %matmul = transform.structured.match ops{["linalg.matmul"]} in %module_op
     : (!transform.any_op) -> !transform.any_op
 
   %matmul_padded = transform.structured.pad %matmul {
     padding_values=[0.0 : f32, 0.0 : f32, 0.0 : f32],
     padding_dimensions=[0, 1, 2],
-    pad_to_multiple_of=[32, 32, 1726], // 1726 = 108 * 16 on ampere
+    pad_to_multiple_of=[32, 32, 1728], // 1728 = 108 * 16 on ampere
     pack_paddings=[0, 0, 0]
   } : (!transform.any_op) -> !transform.any_op
 
