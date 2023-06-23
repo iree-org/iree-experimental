@@ -95,8 +95,9 @@ def make_iree_td_options(config, td_repro=False, benchmark=False):
     f"--td-matmul-strategy-pipeline-depth={config['p']}",
     f"--td-matmul-strategy-reduc-size={config['r']}",
     f"--td-matmul-strategy-use-async-copies={config['acp']}",
-    f"--td-matmul-strategy-use-mma-sync={config['mma']}",
   ]
+  if 'mma' in config:
+    res.append(f"--td-matmul-strategy-use-mma={config['mma']}")
   if 'wmma' in config:
     res.append(f"--td-matmul-strategy-use-wmma={config['wmma']}")
   if 'fma' in config:
