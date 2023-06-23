@@ -39,7 +39,6 @@ def append_td_repro_options(options, td_repro=False):
   return options + [
     "--debug-only=transform-dialect-save-repro",
     "--mlir-disable-threading",
-
   ] if td_repro else options
 
 def make_iree_baseline_options(td_repro=False):
@@ -78,6 +77,18 @@ def make_iree_td_options(config, td_repro=False, benchmark=False):
     "--iree-stream-resource-index-bits=64",
     "--iree-vm-target-index-bits=64",
     "--iree-hal-cuda-llvm-target-arch=sm_80",
+  ]
+
+  res = res + [
+    f"--iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul",
+    f"--iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy",
+    f"--iree-codegen-llvmgpu-enable-transform-dialect-small-matmul",
+    f"--iree-flow-enable-pad-handling",
+  ]
+  if 'default' in config:
+    return append_td_repro_options(res, td_repro)
+
+  res = res + [
     f"--td-matmul-strategy-blk-sizes={config['blk']}",
     f"--td-matmul-strategy-num-threads={config['tds']}",
     f"--td-matmul-strategy-num-warps={config['wps']}",
@@ -85,10 +96,11 @@ def make_iree_td_options(config, td_repro=False, benchmark=False):
     f"--td-matmul-strategy-reduc-size={config['r']}",
     f"--td-matmul-strategy-use-async-copies={config['acp']}",
     f"--td-matmul-strategy-use-mma-sync={config['mma']}",
-    "--iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul",
-    f'--iree-flow-enable-pad-handling',
-    f'--iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy'
   ]
+  if 'wmma' in config:
+    res.append(f"--td-matmul-strategy-use-wmma={config['wmma']}")
+  if 'fma' in config:
+    res.append(f"--td-matmul-strategy-use-fma={config['fma']}")
   return append_td_repro_options(res, td_repro)
 
 def append_td_graph_script(l, filename=None):
