@@ -1,12 +1,12 @@
 
 fill_matmul_f32 = """ 
-!input_tensor_t = tensor<${M}x${K}xf32>
-!weight_tensor_t = tensor<${K}x${N}xf32>
-!output_tensor_t = tensor<${M}x${N}xf32>
+!input_tensor_t = tensor<${M}x${K}x${LHS_TYPE}>
+!weight_tensor_t = tensor<${K}x${N}x${RHS_TYPE}>
+!output_tensor_t = tensor<${M}x${N}x${RES_TYPE}>
 func.func @${FN_NAME}(%in: !input_tensor_t, %wei: !weight_tensor_t) -> !output_tensor_t {
-  %cst_0 = arith.constant 0.0 : f32 
+  %cst_0 = arith.constant ${INIT_VAL} : ${RES_TYPE}
   %empty = tensor.empty() : !output_tensor_t
-  %out = linalg.fill ins(%cst_0 : f32) outs(%empty : !output_tensor_t) -> !output_tensor_t
+  %out = linalg.fill ins(%cst_0 : ${RES_TYPE}) outs(%empty : !output_tensor_t) -> !output_tensor_t
   %res = linalg.matmul
      ins(%in, %wei: !input_tensor_t, !weight_tensor_t)
     outs(%out: !output_tensor_t) -> !output_tensor_t
@@ -14,7 +14,19 @@ func.func @${FN_NAME}(%in: !input_tensor_t, %wei: !weight_tensor_t) -> !output_t
 }
 """
 
-def make_fill_matmul_f32_problem(M, N, K, td_config=None):
+mlir_type_to_init_val = {
+  "f64": "0.0",
+  "f32": "0.0",
+  "bf16": "0.0",
+  "f16": "0.0",
+  # "f8": "0.0",
+  "i64": "0",
+  "i32": "0",
+  "i16": "0",
+  "i8": "0",
+}
+
+def make_fill_matmul_problem(M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE, td_config=None):
   fn_name = f"mm_{M}_{N}_{K}"
   fn_name = fn_name if td_config is None else \
     fn_name  + "_" + "_".join([f"{k}_{v}" for k, v in td_config.items()])
@@ -23,6 +35,10 @@ def make_fill_matmul_f32_problem(M, N, K, td_config=None):
     "${M}", str(M)).replace(
     "${K}", str(K)).replace(
     "${N}", str(N)).replace(
+    "${LHS_TYPE}", str(LHS_TYPE)).replace(
+    "${RHS_TYPE}", str(RHS_TYPE)).replace(
+    "${RES_TYPE}", str(RES_TYPE)).replace(
+    "${INIT_VAL}", str(mlir_type_to_init_val[RES_TYPE])).replace(
     "${FN_NAME}", str(fn_name)), \
     fn_name
 
@@ -97,7 +113,7 @@ def make_iree_td_options(config, td_repro=False, benchmark=False):
     f"--td-matmul-strategy-use-async-copies={config['acp']}",
   ]
   if 'mma' in config:
-    res.append(f"--td-matmul-strategy-use-mma={config['mma']}")
+    res.append(f"--td-matmul-strategy-use-mma-sync={config['mma']}")
   if 'wmma' in config:
     res.append(f"--td-matmul-strategy-use-wmma={config['wmma']}")
   if 'fma' in config:
@@ -115,7 +131,7 @@ def append_td_graph_script(l, filename=None):
   ] if filename is not None else l
 
 # For now assume type if TF32.
-def compute_precision(K, *tensors):
+def compute_precision(K, LHS_TYPE, RHS_TYPE, RES_TYPE, *tensors):
   max_value = 0.0
   for t in tensors:
       max_value = max(float(t.abs().max()), max_value)

@@ -38,7 +38,6 @@ problem_sizes = [
   [512, 512, 512],
   [1024, 1024, 1024],
 ]
-
 td_configurations = [
   {'blk': '128,128,1', 'tds': '64,2,1', 'wps': '2,2,1', 'p': 1, 'r': 16, 'acp': "0", 'mma': "0"},
   {'blk': '128,128,1', 'tds': '64,2,1', 'wps': '2,2,1', 'p': 1, 'r': 16, 'acp': "1", 'mma': "1"},
@@ -50,6 +49,9 @@ td_configurations = [
   {'blk': '16,16,1', 'tds': '32,1,1', 'wps': '1,1,1', 'p': 3, 'r': 16, 'acp': "1", 'mma': "0"},
   {'blk': '16,16,1', 'tds': '32,1,1', 'wps': '1,1,1', 'p': 7, 'r': 16, 'acp': "1", 'mma': "1"},
 ]
+data_types = [
+  ["f32", "f32", "f32"]
+]
 
 import matmul_runner as runner
 import td_argparse
@@ -57,4 +59,4 @@ args = td_argparse.parse_args()
 
 n_iters = 5
 check_results = True
-runner.run(problem_sizes, td_configurations, args, n_iters, check_results)
+runner.run(problem_sizes, data_types, td_configurations, args, n_iters, check_results)
