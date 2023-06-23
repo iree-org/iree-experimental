@@ -15,7 +15,8 @@ td_configurations = [
   {'blk': '16,16,1', 'tds': '32,1,1', 'wps': '1,1,1', 'p': 1, 'r': 16, 'acp': "1", 'mma': "0", 'wmma': "0", "fma": "1"},
 ]
 data_types = [
-  ["f16", "i8", "f16"]
+  ["f16", "i8", "f16"],
+  ["f16", "f16", "i8"],
 ]
 
 import matmul_runner as runner

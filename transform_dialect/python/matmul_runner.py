@@ -65,21 +65,24 @@ def run(problem_sizes, data_types, td_configurations, argparse, n_iters, check_r
         lhs_torch, rhs_torch, res_torch, lhs_iree, rhs_iree, res_iree = \
           make_fill_matmul_tensors(M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE, init_fn)
 
-        # Compile and run the baseline.
-        extra_args=config.append_td_graph_script(
-          config.make_iree_baseline_options(argparse.td_repro), \
-          argparse.td_graph_script)
-        # print(f"compile baseline {extra_args}")
-        print(f'ir_str: {ir_str}')
-        baseline_vmfb_str = ireec.compile_str(
-          ir_str,
-          target_backends=[iree_device],
-          extra_args=extra_args,
-        )
-        # print("prepare baseline fun")
-        baseline_fun = cc.prepare_fun(baseline_vmfb_str, fn_name, iree_runtime_device_name)
-        # print("run baseline fun")
-        baseline_result_0 = torch.from_numpy(baseline_fun(lhs_iree, rhs_iree).to_host())
+        # Compile and run the baseline, only if LHS and RHS types match for now.
+        # Legacy IREE pass pipeline does not support mixed input types.
+        baseline_result_0 = None
+        if LHS_TYPE == RHS_TYPE:
+          extra_args=config.append_td_graph_script(
+            config.make_iree_baseline_options(argparse.td_repro), \
+            argparse.td_graph_script)
+          # print(f"compile baseline {extra_args}")
+          # print(f'ir_str: {ir_str}')
+          baseline_vmfb_str = ireec.compile_str(
+            ir_str,
+            target_backends=[iree_device],
+            extra_args=extra_args,
+          )
+          # print("prepare baseline fun")
+          baseline_fun = cc.prepare_fun(baseline_vmfb_str, fn_name, iree_runtime_device_name)
+          # print("run baseline fun")
+          baseline_result_0 = torch.from_numpy(baseline_fun(lhs_iree, rhs_iree).to_host())
 
         # Compile and run with TD options.
         extra_args = config.append_td_graph_script(
@@ -118,33 +121,37 @@ def run(problem_sizes, data_types, td_configurations, argparse, n_iters, check_r
           # Compute a proper precision for the problem size, assuming TF32 implementation.
           rtol, atol = config.compute_precision(K, LHS_TYPE, RHS_TYPE, RES_TYPE, lhs_torch, rhs_torch)
 
-          if torch_result:
+          if torch_result is not None:
             torch.testing.assert_close(
               td_result_0.cuda(), torch_result, rtol=rtol, atol=atol)
             torch.testing.assert_close(
               baseline_result_0.cuda(), torch_result, rtol=rtol, atol=atol)
           
-          torch.testing.assert_close(
-            td_result_0.cuda(), baseline_result_0.cuda(), rtol=rtol, atol=atol)
+          if baseline_result_0 is not None:
+            torch.testing.assert_close(
+              td_result_0.cuda(), baseline_result_0.cuda(), rtol=rtol, atol=atol)
         
-          # We already ran an iteration above.
-          if n_iters > 1:
-            # print(f"run {n_iters - 1} iterations")
-            for iter in range(n_iters - 1):
-              # init_fn = ones_initialization_fn
-              # init_fn = linspace_initialization_fn
-              init_fn = randn_initialization_fn
-              lhs_torch, rhs_torch, res_torch, lhs_iree, rhs_iree, res_iree = \
-                make_fill_matmul_tensors(M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE, init_fn)
-              rtol, atol = config.compute_precision(K, LHS_TYPE, RHS_TYPE, RES_TYPE, lhs_torch, rhs_torch)
+        # We already ran an iteration above.
+        if n_iters > 1:
+          # print(f"run {n_iters - 1} iterations")
+          for iter in range(n_iters - 1):
+            # init_fn = ones_initialization_fn
+            # init_fn = linspace_initialization_fn
+            init_fn = randn_initialization_fn
+            lhs_torch, rhs_torch, res_torch, lhs_iree, rhs_iree, res_iree = \
+              make_fill_matmul_tensors(M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE, init_fn)
+            rtol, atol = config.compute_precision(K, LHS_TYPE, RHS_TYPE, RES_TYPE, lhs_torch, rhs_torch)
 
-              # Test against self, this should be bitwise accurate to rule out sync issues.
-              td_result_0 = torch.from_numpy(td_fun(lhs_iree, rhs_iree).to_host())
-              td_result_1 = torch.from_numpy(td_fun(lhs_iree, rhs_iree).to_host())
-              torch.testing.assert_close(
-                td_result_0.cuda(), td_result_1.cuda(), rtol=1e-07, atol=1e-07)
-            
-              # Cross-impl test.
+            # Test against self, this should be bitwise accurate to rule out sync issues.
+            td_result_0 = torch.from_numpy(td_fun(lhs_iree, rhs_iree).to_host())
+            td_result_1 = torch.from_numpy(td_fun(lhs_iree, rhs_iree).to_host())
+            torch.testing.assert_close(
+              td_result_0.cuda(), td_result_1.cuda(), rtol=1e-07, atol=1e-07)
+          
+            # Cross-impl test.
+            # Compile and run the baseline, only if LHS and RHS types match for now.
+            # Legacy IREE pass pipeline does not support mixed input types.
+            if LHS_TYPE == RHS_TYPE:
               baseline_result = torch.from_numpy(baseline_fun(lhs_iree, rhs_iree).to_host())
               torch.testing.assert_close(
                 td_result_0.cuda(), baseline_result.cuda(), rtol=rtol, atol=atol)
