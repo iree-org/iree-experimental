@@ -28,8 +28,45 @@ RESNET50_FP32_JAX_2048X7X7XF32_BATCH_TEMPLATE = data_types_builder.ModelDataTemp
         string.Template(PARENT_GCS_DIR +
                         "/RESNET50/batch_${batch_size}/output_0.npy")
     ])
+
+RESNET50_FP16_JAX_2048X7X7XF16_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
+    id=BATCH_ID(unique_ids.OUTPUT_DATA_RESNET50_FP16_JAX_2048X7X7XF16),
+    name=BATCH_NAME("RESNET50_FP16_JAX_2048X7X7XF16"),
+    tags=["output-data", BATCH_TAG],
+    data_format=data_types.DataFormat.NUMPY_NPY,
+    model_id=BATCH_MODEL_ID(unique_ids.MODEL_RESNET50_FP16_JAX_3X224X224XF16),
+    source_info="",
+    tensor_names=["output_0"],
+    tensor_dimensions=[BATCH_TENSOR_DIMS("2048x7x7xf16")],
+    source_url=[
+        string.Template(PARENT_GCS_DIR +
+                        "/RESNET50/batch_${batch_size}/output_0.npy")
+    ])
+
+RESNET50_BF16_JAX_2048X7X7XBF16_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
+    id=BATCH_ID(unique_ids.OUTPUT_DATA_RESNET50_BF16_JAX_2048X7X7XBF16),
+    name=BATCH_NAME("RESNET50_BF16_JAX_2048X7X7XBF16"),
+    tags=["output-data", BATCH_TAG],
+    data_format=data_types.DataFormat.NUMPY_NPY,
+    model_id=BATCH_MODEL_ID(unique_ids.MODEL_RESNET50_BF16_JAX_3X224X224XBF16),
+    source_info="",
+    tensor_names=["output_0"],
+    tensor_dimensions=[BATCH_TENSOR_DIMS("2048x7x7xbf16")],
+    source_url=[
+        string.Template(PARENT_GCS_DIR +
+                        "/RESNET50/batch_${batch_size}/output_0.npy")
+    ])
+
 RESNET50_FP32_JAX_2048X7X7XF32_BATCHES = data_types_builder.build_batch_model_data(
     template=RESNET50_FP32_JAX_2048X7X7XF32_BATCH_TEMPLATE,
+    batch_sizes=[1, 8, 64, 128, 256, 2048])
+
+RESNET50_FP16_JAX_2048X7X7XF16_BATCHES = data_types_builder.build_batch_model_data(
+    template=RESNET50_FP16_JAX_2048X7X7XF16_BATCH_TEMPLATE,
+    batch_sizes=[1, 8, 64, 128, 256, 2048])
+
+RESNET50_BF16_JAX_2048X7X7XBF16_BATCHES = data_types_builder.build_batch_model_data(
+    template=RESNET50_BF16_JAX_2048X7X7XBF16_BATCH_TEMPLATE,
     batch_sizes=[1, 8, 64, 128, 256, 2048])
 
 # Bert-Large Outputs.
@@ -46,8 +83,45 @@ BERT_LARGE_FP32_JAX_384X1024XF32_BATCH_TEMPLATE = data_types_builder.ModelDataTe
         string.Template(PARENT_GCS_DIR +
                         "/BERT_LARGE/batch_${batch_size}/output_0.npy")
     ])
+
+BERT_LARGE_FP16_JAX_384X1024XF16_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
+    id=BATCH_ID(unique_ids.OUTPUT_DATA_BERT_LARGE_FP16_JAX_384X1024XF16),
+    name=BATCH_NAME("BERT_LARGE_FP16_JAX_384X1024XF16"),
+    tags=["output-data", BATCH_TAG],
+    data_format=data_types.DataFormat.NUMPY_NPY,
+    model_id=BATCH_MODEL_ID(unique_ids.MODEL_BERT_LARGE_FP16_JAX_384XI32),
+    source_info="",
+    tensor_names=["output_0"],
+    tensor_dimensions=[BATCH_TENSOR_DIMS("384x1024xf16")],
+    source_url=[
+        string.Template(PARENT_GCS_DIR +
+                        "/BERT_LARGE/batch_${batch_size}/output_0.npy")
+    ])
+
+BERT_LARGE_BF16_JAX_384X1024XBF16_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
+    id=BATCH_ID(unique_ids.OUTPUT_DATA_BERT_LARGE_BF16_JAX_384X1024XBF16),
+    name=BATCH_NAME("BERT_LARGE_BF16_JAX_384X1024XBF16"),
+    tags=["output-data", BATCH_TAG],
+    data_format=data_types.DataFormat.NUMPY_NPY,
+    model_id=BATCH_MODEL_ID(unique_ids.MODEL_BERT_LARGE_BF16_JAX_384XI32),
+    source_info="",
+    tensor_names=["output_0"],
+    tensor_dimensions=[BATCH_TENSOR_DIMS("384x1024xbf16")],
+    source_url=[
+        string.Template(PARENT_GCS_DIR +
+                        "/BERT_LARGE/batch_${batch_size}/output_0.npy")
+    ])
+
 BERT_LARGE_FP32_JAX_384X1024XF32_BATCHES = data_types_builder.build_batch_model_data(
     template=BERT_LARGE_FP32_JAX_384X1024XF32_BATCH_TEMPLATE,
+    batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280])
+
+BERT_LARGE_FP16_JAX_384X1024XF16_BATCHES = data_types_builder.build_batch_model_data(
+    template=BERT_LARGE_FP16_JAX_384X1024XF16_BATCH_TEMPLATE,
+    batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280])
+
+BERT_LARGE_BF16_JAX_384X1024XBF16_BATCHES = data_types_builder.build_batch_model_data(
+    template=BERT_LARGE_BF16_JAX_384X1024XBF16_BATCH_TEMPLATE,
     batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280])
 
 # T5-Large Outputs.
@@ -64,6 +138,43 @@ T5_LARGE_FP32_JAX_512X1024XF32_BATCH_TEMPLATE = data_types_builder.ModelDataTemp
         string.Template(PARENT_GCS_DIR +
                         "/T5_LARGE/batch_${batch_size}/output_0.npy")
     ])
+
+T5_LARGE_FP16_JAX_512X1024XF16_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
+    id=BATCH_ID(unique_ids.OUTPUT_DATA_T5_LARGE_FP16_JAX_512X1024XF16),
+    name=BATCH_NAME("T5_LARGE_FP16_JAX_512X1024XF16"),
+    tags=["output-data", BATCH_TAG],
+    data_format=data_types.DataFormat.NUMPY_NPY,
+    model_id=BATCH_MODEL_ID(unique_ids.MODEL_T5_LARGE_FP16_JAX_512XI32),
+    source_info="",
+    tensor_names=["output_0"],
+    tensor_dimensions=[BATCH_TENSOR_DIMS("512x1024xf16")],
+    source_url=[
+        string.Template(PARENT_GCS_DIR +
+                        "/T5_LARGE/batch_${batch_size}/output_0.npy")
+    ])
+
+T5_LARGE_BF16_JAX_512X1024XBF16_BATCH_TEMPLATE = data_types_builder.ModelDataTemplate(
+    id=BATCH_ID(unique_ids.OUTPUT_DATA_T5_LARGE_BF16_JAX_512X1024XBF16),
+    name=BATCH_NAME("T5_LARGE_BF16_JAX_512X1024XBF16"),
+    tags=["output-data", BATCH_TAG],
+    data_format=data_types.DataFormat.NUMPY_NPY,
+    model_id=BATCH_MODEL_ID(unique_ids.MODEL_T5_LARGE_BF16_JAX_512XI32),
+    source_info="",
+    tensor_names=["output_0"],
+    tensor_dimensions=[BATCH_TENSOR_DIMS("512x1024xbf16")],
+    source_url=[
+        string.Template(PARENT_GCS_DIR +
+                        "/T5_LARGE/batch_${batch_size}/output_0.npy")
+    ])
+
 T5_LARGE_FP32_JAX_512X1024XF32_BATCHES = data_types_builder.build_batch_model_data(
     template=T5_LARGE_FP32_JAX_512X1024XF32_BATCH_TEMPLATE,
+    batch_sizes=[1, 16, 24, 32, 48, 64, 512])
+
+T5_LARGE_FP16_JAX_512X1024XF16_BATCHES = data_types_builder.build_batch_model_data(
+    template=T5_LARGE_FP16_JAX_512X1024XF16_BATCH_TEMPLATE,
+    batch_sizes=[1, 16, 24, 32, 48, 64, 512])
+
+T5_LARGE_BF16_JAX_512X1024XBF16_BATCHES = data_types_builder.build_batch_model_data(
+    template=T5_LARGE_BF16_JAX_512X1024XBF16_BATCH_TEMPLATE,
     batch_sizes=[1, 16, 24, 32, 48, 64, 512])

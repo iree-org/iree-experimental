@@ -1,4 +1,5 @@
 from transformers import AutoTokenizer, FlaxT5Model
+import jax.numpy as jnp
 
 # We use a maximum sequence length of 512 since this is the default used in the T5 config.
 _SEQUENCE_LENGTH = 512
@@ -6,8 +7,12 @@ _SEQUENCE_LENGTH = 512
 
 class T5Large():
 
-  def __init__(self):
-    self.model = FlaxT5Model.from_pretrained("t5-large", return_dict=True)
+  def __init__(self, dtype=jnp.float32):
+    self.model = FlaxT5Model.from_pretrained("t5-large", return_dict=True, dtype=dtype)
+    if dtype == jnp.float16:
+      self.model.params = self.model.to_fp16(self.model.params)
+    elif dtype == jnp.bfloat16:
+      self.model.params = self.model.to_bf16(self.model.params)
 
   def generate_inputs(self, batch_size=1):
     tokenizer = AutoTokenizer.from_pretrained("t5-large")

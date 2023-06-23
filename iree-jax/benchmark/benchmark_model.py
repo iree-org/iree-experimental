@@ -19,6 +19,31 @@ from models import bert_large, resnet50, t5_large
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent / "oobi" / "benchmark-definitions" / "python"))
 import data_types, jax_model_definitions, unique_ids, utils
 
+
+IDS_TO_SOURCE_MODEL = {
+  (
+    unique_ids.MODEL_RESNET50_FP32_JAX, 
+    unique_ids.MODEL_RESNET50_FP16_JAX, 
+    unique_ids.MODEL_RESNET50_BF16_JAX
+  ): ("RESNET50", resnet50.ResNet50),
+  (
+    unique_ids.MODEL_BERT_LARGE_FP32_JAX, 
+    unique_ids.MODEL_BERT_LARGE_FP16_JAX, 
+    unique_ids.MODEL_BERT_LARGE_BF16_JAX
+  ): ("BERT_LARGE", bert_large.BertLarge),
+  (
+    unique_ids.MODEL_T5_LARGE_FP32_JAX,
+    unique_ids.MODEL_T5_LARGE_FP16_JAX,
+    unique_ids.MODEL_T5_LARGE_BF16_JAX
+  ): ("T5_LARGE", t5_large.T5Large)
+}
+
+DTYPE_MAPPING = {
+  data_types.DataType.FP32: jnp.float32,
+  data_types.DataType.FP16: jnp.float16,
+  data_types.DataType.BF16: jnp.bfloat16
+}
+
 def benchmark_lookup(unique_id: str):
   if unique_id not in jax_model_definitions.JAX_MODELS_DICT:
     id_list = '\n  '.join(jax_model_definitions.JAX_MODELS_DICT.keys())
@@ -26,14 +51,13 @@ def benchmark_lookup(unique_id: str):
                      f"one of:\n  {id_list}")
 
   model_definition = jax_model_definitions.JAX_MODELS_DICT[unique_id]
-  if unique_id.startswith(unique_ids.MODEL_RESNET50_FP32_JAX):
-    return ("RESNET50", resnet50.ResNet50, model_definition)
-  elif unique_id.startswith(unique_ids.MODEL_BERT_LARGE_FP32_JAX):
-    return ("BERT_LARGE", bert_large.BertLarge, model_definition)
-  elif unique_id.startswith(unique_ids.MODEL_T5_LARGE_FP32_JAX):
-    return ("T5_LARGE", t5_large.T5Large, model_definition)
-  else:
-    raise ValueError(f"Model definition not supported")
+
+  for model_ids, model_name_and_class in IDS_TO_SOURCE_MODEL.items():
+    for model_id in model_ids:
+      if unique_id.startswith(model_id):
+        return (model_name_and_class[0], model_name_and_class[1], model_definition)
+
+  raise ValueError(f"Model definition not supported")
 
 
 def dump_result(file_path: str, result: dict) -> None:
@@ -52,13 +76,14 @@ def bytes_to_mb_str(bytes: Optional[int]) -> str:
   return "n/a" if bytes is None else f"{bytes / 1e6:.6f}"
 
 def run_framework_benchmark(model_name: str, model_class: Any,
+                            jax_dtype: jnp.dtype,
                             input_data: tuple[np.array, ...],
                             expected_outputs: tuple[np.array, ...],
                             warmup_iterations: int, benchmark_iterations: int,
                             backend: str, shared_dict) -> None:
   try:
     with jax.default_device(jax.devices(backend)[0]):
-      model = model_class()
+      model = model_class(dtype=jax_dtype)
 
       # Create jits.
       start = time.perf_counter()
@@ -181,11 +206,13 @@ if __name__ == "__main__":
     shared_dict = manager.dict()
 
     if args.run_in_process:
-      run_framework_benchmark(model_name, model_class, inputs, expected_outputs, args.warmup_iterations,
+      run_framework_benchmark(model_name, model_class, DTYPE_MAPPING[model_definition.meta_model.data_type], inputs, 
+                              expected_outputs, args.warmup_iterations,
                               args.iterations, args.device, shared_dict)
     else:
       p = multiprocessing.Process(target=run_framework_benchmark,
-                                  args=(model_name, model_class, inputs, expected_outputs,
+                                  args=(model_name, model_class, DTYPE_MAPPING[model_definition.meta_model.data_type],
+                                        inputs, expected_outputs,
                                         args.warmup_iterations, args.iterations,
                                         args.device, shared_dict))
       p.start()
