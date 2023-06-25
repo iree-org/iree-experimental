@@ -1,5 +1,6 @@
 import argparse
 import jax
+import jax.numpy as jnp
 import json
 import multiprocessing
 import numpy as np
