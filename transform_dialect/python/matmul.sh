@@ -7,12 +7,17 @@
 
 # Debug TD stuff by appending: --td-repro=1
 
-python matmul_test.py
-python matmul_pad_test.py
-python matmul_pad_test.py --td-graph-script=./td_scripts/matmul_pad.mlir
-python matmul_pad_test.py --td-graph-script=./td_scripts/matmul_pad_split_k.mlir
+python test_matmul_mixed.py
+python test_matmul_pad.py
+python test_matmul_transpose_a_mixed.py
+python test_matmul_transpose_b_mixed.py
+# The scripts are broken atm, we should move to nvgpu anyway.
+# python test_matmul_pad.py --td-graph-script=./td_scripts/matmul_pad.mlir
+#python test_matmul_pad.py --td-graph-script=./td_scripts/matmul_pad_split_k.mlir
+python test_matmul.py
 
-/usr/local/cuda/bin/nsys profile --stats=true python matmul_bench.py
-/usr/local/cuda/bin/nsys profile --stats=true python matmul_pad_bench.py
-/usr/local/cuda/bin/nsys profile --stats=true python matmul_pad_bench.py --td-graph-script=./td_scripts/matmul_pad.mlir
-/usr/local/cuda/bin/nsys profile --stats=true python matmul_pad_bench.py --td-graph-script=./td_scripts/matmul_pad_split_k.mlir
+/usr/local/cuda/bin/nsys profile --stats=true python bench_matmul.py
+/usr/local/cuda/bin/nsys profile --stats=true python bench_matmul_pad.py
+# The scripts are broken atm, we should move to nvgpu anyway.
+# /usr/local/cuda/bin/nsys profile --stats=true python bench_matmul_pad.py --td-graph-script=./td_scripts/matmul_pad.mlir
+# /usr/local/cuda/bin/nsys profile --stats=true python bench_matmul_pad.py --td-graph-script=./td_scripts/matmul_pad_split_k.mlir

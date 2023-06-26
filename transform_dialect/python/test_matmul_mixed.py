@@ -5,18 +5,18 @@
 #
 # Debug TD stuff by appending: --td-repro=1
 
-# python matmul_pad_test.py
-# python matmul_test.py --td-graph-script=./td_scripts/matmul_pad.mlir
-# python matmul_test.py --td-graph-script=./td_scripts/matmul_pad_split_k.mlir
+# python test_matmul_mixed.py
 
-problem_sizes = [ 
-  [123, 123, 12345] 
+problem_sizes = [
+  # Partially aligned
+  [123, 456, 789],
 ]
 td_configurations = [
-  {'blk': '16,16,1', 'tds': '32,1,1', 'wps': '1,1,1', 'p': 3, 'r': 16, 'acp': "1", 'mma': "1"},
+  {'blk': '16,16,1', 'tds': '32,1,1', 'wps': '1,1,1', 'p': 1, 'r': 16, 'acp': "1", 'mma': "0", 'wmma': "0", "fma": "1"},
 ]
 data_types = [
-  ["f32", "f32", "f32"]
+  ["f16", "i8", "f16"],
+  ["f16", "f16", "i8"],
 ]
 
 import matmul_runner as runner
