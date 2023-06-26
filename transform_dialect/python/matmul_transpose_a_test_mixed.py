@@ -5,7 +5,7 @@
 #
 # Debug TD stuff by appending: --td-repro=1
 
-# python matmul_test_mixed.py
+# python matmul_transpose_a_test_mixed.py
 
 problem_sizes = [
   # Partially aligned
@@ -19,10 +19,15 @@ data_types = [
   ["f16", "f16", "i8"],
 ]
 
+import matmul_config as config
 import matmul_runner as runner
 import td_argparse
 args = td_argparse.parse_args()
 
 n_iters = 5
 check_results = True
-runner.run(problem_sizes, data_types, td_configurations, args, n_iters, check_results = check_results)
+runner.run(problem_sizes, data_types, td_configurations, args, n_iters, \
+           template_str=config.fill_matmul_transpose_a_template, \
+           tensor_builder_fn=runner.make_fill_matmul_transpose_a_tensors, \
+           torch_baseline_fn=runner.torch_baseline_fill_matmul_transpose_a_tensors, \
+           check_results = check_results)

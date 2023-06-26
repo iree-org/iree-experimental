@@ -59,4 +59,4 @@ args = td_argparse.parse_args()
 
 n_iters = 5
 check_results = True
-runner.run(problem_sizes, data_types, td_configurations, args, n_iters, check_results)
+runner.run(problem_sizes, data_types, td_configurations, args, n_iters, check_results = check_results)
