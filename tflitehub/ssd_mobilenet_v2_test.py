@@ -1,5 +1,4 @@
 # RUN: %PYTHON %s %config_flag
-# XFAIL: *
 
 import absl.testing
 import coco_test_data
