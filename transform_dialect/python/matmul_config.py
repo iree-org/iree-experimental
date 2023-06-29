@@ -126,7 +126,7 @@ def make_iree_baseline_options(td_repro=False):
 # "--debug-only=transform-llvmgpu-extensions-alias",
 #
 # Options for debugging transform strategies.
-# "--debug-only=iree-transform-strategy-builder",
+# "--debug-only=iree-transform-builder",
 # "--debug-only=transform-dialect-save-repro",
 # "--mlir-disable-threading",
 def make_iree_td_options(config, td_repro=False, benchmark=False):
@@ -144,8 +144,11 @@ def make_iree_td_options(config, td_repro=False, benchmark=False):
     f"--iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy",
     f"--iree-codegen-llvmgpu-enable-transform-dialect-small-matmul",
     f"--iree-flow-enable-pad-handling",
+    # Some manual debugging
     # f"--debug-only=iree-gpu-copy-mapping",
     # f"--debug-only=iree-transform-builder",
+    # f"--debug-only=mlir-print-ir-after-all",
+    # f"--debug-only=mlir-disable-threading",
   ]
   if 'default' in config:
     return append_td_repro_options(res, td_repro)
@@ -153,11 +156,12 @@ def make_iree_td_options(config, td_repro=False, benchmark=False):
   res = res + [
     f"--td-matmul-strategy-blk-sizes={config['blk']}",
     f"--td-matmul-strategy-num-threads={config['tds']}",
-    f"--td-matmul-strategy-num-warps={config['wps']}",
     f"--td-matmul-strategy-pipeline-depth={config['p']}",
     f"--td-matmul-strategy-reduc-size={config['r']}",
     f"--td-matmul-strategy-use-async-copies={config['acp']}",
   ]
+  if 'wps' in config:
+    res.append(f"--td-matmul-strategy-num-warps={config['wps']}")
   if 'mma' in config:
     res.append(f"--td-matmul-strategy-use-mma-sync={config['mma']}")
   if 'wmma' in config:

@@ -5,7 +5,7 @@
 #
 # Debug TD stuff by appending: --td-repro=1
 
-# python matmul_transpose_b_test_mixed.py
+# python test_matmul_transpose_b_mixed.py
 
 problem_sizes = [
   # Partially aligned
