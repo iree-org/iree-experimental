@@ -104,15 +104,15 @@ def run(problem_sizes,
             config.make_iree_td_options(td_config, \
                                         argparse.td_repro), \
             argparse.td_graph_script)
-        print(f"compile td {extra_args}")
+        # print(f"compile td {extra_args}")
         td_vmfb_str = ireec.compile_str(
           td_ir_str,
           target_backends=[iree_device],
           extra_args=extra_args,
         )
-        print("prepare td fun")
+        # print("prepare td fun")
         td_fun = cc.prepare_fun(td_vmfb_str, td_fn_name, iree_runtime_device_name)
-        print("run td fun")
+        # print("run td fun")
         td_result_0 = torch.from_numpy(td_fun(lhs_iree, rhs_iree).to_host())
 
         if check_results:
@@ -154,7 +154,6 @@ def run(problem_sizes,
           
             # Cross-impl test.
             # Compile and run the baseline, only if LHS and RHS types match for now.
-            # Legacy IREE pass pipeline does not support mixed input types.
             if torch_result is not None:
               torch_result = torch_baseline_fn(lhs_torch, rhs_torch, out=res_torch)
               torch.testing.assert_close(
