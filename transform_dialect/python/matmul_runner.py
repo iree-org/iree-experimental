@@ -11,11 +11,19 @@ iree_runtime_device = get_device(iree_runtime_device_name)
 import compile_and_compare as cc
 import matmul_config as config
 import sys
+import math
 
-zeros_initialization_fn = lambda x, y: torch.zeros(x, y)
-ones_initialization_fn = lambda x, y: torch.ones(x, y)
-linspace_initialization_fn = lambda x, y: torch.linspace(0, x*y - 1, x*y).reshape(x, y)
-randn_initialization_fn = lambda x, y: torch.randn(x, y)
+def zeros_initialization_fn(*args):
+  return torch.zeros(*args)
+
+def ones_initialization_fn(*args):
+  return torch.ones(*args)
+
+def linspace_initialization_fn(*args):
+  return torch.linspace(0, math.prod(args) - 1, math.prod(args)).reshape(*args)
+
+def randn_initialization_fn(*args):
+  return torch.randn(*args)
 
 mlir_type_to_dtype = {
   "f64": torch.float64,
@@ -39,7 +47,7 @@ def convert(t, type):
 #   * either I am misusing this API or ireert.asdevicearray does not work as expected:
 #     - the kernel cost as shown in nvprof is still heavily skewed by the copy cost
 #     - it is still necessary to run multiple times to show the real timings
-def finalize_make_fill_matmul_tensors(lhs, rhs, res, LHS_TYPE, RHS_TYPE, RES_TYPE):
+def finalize_make_mamtul_like_tensors(lhs, rhs, res, LHS_TYPE, RHS_TYPE, RES_TYPE):
   lhs = convert(lhs, LHS_TYPE)
   rhs = convert(rhs, RHS_TYPE)
   res = convert(res, RES_TYPE)
@@ -52,7 +60,7 @@ def finalize_make_fill_matmul_tensors(lhs, rhs, res, LHS_TYPE, RHS_TYPE, RES_TYP
 
 def make_fill_matmul_tensors(M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE, initialization_fn=lambda x, y: torch.randn(x, y)):
   lhs, rhs, res = initialization_fn(M, K), initialization_fn(K, N), zeros_initialization_fn(M, N)
-  return finalize_make_fill_matmul_tensors(lhs, rhs, res, LHS_TYPE, RHS_TYPE, RES_TYPE)
+  return finalize_make_mamtul_like_tensors(lhs, rhs, res, LHS_TYPE, RHS_TYPE, RES_TYPE)
 
 def torch_baseline_fill_matmul_tensors(lhs, rhs, out=None):
   return torch.mm(lhs, rhs, out=out)
@@ -60,7 +68,7 @@ def torch_baseline_fill_matmul_tensors(lhs, rhs, out=None):
 
 def make_fill_matmul_transpose_a_tensors(M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE, initialization_fn=lambda x, y: torch.randn(x, y)):
   lhs, rhs, res = initialization_fn(K, M), initialization_fn(K, N), zeros_initialization_fn(M, N)
-  return finalize_make_fill_matmul_tensors(lhs, rhs, res, LHS_TYPE, RHS_TYPE, RES_TYPE)
+  return finalize_make_mamtul_like_tensors(lhs, rhs, res, LHS_TYPE, RHS_TYPE, RES_TYPE)
 
 def torch_baseline_fill_matmul_transpose_a_tensors(lhs, rhs, out=None):
   return torch.mm(lhs.t(), rhs, out=out)
@@ -68,36 +76,41 @@ def torch_baseline_fill_matmul_transpose_a_tensors(lhs, rhs, out=None):
 
 def make_fill_matmul_transpose_b_tensors(M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE, initialization_fn=lambda x, y: torch.randn(x, y)):
   lhs, rhs, res = initialization_fn(M, K), initialization_fn(N, K), zeros_initialization_fn(M, N)
-  return finalize_make_fill_matmul_tensors(lhs, rhs, res, LHS_TYPE, RHS_TYPE, RES_TYPE)
+  return finalize_make_mamtul_like_tensors(lhs, rhs, res, LHS_TYPE, RHS_TYPE, RES_TYPE)
 
 def torch_baseline_fill_matmul_transpose_b_tensors(lhs, rhs, out=None):
   return torch.mm(lhs, rhs.t(), out=out)
 
 
+def make_fill_batch_matmul_tensors(BATCH, M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE, initialization_fn=lambda x, y: torch.randn(x, y, z)):
+  lhs, rhs, res = initialization_fn(BATCH, M, K), initialization_fn(BATCH, K, N), initialization_fn(BATCH, M, N)
+  return finalize_make_mamtul_like_tensors(lhs, rhs, res, LHS_TYPE, RHS_TYPE, RES_TYPE)
 
-def run(problem_sizes,
+def torch_baseline_fill_batch_matmul_tensors(lhs, rhs, out=None):
+  return torch.bmm(lhs, rhs, out=out)
+
+
+def run(problem_builder,
+        problem_sizes,
         data_types,
         td_configurations,
         argparse,
         n_iters,
-        template_str = config.fill_matmul_template,
-        tensor_builder_fn = make_fill_matmul_tensors,
-        torch_baseline_fn = torch_baseline_fill_matmul_tensors,
+        tensor_builder_fn,
+        torch_baseline_fn,
         check_results=False):
-  for M, N, K in problem_sizes:
+  for ps in problem_sizes:
     for LHS_TYPE, RHS_TYPE, RES_TYPE in data_types:
       # init_fn = ones_initialization_fn
       # init_fn = linspace_initialization_fn
       init_fn = randn_initialization_fn
-      ir_str, fn_name = config.make_fill_matmul_problem(
-        template_str, M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE)
-      print(f"matmul_{M}x{N}x{K}")
+      ir_str, fn_name = problem_builder(*ps, LHS_TYPE, RHS_TYPE, RES_TYPE)
+      print("sizes: " + "x".join(map(str, ps)))
       for td_config in td_configurations:
         print(f"td_config: {td_config}")
-        td_ir_str, td_fn_name = config.make_fill_matmul_problem(
-          template_str, M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE, td_config)
+        td_ir_str, td_fn_name = problem_builder(*ps, LHS_TYPE, RHS_TYPE, RES_TYPE, td_config)
         lhs_torch, rhs_torch, res_torch, lhs_iree, rhs_iree, res_iree = \
-          tensor_builder_fn(M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE, init_fn)
+          tensor_builder_fn(*ps, LHS_TYPE, RHS_TYPE, RES_TYPE, init_fn)
 
         # Compile and run with TD options.
         extra_args = config.append_td_graph_script(
@@ -115,20 +128,22 @@ def run(problem_sizes,
         # print("run td fun")
         td_result_0 = torch.from_numpy(td_fun(lhs_iree, rhs_iree).to_host())
 
+        torch_result = None
+        if LHS_TYPE == RHS_TYPE and LHS_TYPE == RES_TYPE:
+          torch_result = torch_baseline_fn(lhs_torch, rhs_torch, out=res_torch)
+
         if check_results:
           # print("check results")
           # Cross-impl test: this is tricky as we may have a TF32 vs F32 situation.
           # Compute a proper precision for the problem size, assuming TF32 implementation.
-          rtol, atol = config.compute_precision(K, LHS_TYPE, RHS_TYPE, RES_TYPE, lhs_torch, rhs_torch)
+          rtol, atol = config.compute_precision(ps[-1], LHS_TYPE, RHS_TYPE, RES_TYPE, lhs_torch, rhs_torch)
 
           # Run with torch, only if types match for now, don't know how to do
           # mixed precision in torch.
           # print("run torch")
-          torch_result = None
           if LHS_TYPE == RHS_TYPE and LHS_TYPE == RES_TYPE:
             torch.backends.cuda.matmul.allow_tf32
             torch.backends.cudnn.allow_tf32
-            torch_result = torch_baseline_fn(lhs_torch, rhs_torch, out=res_torch)
             if argparse.dump_full_tensor:
               torch.set_printoptions(threshold=10_000)
               print(f"torch_result: {torch_result}")
@@ -138,24 +153,27 @@ def run(problem_sizes,
             torch.testing.assert_close(
               td_result_0.cuda(), torch_result, rtol=rtol, atol=atol)
           
-          for iter in range(n_iters - 1):
-            # init_fn = ones_initialization_fn
-            # init_fn = linspace_initialization_fn
-            init_fn = randn_initialization_fn
-            lhs_torch, rhs_torch, res_torch, lhs_iree, rhs_iree, res_iree = \
-              tensor_builder_fn(M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE, init_fn)
-            rtol, atol = config.compute_precision(K, LHS_TYPE, RHS_TYPE, RES_TYPE, lhs_torch, rhs_torch)
+        for iter in range(n_iters - 1):
+          # init_fn = ones_initialization_fn
+          # init_fn = linspace_initialization_fn
+          init_fn = randn_initialization_fn
+          lhs_torch, rhs_torch, res_torch, lhs_iree, rhs_iree, res_iree = \
+            tensor_builder_fn(*ps, LHS_TYPE, RHS_TYPE, RES_TYPE, init_fn)
 
-            # Test against self, this should be bitwise accurate to rule out sync issues.
-            td_result_0 = torch.from_numpy(td_fun(lhs_iree, rhs_iree).to_host())
+          # Test against self, this should be bitwise accurate to rule out sync issues.
+          td_result_0 = torch.from_numpy(td_fun(lhs_iree, rhs_iree).to_host())
+
+          if torch_result is not None:
+            torch_result = torch_baseline_fn(lhs_torch, rhs_torch, out=res_torch)
+          if check_results:
+            rtol, atol = config.compute_precision(ps[-1], LHS_TYPE, RHS_TYPE, RES_TYPE, lhs_torch, rhs_torch)
             td_result_1 = torch.from_numpy(td_fun(lhs_iree, rhs_iree).to_host())
             torch.testing.assert_close(
               td_result_0.cuda(), td_result_1.cuda(), rtol=1e-07, atol=1e-07)
-          
+        
             # Cross-impl test.
             # Compile and run the baseline, only if LHS and RHS types match for now.
-            if torch_result is not None:
-              torch_result = torch_baseline_fn(lhs_torch, rhs_torch, out=res_torch)
+            if LHS_TYPE == RHS_TYPE and LHS_TYPE == RES_TYPE:
               torch.testing.assert_close(
                 td_result_0.cuda(), torch_result, rtol=rtol, atol=atol)
 
