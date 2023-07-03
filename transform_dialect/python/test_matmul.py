@@ -63,7 +63,12 @@ args = td_argparse.parse_args()
 
 n_iters = 5
 check_results = True
-runner.run(problem_sizes, data_types, td_configurations, args, n_iters, check_results = check_results)
+runner.run(
+  lambda *args: config.make_fill_matmul_problem(config.fill_matmul_template, *args),
+  problem_sizes, data_types, td_configurations, args, n_iters, 
+  tensor_builder_fn = runner.make_fill_matmul_tensors,
+  torch_baseline_fn = runner.torch_baseline_fill_matmul_tensors,
+  check_results = check_results)
 
 # transpose_a does not correctly generate the mma sync instructions and results
 # in extremely long compile + runtimes atm.

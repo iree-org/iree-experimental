@@ -81,6 +81,49 @@ def make_fill_matmul_problem(template_str, M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE
     "${FN_NAME}", str(fn_name)), \
     fn_name
 
+fill_batch_matmul_template = """
+!lhs = tensor<${BATCH} x ${M} x ${K} x f32>
+!rhs = tensor<${BATCH} x ${K} x ${N} x f32>
+!res = tensor<${BATCH} x ${M} x ${N} x f32>
+
+func.func @${FN_NAME}(%arg0: !lhs, %arg1: !rhs) -> !res {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : !res
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : !res) -> !res
+  %2 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+    ],
+    iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+  } ins(%arg0, %arg1 : !lhs, !rhs) outs(%1 : !res) {
+  ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
+    %3 = arith.mulf %arg3, %arg4 : f32
+    %4 = arith.addf %arg5, %3 : f32
+    linalg.yield %4 : f32
+  } -> !res
+  return %2 : !res
+}
+"""
+
+def make_fill_batch_matmul_problem(template_str, BATCH, M, N, K, LHS_TYPE, RHS_TYPE, RES_TYPE, td_config=None):
+  fn_name = f"bmm_{BATCH}_{M}_{N}_{K}"
+  fn_name = fn_name if td_config is None else \
+    fn_name  + "_" + "_".join([f"{k}_{v}" for k, v in td_config.items()])
+  fn_name = fn_name.replace(',', '_')
+  return template_str.replace(
+    "${BATCH}", str(BATCH)).replace(
+    "${M}", str(M)).replace(
+    "${K}", str(K)).replace(
+    "${N}", str(N)).replace(
+    "${LHS_TYPE}", str(LHS_TYPE)).replace(
+    "${RHS_TYPE}", str(RHS_TYPE)).replace(
+    "${RES_TYPE}", str(RES_TYPE)).replace(
+    "${INIT_VAL}", str(mlir_type_to_init_val[RES_TYPE])).replace(
+    "${FN_NAME}", str(fn_name)), \
+    fn_name
+
 # Some extra flags that may be useful to uncomment, but not to remember and type...
 # "--mlir-print-ir-after-all",
 # "--iree-hal-dump-executable-benchmarks-to=/tmp/iree-executables",
@@ -143,10 +186,12 @@ def make_iree_td_options(config, td_repro=False, benchmark=False):
     f"--iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul",
     f"--iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy",
     f"--iree-codegen-llvmgpu-enable-transform-dialect-small-matmul",
+    f"--iree-codegen-llvmgpu-enable-transform-dialect-batch-matmul-strategy",
     f"--iree-flow-enable-pad-handling",
     # Some manual debugging
     # f"--debug-only=iree-gpu-copy-mapping",
     # f"--debug-only=iree-transform-builder",
+    # f"--debug-only=transform-dialect",
     # f"--debug-only=mlir-print-ir-after-all",
     # f"--debug-only=mlir-disable-threading",
   ]
