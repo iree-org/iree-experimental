@@ -49,7 +49,7 @@ module attributes { transform.with_named_sequence } {
     %padded, %pad, %__ = transform.structured.pad %tiled_reduction {
       padding_values=[0.0 : f32, 0.0 : f32, 0.0 : f32],
       padding_dimensions=[0, 1, 2],
-      pack_paddings=[1, 1, 0],
+      pack_paddings=[1, 1, 1],
       copy_back_op="none"
     } : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     %pad_dps = transform.structured.rewrite_in_destination_passing_style %pad : (!transform.any_op) -> !transform.any_op
