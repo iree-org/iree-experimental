@@ -52,6 +52,7 @@ module attributes { transform.with_named_sequence } {
       pack_paddings=[1, 1, 0],
       copy_back_op="none"
     } : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %pad_dps = transform.structured.rewrite_in_destination_passing_style %pad : (!transform.any_op) -> !transform.any_op
 
     // Second level tile to forall with tile_sizes [8, 8].
     %forall_1, %tiled_matmul_1 =
@@ -65,6 +66,7 @@ module attributes { transform.with_named_sequence } {
       pack_paddings=[0, 0, 1],
       copy_back_op="none"
     } : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %pad_1_dps = transform.structured.rewrite_in_destination_passing_style %pad_1 : (!transform.any_op) -> !transform.any_op
 
     // Clean up.
     transform.include @cleanup failures(propagate) (%variant_op) : (!transform.any_op) -> ()
