@@ -33,38 +33,39 @@ module attributes { transform.with_named_sequence } {
   ^bb1(%variant_op: !transform.any_op):
     %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
 
-    // First level tile to forall with tile_sizes [16, 16].
+    // First level tile to forall with tile_sizes [64, 32].
     %forall, %tiled_matmul =
-      transform.structured.tile_to_forall_op %matmul tile_sizes [16, 16]
+      transform.structured.tile_to_forall_op %matmul tile_sizes [64, 32]
         ( mapping = [#gpu.block<y>, #gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall
       : (!transform.any_op) -> ()
 
     // Tile reduction dimension.
     %tiled_reduction, %loop =
-      transform.structured.tile %tiled_matmul [0, 0, 8]
+      transform.structured.tile %tiled_matmul [0, 0, 16]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Pack by applying data tiling, and the linalg.matmul becomes linalg.mmt4d.
-    %pack = transform.structured.pack %tiled_reduction packed_sizes = [2, 4, 4]
+    %pack = transform.structured.pack %tiled_reduction packed_sizes = [64, 32, 16]
       : (!transform.any_op) -> (!transform.any_op)
 
-    // Second level tile to forall with tile_sizes [8, 8].
+    // Second level tile to forall with tile_sizes [8, 4].
     %forall_1, %tiled_matmul_1 =
-      transform.structured.tile_to_forall_op %pack tile_sizes [8, 8]
+      transform.structured.tile_to_forall_op %pack tile_sizes [8, 4]
         ( mapping = [#gpu.thread<y>, #gpu.thread<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+
+    // Pack by applying data tiling, and the linalg.matmul becomes linalg.mmt4d.
+    %pack_2 = transform.structured.pack %tiled_matmul_1 packed_sizes = [0, 0, 0, 8, 4, 16]
+      : (!transform.any_op) -> (!transform.any_op)
 
     // Clean up.
     transform.include @cleanup failures(propagate) (%variant_op) : (!transform.any_op) -> ()
+
+    transform.print %variant_op : !transform.any_op
+
     transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
 
     // Bufferize and drop HAL decriptor from memref ops.
     %variant_op_3 = transform.iree.bufferize %variant_op : (!transform.any_op) -> !transform.any_op
-
-    // Post-bufferization mapping workgroup.
-    %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-    transform.iree.forall_to_workgroup %memref_func : (!transform.any_op) -> ()
-    transform.iree.map_nested_forall_to_gpu_threads %memref_func workgroup_dims = [4, 2, 1] subgroup_size = 1 : (!transform.any_op) -> ()
-    transform.iree.hoist_static_alloc %memref_func : (!transform.any_op) -> ()
   }
 }
