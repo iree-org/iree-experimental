@@ -45,18 +45,34 @@ module attributes { transform.with_named_sequence } {
       transform.structured.tile %tiled_matmul [0, 0, 16]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    // Pack by applying data tiling, and the linalg.matmul becomes linalg.mmt4d.
-    %pack = transform.structured.pack %tiled_reduction packed_sizes = [64, 32, 16]
+    // Pack by applying data tiling, and the linalg.matmul becomes linalg.generic.
+    %packed = transform.structured.pack %tiled_reduction packed_sizes = [64, 32, 16]
       : (!transform.any_op) -> (!transform.any_op)
+
+    // Transpose B matrix from [K N n k] to [K N k n]
+    %pack_producer = transform.get_producer_of_operand %packed[1]
+      : (!transform.any_op) -> (!transform.any_op)
+    %packed_1, %pack_1, %empty_unpack_1 =
+      transform.structured.pack_transpose %pack_producer with_compute_op(%packed)
+      inner_perm = [1, 0] : (!transform.any_op, !transform.any_op)
+      -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
     // Second level tile to forall with tile_sizes [8, 4].
     %forall_1, %tiled_matmul_1 =
-      transform.structured.tile_to_forall_op %pack tile_sizes [8, 4]
+      transform.structured.tile_to_forall_op %packed_1 tile_sizes [8, 4]
         ( mapping = [#gpu.thread<y>, #gpu.thread<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    // Pack by applying data tiling, and the linalg.matmul becomes linalg.mmt4d.
-    %pack_2 = transform.structured.pack %tiled_matmul_1 packed_sizes = [0, 0, 0, 8, 4, 16]
+    // Pack by applying data tiling, and the linalg.matmul becomes linalg.generic.
+    %packed_2 = transform.structured.pack %tiled_matmul_1 packed_sizes = [0, 0, 0, 8, 4, 16]
       : (!transform.any_op) -> (!transform.any_op)
+
+    // Transpose B matrix from [K N n k] to [K N k n]
+    %pack_producer_2 = transform.get_producer_of_operand %packed_2[1]
+      : (!transform.any_op) -> (!transform.any_op)
+    %packed_3, %pack_3, %empty_unpack_3 =
+      transform.structured.pack_transpose %pack_producer_2 with_compute_op(%packed_2)
+      inner_perm = [1, 0] : (!transform.any_op, !transform.any_op)
+      -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
     // Clean up.
     transform.include @cleanup failures(propagate) (%variant_op) : (!transform.any_op) -> ()
