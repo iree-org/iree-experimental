@@ -49,23 +49,55 @@ module attributes { transform.with_named_sequence } {
     %packed = transform.structured.pack %tiled_reduction packed_sizes = [16, 64, 64]
       : (!transform.any_op) -> (!transform.any_op)
 
+    // Transpose B matrix from [K N n k] to [K N k n]
+    %pack_producer_b0 = transform.get_producer_of_operand %packed[1]
+      : (!transform.any_op) -> (!transform.any_op)
+    %packed_b0, %pack_b0, %empty_unpack_b0 =
+      transform.structured.pack_transpose %pack_producer_b0 with_compute_op(%packed)
+      inner_perm = [1, 0] : (!transform.any_op, !transform.any_op)
+      -> (!transform.any_op, !transform.any_op, !transform.any_op)
+
     // Second level tile to forall with tile_sizes [16, 64].
     %forall_1, %tiled_matmul_1 =
-      transform.structured.tile_to_forall_op %packed tile_sizes [16, 64]
+      transform.structured.tile_to_forall_op %packed_b0 tile_sizes [16, 64]
         ( mapping = [#gpu.thread<y>, #gpu.thread<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Pack by applying data tiling, and the linalg.matmul becomes linalg.mmt4d.
     %packed_2 = transform.structured.pack %tiled_matmul_1 packed_sizes = [0, 0, 0, 4, 8, 8]
       : (!transform.any_op) -> (!transform.any_op)
 
+    // Transpose A matrix from [M K m k m0 k0] to [M K k m m0 k0]
+    %pack_producer_a = transform.get_producer_of_operand %packed_2[0]
+      : (!transform.any_op) -> (!transform.any_op)
+    %packed_a, %pack_a, %empty_unpack_a =
+      transform.structured.pack_transpose %pack_producer_a with_compute_op(%packed_2)
+      outer_perm = [0, 1, 3, 2] : (!transform.any_op, !transform.any_op)
+      -> (!transform.any_op, !transform.any_op, !transform.any_op)
+
+    // Transpose B matrix from [K N k n n0 k0] to [K N n k k0 n0]
+    %pack_producer_b = transform.get_producer_of_operand %packed_a[1]
+      : (!transform.any_op) -> (!transform.any_op)
+    %packed_b, %pack_b, %empty_unpack_b =
+      transform.structured.pack_transpose %pack_producer_b with_compute_op(%packed_a)
+      outer_perm = [0, 1, 3, 2] inner_perm = [1, 0] : (!transform.any_op, !transform.any_op)
+      -> (!transform.any_op, !transform.any_op, !transform.any_op)
+
+    // Transpose C matrix from [M N m n m0 n0] to [M N n m m0 n0]
+    %unpack = transform.get_consumers_of_result %packed_b[0]
+      : (!transform.any_op) -> (!transform.any_op)
+    %packed_c, %pack_c, %unpack_c =
+      transform.structured.pack_transpose %unpack with_compute_op(%packed_b)
+      outer_perm = [0, 1, 3, 2] : (!transform.any_op, !transform.any_op)
+      -> (!transform.any_op, !transform.any_op, !transform.any_op)
+
     // Clean up.
     transform.include @cleanup failures(propagate) (%variant_op) : (!transform.any_op) -> ()
-
     transform.print %variant_op : !transform.any_op
 
     transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
 
     // Bufferize and drop HAL decriptor from memref ops.
     %variant_op_3 = transform.iree.bufferize %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.print %variant_op_3 : !transform.any_op
   }
 }
