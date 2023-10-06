@@ -64,9 +64,9 @@ module attributes { transform.with_named_sequence } {
     %buffer_c0, %new_c0 = transform.structured.bufferize_to_allocation %pack_producer_c0
       {memory_space = "shared", bufferize_destination_only, emit_dealloc} : !transform.any_op
 
-    // Second level tile to forall with tile_sizes [16, 64].
+    // Second level tile to forall with tile_sizes [1, 1].
     %tiled_matmul_1, %forall_1 =
-      transform.structured.tile_using_forall %packed_b0 tile_sizes [16, 64]
+      transform.structured.tile_using_forall %packed_b0 tile_sizes [1, 1]
         ( mapping = [#gpu.thread<y>, #gpu.thread<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Tile reduction dimension.
