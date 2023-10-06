@@ -52,6 +52,18 @@ module attributes { transform.with_named_sequence } {
       inner_perm = [1, 0] : (!transform.any_op, !transform.any_op)
       -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
+    // Bufferize to shared memory allocation
+    %pack_producer_a0 = transform.get_producer_of_operand %packed_b0[0]
+      : (!transform.any_op) -> (!transform.any_op)
+    %pack_producer_c0 = transform.get_producer_of_operand %packed_b0[2]
+      : (!transform.any_op) -> (!transform.any_op)
+    %buffer_a0, %new_a0 = transform.structured.bufferize_to_allocation %pack_b0
+      {memory_space = "shared", bufferize_destination_only, emit_dealloc} : !transform.any_op
+    %buffer_b0, %new_b0 = transform.structured.bufferize_to_allocation %pack_producer_a0
+      {memory_space = "shared", bufferize_destination_only, emit_dealloc} : !transform.any_op
+    %buffer_c0, %new_c0 = transform.structured.bufferize_to_allocation %pack_producer_c0
+      {memory_space = "shared", bufferize_destination_only, emit_dealloc} : !transform.any_op
+
     // Second level tile to forall with tile_sizes [16, 64].
     %tiled_matmul_1, %forall_1 =
       transform.structured.tile_using_forall %packed_b0 tile_sizes [16, 64]
@@ -59,7 +71,7 @@ module attributes { transform.with_named_sequence } {
 
     // Tile reduction dimension.
     %tiled_reduction, %loop =
-      transform.structured.tile_using_for %tiled_matmul_1 [0, 0, 128]
+      transform.structured.tile_using_for %tiled_matmul_1 [0, 0, 1]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Pack by applying data tiling, and the linalg.matmul becomes linalg.generic.
@@ -90,14 +102,22 @@ module attributes { transform.with_named_sequence } {
       outer_perm = [0, 1, 3, 2] : (!transform.any_op, !transform.any_op)
       -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
+    // Bufferize to local memory allocation
+    %buffer_a, %new_a = transform.structured.bufferize_to_allocation %pack_a
+      {memory_space = "local", bufferize_destination_only, emit_dealloc} : !transform.any_op
+    %buffer_b, %new_b = transform.structured.bufferize_to_allocation %pack_b
+      {memory_space = "local", bufferize_destination_only, emit_dealloc} : !transform.any_op
+    %buffer_c, %new_c = transform.structured.bufferize_to_allocation %pack_c
+      {memory_space = "local", bufferize_destination_only, emit_dealloc} : !transform.any_op
+
     // Clean up.
     transform.include @cleanup failures(propagate) (%variant_op) : (!transform.any_op) -> ()
-    transform.print %variant_op : !transform.any_op
-
     transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
 
     // Bufferize and drop HAL decriptor from memref ops.
     %variant_op_3 = transform.iree.bufferize %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.print %variant_op_3 : !transform.any_op
+    %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3
+      : (!transform.any_op) -> !transform.any_op
+    transform.iree.hoist_static_alloc %memref_func : (!transform.any_op) -> ()
   }
 }
