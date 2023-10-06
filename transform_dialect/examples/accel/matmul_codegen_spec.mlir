@@ -4,7 +4,7 @@
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   ${IREE_DIR}/build/tools/iree-opt \
-//     ${IREE_SAMPLES_DIR}/transform_dialect/examples/accel/matmul_source.mlir \
+//     ${IREE_SAMPLES_DIR}/transform_dialect/examples/accel/matmul_f32_source.mlir \
 //     --iree-hal-target-backends=llvm-cpu \
 //     --iree-abi-transformation-pipeline \
 //     --iree-flow-transformation-pipeline \
@@ -34,20 +34,20 @@ module attributes { transform.with_named_sequence } {
     %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
 
     // First level tile to forall with tile_sizes [15, 20].
-    %forall, %tiled_matmul =
-      transform.structured.tile_to_forall_op %matmul tile_sizes [15, 20]
+    %tiled_matmul, %forall =
+      transform.structured.tile_using_forall %matmul tile_sizes [15, 20]
         ( mapping = [#gpu.block<x>, #gpu.block<y>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall
       : (!transform.any_op) -> ()
 
     // Tile reduction dimension.
     %tiled_reduction, %loop =
-      transform.structured.tile %tiled_matmul [0, 0, 10]
+      transform.structured.tile_using_for %tiled_matmul [0, 0, 10]
         : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Second level tile to forall with tile_sizes [5, 10].
-    %forall_1, %tiled_matmul_1 =
-      transform.structured.tile_to_forall_op %tiled_reduction tile_sizes [5, 10]
+    %tiled_matmul_1, %forall_1 =
+      transform.structured.tile_using_forall %tiled_reduction tile_sizes [5, 10]
         ( mapping = [#gpu.thread<x>, #gpu.thread<y>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Clean up.

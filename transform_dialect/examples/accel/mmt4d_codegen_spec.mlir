@@ -66,15 +66,15 @@ module attributes { transform.with_named_sequence } {
     %matmul = transform.structured.match ops{["linalg.mmt4d"]} in %variant_op : (!transform.any_op) -> !transform.any_op
 
     // First level tile to forall with tile_sizes [2, 4].
-    %forall, %tiled_matmul =
-      transform.structured.tile_to_forall_op %matmul tile_sizes [2, 4]
+    %tiled_matmul, %forall =
+      transform.structured.tile_using_forall %matmul tile_sizes [2, 4]
         ( mapping = [#gpu.block<y>, #gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall
       : (!transform.any_op) -> ()
 
     // Tile reduction dimension.
     %tiled_reduction, %loop =
-      transform.structured.tile %tiled_matmul [0, 0, 8]
+      transform.structured.tile_using_for %tiled_matmul [0, 0, 8]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Pad operation.
@@ -87,8 +87,8 @@ module attributes { transform.with_named_sequence } {
     %pad_dps = transform.structured.rewrite_in_destination_passing_style %pad : (!transform.any_op) -> !transform.any_op
 
     // Second level tile to forall with tile_sizes [1, 1].
-    %forall_1, %tiled_matmul_1 =
-      transform.structured.tile_to_forall_op %padded tile_sizes [1, 1]
+    %tiled_matmul_1, %forall_1 =
+      transform.structured.tile_using_forall %padded tile_sizes [1, 1]
         ( mapping = [#gpu.thread<y>, #gpu.thread<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Pad operation.

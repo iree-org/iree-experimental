@@ -4,7 +4,7 @@
 //   export IREE_DIR=${HOME}/github/iree; \
 //   export IREE_SAMPLES_DIR=${HOME}/github/iree-samples; \
 //   ${IREE_DIR}/build/tools/iree-opt \
-//     ${IREE_SAMPLES_DIR}/transform_dialect/examples/accel/matmul_source.mlir \
+//     ${IREE_SAMPLES_DIR}/transform_dialect/examples/accel/matmul_f32_source.mlir \
 //     --iree-hal-target-backends=llvm-cpu \
 //     --iree-abi-transformation-pipeline \
 //     --iree-flow-transformation-pipeline \
@@ -34,15 +34,15 @@ module attributes { transform.with_named_sequence } {
     %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
 
     // First level tile to forall with tile_sizes [16, 32].
-    %forall, %tiled_matmul =
-      transform.structured.tile_to_forall_op %matmul tile_sizes [16, 32]
+    %tiled_matmul, %forall =
+      transform.structured.tile_using_forall %matmul tile_sizes [16, 32]
         ( mapping = [#gpu.block<y>, #gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall
       : (!transform.any_op) -> ()
 
     // Tile reduction dimension.
     %tiled_reduction, %loop =
-      transform.structured.tile %tiled_matmul [0, 0, 8]
+      transform.structured.tile_using_for %tiled_matmul [0, 0, 8]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Pad operation.
@@ -55,8 +55,8 @@ module attributes { transform.with_named_sequence } {
     %pad_dps = transform.structured.rewrite_in_destination_passing_style %pad : (!transform.any_op) -> !transform.any_op
 
     // Second level tile to forall with tile_sizes [8, 8].
-    %forall_1, %tiled_matmul_1 =
-      transform.structured.tile_to_forall_op %padded tile_sizes [8, 8]
+    %tiled_matmul_1, %forall_1 =
+      transform.structured.tile_using_forall %padded tile_sizes [8, 8]
         ( mapping = [#gpu.thread<y>, #gpu.thread<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Pad operation.
