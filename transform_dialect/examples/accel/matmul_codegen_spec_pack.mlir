@@ -34,19 +34,14 @@ module attributes { transform.with_named_sequence } {
     %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
 
     // First level tile to forall with tile_sizes [16, 128].
-    %forall, %tiled_matmul =
-      transform.structured.tile_to_forall_op %matmul tile_sizes [16, 128]
+    %tiled_matmul, %forall =
+      transform.structured.tile_using_forall %matmul tile_sizes [16, 128]
         ( mapping = [#gpu.block<y>, #gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall
       : (!transform.any_op) -> ()
 
-    // Tile reduction dimension.
-    %tiled_reduction, %loop =
-      transform.structured.tile %tiled_matmul [0, 0, 128]
-      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
-
-    // Pack by applying data tiling, and the linalg.matmul becomes linalg.mmt4d.
-    %packed = transform.structured.pack %tiled_reduction packed_sizes = [16, 64, 64]
+    // Pack by applying data tiling, and the linalg.matmul becomes linalg.generic.
+    %packed = transform.structured.pack %tiled_matmul packed_sizes = [16, 64, 64]
       : (!transform.any_op) -> (!transform.any_op)
 
     // Transpose B matrix from [K N n k] to [K N k n]
@@ -58,12 +53,17 @@ module attributes { transform.with_named_sequence } {
       -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
     // Second level tile to forall with tile_sizes [16, 64].
-    %forall_1, %tiled_matmul_1 =
-      transform.structured.tile_to_forall_op %packed_b0 tile_sizes [16, 64]
+    %tiled_matmul_1, %forall_1 =
+      transform.structured.tile_using_forall %packed_b0 tile_sizes [16, 64]
         ( mapping = [#gpu.thread<y>, #gpu.thread<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    // Pack by applying data tiling, and the linalg.matmul becomes linalg.mmt4d.
-    %packed_2 = transform.structured.pack %tiled_matmul_1 packed_sizes = [0, 0, 0, 4, 8, 8]
+    // Tile reduction dimension.
+    %tiled_reduction, %loop =
+      transform.structured.tile_using_for %tiled_matmul_1 [0, 0, 128]
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+
+    // Pack by applying data tiling, and the linalg.matmul becomes linalg.generic.
+    %packed_2 = transform.structured.pack %tiled_reduction packed_sizes = [0, 0, 0, 4, 8, 8]
       : (!transform.any_op) -> (!transform.any_op)
 
     // Transpose A matrix from [M K m k m0 k0] to [M K k m m0 k0]
