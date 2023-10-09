@@ -69,13 +69,8 @@ module attributes { transform.with_named_sequence } {
       transform.structured.tile_using_forall %packed_b0 tile_sizes [1, 1]
         ( mapping = [#gpu.thread<y>, #gpu.thread<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    // Tile reduction dimension.
-    %tiled_reduction, %loop =
-      transform.structured.tile_using_for %tiled_matmul_1 [0, 0, 1]
-      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
-
     // Pack by applying data tiling, and the linalg.matmul becomes linalg.generic.
-    %packed_2 = transform.structured.pack %tiled_reduction packed_sizes = [0, 0, 0, 4, 8, 8]
+    %packed_2 = transform.structured.pack %tiled_matmul_1 packed_sizes = [0, 0, 0, 4, 8, 8]
       : (!transform.any_op) -> (!transform.any_op)
 
     // Transpose A matrix from [M K m k m0 k0] to [M K k m m0 k0]
@@ -109,6 +104,11 @@ module attributes { transform.with_named_sequence } {
       {memory_space = "local", bufferize_destination_only, emit_dealloc} : !transform.any_op
     %buffer_c, %new_c = transform.structured.bufferize_to_allocation %pack_c
       {memory_space = "local", bufferize_destination_only, emit_dealloc} : !transform.any_op
+
+    // Tile reduction dimension.
+    %tiled_reduction, %loop =
+      transform.structured.tile_using_for %packed_c [0, 0, 1]
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Clean up.
     transform.include @cleanup failures(propagate) (%variant_op) : (!transform.any_op) -> ()
