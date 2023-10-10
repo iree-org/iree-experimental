@@ -31,7 +31,8 @@ module attributes { transform.with_named_sequence } {
 
   transform.sequence failures(propagate) {
   ^bb1(%variant_op: !transform.any_op):
-    %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %ops = transform.structured.match ops{["linalg.fill", "linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %fill, %matmul = transform.split_handle %ops : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // First level tile to forall with tile_sizes [16, 128].
     %tiled_matmul, %forall =
@@ -39,6 +40,9 @@ module attributes { transform.with_named_sequence } {
         ( mapping = [#gpu.block<y>, #gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall
       : (!transform.any_op) -> ()
+
+    // Fuse fill operation into the loop
+    %fused_fill, %_ = transform.structured.fuse_into_containing_op %fill into %forall : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Pack by applying data tiling, and the linalg.matmul becomes linalg.generic.
     %packed = transform.structured.pack %tiled_matmul packed_sizes = [16, 64, 64]
@@ -51,6 +55,9 @@ module attributes { transform.with_named_sequence } {
       transform.structured.pack_transpose %pack_producer_b0 with_compute_op(%packed)
       inner_perm = [1, 0] : (!transform.any_op, !transform.any_op)
       -> (!transform.any_op, !transform.any_op, !transform.any_op)
+
+    // Run canonicalization to fold fill with pack and unpack operations.
+    transform.include @cleanup failures(propagate) (%variant_op) : (!transform.any_op) -> ()
 
     // Bufferize to shared memory allocation
     %pack_producer_a0 = transform.get_producer_of_operand %packed_b0[0]
@@ -68,6 +75,12 @@ module attributes { transform.with_named_sequence } {
     %tiled_matmul_1, %forall_1 =
       transform.structured.tile_using_forall %packed_b0 tile_sizes [1, 1]
         ( mapping = [#gpu.thread<y>, #gpu.thread<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+
+    // Find the fill operation to fuse.
+    %fused_fill_1 = transform.get_producer_of_operand %forall_1[0] : (!transform.any_op) -> (!transform.any_op)
+
+    // Fuse fill operation into the loop
+    %fused_fill_2, %__ = transform.structured.fuse_into_containing_op %fused_fill_1 into %forall_1 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Pack by applying data tiling, and the linalg.matmul becomes linalg.generic.
     %packed_2 = transform.structured.pack %tiled_matmul_1 packed_sizes = [0, 0, 0, 4, 8, 8]
@@ -97,12 +110,19 @@ module attributes { transform.with_named_sequence } {
       outer_perm = [0, 1, 3, 2] : (!transform.any_op, !transform.any_op)
       -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
+    // Fold fill operation with pack and unpack.
+    transform.include @cleanup failures(propagate) (%variant_op) : (!transform.any_op) -> ()
+
     // Bufferize to local memory allocation
     %buffer_a, %new_a = transform.structured.bufferize_to_allocation %pack_a
       {memory_space = "local", bufferize_destination_only, emit_dealloc} : !transform.any_op
     %buffer_b, %new_b = transform.structured.bufferize_to_allocation %pack_b
       {memory_space = "local", bufferize_destination_only, emit_dealloc} : !transform.any_op
-    %buffer_c, %new_c = transform.structured.bufferize_to_allocation %pack_c
+
+    // Earlier handle for pack operation is now defunct. Find it again.
+    %fused_pack_fill = transform.get_producer_of_operand %packed_c[2] : (!transform.any_op) -> (!transform.any_op)
+
+    %buffer_c, %new_c = transform.structured.bufferize_to_allocation %fused_pack_fill
       {memory_space = "local", bufferize_destination_only, emit_dealloc} : !transform.any_op
 
     // Tile reduction dimension.
