@@ -13,13 +13,14 @@ endif()
 # This target statically links against Vulkan.
 # One way to achieve this is by installing the Vulkan SDK from
 # https://vulkan.lunarg.com/.
+# vcpkg install vulkan
 include(FindVulkan)
 if(NOT Vulkan_FOUND)
   message(STATUS "Could not find Vulkan, skipping vulkan_gui sample")
   return()
 endif()
 
-# vcpkg install imgui[vulkan-binding,sdl2-binding]
+# vcpkg install imgui[core,sdl2-renderer-binding,sdl2-binding,bulkan-binding,win32-binding]
 #   tested with versions 1.83 - 1.87#1
 find_package(imgui)
 if(NOT imgui_FOUND)

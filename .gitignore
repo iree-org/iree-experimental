@@ -6,3 +6,6 @@ __pycache__
 # CMake artifacts
 build/
 build-*/
+
+# Sample artifacts
+imgui.ini
