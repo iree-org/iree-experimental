@@ -1,4 +1,6 @@
-# RUN: %PYTHON %s
+# RUN: %PYTHON %s %config_flag
+# TODO(iree/#10514): Address vmvx numerical mismatch issue.
+# XFAIL: vmvx
 
 import absl.testing
 import numpy
@@ -19,4 +21,3 @@ class ResNet50Int8Test(test_util.TFLiteModelTest):
 
 if __name__ == '__main__':
   absl.testing.absltest.main()
-

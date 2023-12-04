@@ -120,7 +120,7 @@ iree_status_t iree_tools_utils_load_pixel_data(
 iree_status_t iree_tools_utils_buffer_view_from_image(
     const iree_string_view_t filename, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_allocator_t* allocator, iree_hal_buffer_view_t** out_buffer_view) {
+    iree_hal_device_t* device, iree_hal_buffer_view_t** out_buffer_view) {
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_buffer_view = NULL;
   if (element_type != IREE_HAL_ELEMENT_TYPE_SINT_8 &&
@@ -139,9 +139,9 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
     iree_host_size_t element_byte =
         iree_hal_element_dense_byte_count(element_type);
     // SINT_8 and UINT_8 perform direct buffer wrap.
-    result = iree_hal_buffer_view_allocate_buffer(
-        allocator, shape_rank, shape, element_type,
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+    result = iree_hal_buffer_view_allocate_buffer_copy(
+        device, iree_hal_device_allocator(device), shape_rank, shape,
+        element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
             .access = IREE_HAL_MEMORY_ACCESS_READ,
@@ -174,7 +174,7 @@ static iree_status_t iree_tools_utils_buffer_view_load_image_rescaled(
 iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
     const iree_string_view_t filename, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_allocator_t* allocator, const float* input_range,
+    iree_hal_device_t* device, const float* input_range,
     iree_host_size_t input_range_length,
     iree_hal_buffer_view_t** out_buffer_view) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -207,7 +207,8 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
       .input_range_length = input_range_length,
   };
   iree_status_t status = iree_hal_buffer_view_generate_buffer(
-      allocator, shape_rank, shape, element_type, encoding_type,
+      device, iree_hal_device_allocator(device), shape_rank, shape,
+      element_type, encoding_type,
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
                   IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,

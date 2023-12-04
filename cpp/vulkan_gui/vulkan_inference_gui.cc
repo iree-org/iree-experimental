@@ -24,11 +24,8 @@
 #include "iree/hal/drivers/vulkan/registration/driver_module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 #include "iree/vm/ref_cc.h"
-
-// Other dependencies (helpers, etc.)
-#include "iree/base/internal/main.h"
 
 // Compiled module embedded here to avoid file IO:
 #include "simple_mul_bytecode_module_c.h"
@@ -580,8 +577,8 @@ extern "C" int iree_main(int argc, char** argv) {
 
   // Create a runtime Instance.
   iree_vm_instance_t* iree_instance = nullptr;
-  IREE_CHECK_OK(
-      iree_vm_instance_create(iree_allocator_system(), &iree_instance));
+  IREE_CHECK_OK(iree_vm_instance_create(
+      IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_system(), &iree_instance));
 
   // Register HAL drivers and VM module types.
   IREE_CHECK_OK(iree_hal_vulkan_driver_module_register(
@@ -748,8 +745,6 @@ extern "C" int iree_main(int argc, char** argv) {
 
         // Write inputs into mappable buffers.
         constexpr iree_hal_dim_t kElementCount = 4;
-        iree_hal_allocator_t* allocator =
-            iree_hal_device_allocator(iree_vk_device);
         iree_hal_memory_type_t input_memory_type =
             static_cast<iree_hal_memory_type_t>(
                 IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
@@ -762,15 +757,15 @@ extern "C" int iree_main(int argc, char** argv) {
         // Wrap input buffers in buffer views.
         iree_hal_buffer_view_t* input0_buffer_view = nullptr;
         iree_hal_buffer_view_t* input1_buffer_view = nullptr;
-        IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer(
-            allocator,
+        IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer_copy(
+            iree_vk_device, iree_hal_device_allocator(iree_vk_device),
             /*shape_rank=*/1, /*shape=*/&kElementCount,
             IREE_HAL_ELEMENT_TYPE_FLOAT_32,
             IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
             iree_make_const_byte_span(&input_x, sizeof(input_x)),
             &input0_buffer_view));
-        IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer(
-            allocator,
+        IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer_copy(
+            iree_vk_device, iree_hal_device_allocator(iree_vk_device),
             /*shape_rank=*/1, /*shape=*/&kElementCount,
             IREE_HAL_ELEMENT_TYPE_FLOAT_32,
             IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
@@ -779,7 +774,7 @@ extern "C" int iree_main(int argc, char** argv) {
         // Marshal inputs through a VM variant list.
         // [arg0|arg1]
         vm::ref<iree_vm_list_t> inputs;
-        IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 6,
+        IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 6,
                                           iree_allocator_system(), &inputs));
         auto input0_buffer_view_ref =
             iree_hal_buffer_view_move_ref(input0_buffer_view);
@@ -792,7 +787,7 @@ extern "C" int iree_main(int argc, char** argv) {
 
         // Prepare outputs list to accept results from the invocation.
         vm::ref<iree_vm_list_t> outputs;
-        IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr,
+        IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(),
                                           kElementCount * sizeof(float),
                                           iree_allocator_system(), &outputs));
 
@@ -803,9 +798,9 @@ extern "C" int iree_main(int argc, char** argv) {
                                      outputs.get(), iree_allocator_system()));
 
         // Read back the results.
-        auto* output_buffer_view = reinterpret_cast<iree_hal_buffer_view_t*>(
-            iree_vm_list_get_ref_deref(outputs.get(), 0,
-                                       iree_hal_buffer_view_get_descriptor()));
+        iree_hal_buffer_view_t* output_buffer_view =
+            iree_vm_list_get_buffer_view_assign(outputs.get(), 0);
+
         IREE_CHECK_OK(iree_hal_device_transfer_d2h(
             iree_vk_device, iree_hal_buffer_view_buffer(output_buffer_view), 0,
             latest_output, sizeof(latest_output),
@@ -864,3 +859,33 @@ extern "C" int iree_main(int argc, char** argv) {
 }
 
 }  // namespace iree
+
+#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
+    defined(IREE_PLATFORM_LINUX)
+
+int main(int argc, char** argv) { return iree::iree_main(argc, argv); }
+
+#elif defined(IREE_PLATFORM_WINDOWS)
+
+#include <combaseapi.h>
+
+// Entry point when using /SUBSYSTEM:CONSOLE is the standard main().
+int main(int argc, char** argv) { return iree::iree_main(argc, argv); }
+
+// Entry point when using /SUBSYSTEM:WINDOWS.
+// https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-winmain
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                   LPSTR lpCmdLine, int nShowCmd) {
+  // Setup COM on the main thread.
+  // NOTE: this may fail if COM has already been initialized - that's OK.
+  CoInitializeEx(NULL, COINIT_MULTITHREADED);
+
+  // Run standard main function.
+  // We use the MSVCRT __argc/__argv to get access to the standard argc/argv
+  // vs. using the flattened string passed to WinMain (that would require
+  // complex unicode splitting/etc).
+  // https://docs.microsoft.com/en-us/cpp/c-runtime-library/argc-argv-wargv
+  return iree::iree_main(__argc, __argv);
+}
+
+#endif  // IREE_PLATFORM_*

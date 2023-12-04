@@ -52,7 +52,6 @@ target_link_libraries(${_NAME}
   Vulkan::Vulkan
   #
   iree_base_internal_flags
-  iree_base_internal_main
   iree_hal_drivers_vulkan_registration_registration
   iree_modules_hal_hal
   iree_tooling_context_util

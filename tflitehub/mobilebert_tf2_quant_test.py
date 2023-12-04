@@ -1,5 +1,4 @@
-# RUN: %PYTHON %s
-# XFAIL: *
+# RUN: %PYTHON %s %config_flag
 
 import absl.testing
 import numpy as np
@@ -37,4 +36,3 @@ class MobileBertTest(test_util.TFLiteModelTest):
 
 if __name__ == '__main__':
   absl.testing.absltest.main()
-

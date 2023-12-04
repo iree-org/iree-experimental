@@ -27,14 +27,11 @@
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/context_util.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 // HACK:
+#include "iree/hal/drivers/vulkan/base_buffer.h"
 #include "iree/hal/drivers/vulkan/native_semaphore.h"
-#include "iree/hal/drivers/vulkan/vma_buffer.h"
-
-// Other dependencies (helpers, etc.)
-#include "iree/base/internal/main.h"
 
 // Capture:
 #include <d3d11.h>
@@ -70,7 +67,8 @@ iree_status_t load_module(iree_vm_instance_t* instance, const char* module_path,
   // on disk.
   iree_file_contents_t* file_contents = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_file_read_contents(module_path, host_allocator, &file_contents));
+      z0, iree_file_read_contents(module_path, IREE_FILE_READ_FLAG_DEFAULT,
+                                  host_allocator, &file_contents));
 
   // Try to load the module as bytecode (all we have today that we can use).
   // We could sniff the file ID and switch off to other module types.
@@ -932,8 +930,8 @@ extern "C" int iree_main(int argc, char** argv) {
 
   // Create a runtime Instance.
   vm::ref<iree_vm_instance_t> iree_instance;
-  IREE_CHECK_OK(
-      iree_vm_instance_create(iree_allocator_system(), &iree_instance));
+  IREE_CHECK_OK(iree_vm_instance_create(
+      IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_system(), &iree_instance));
 
   // Register HAL drivers and VM module types.
   IREE_CHECK_OK(iree_hal_vulkan_driver_module_register(
@@ -1180,7 +1178,7 @@ extern "C" int iree_main(int argc, char** argv) {
     iree_device_size_t source_buffer_size = width * height * sizeof(uint32_t);
     IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(iree_vk_device), source_buffer_params,
-        source_buffer_size, iree_const_byte_span_empty(), &source_buffer));
+        source_buffer_size, &source_buffer));
 
     source_width = width;
     source_height = height;
@@ -1194,8 +1192,7 @@ extern "C" int iree_main(int argc, char** argv) {
     // Only used for in-place outputs - wasteful otherwise but :shrug:.
     IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(iree_vk_device), source_buffer_params,
-        source_buffer_size, iree_const_byte_span_empty(),
-        &target_buffer_storage));
+        source_buffer_size, &target_buffer_storage));
   };
 
   VkDeviceMemory target_memory = nullptr;
@@ -1292,10 +1289,10 @@ extern "C" int iree_main(int argc, char** argv) {
   };
 
   vm::ref<iree_vm_list_t> inputs;
-  IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 8,
+  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 8,
                                     iree_allocator_system(), &inputs));
   vm::ref<iree_vm_list_t> outputs;
-  IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 8,
+  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 8,
                                     iree_allocator_system(), &outputs));
 
   struct BBox {
@@ -1618,7 +1615,7 @@ extern "C" int iree_main(int argc, char** argv) {
                              nullptr, 1, &to_src_barrier);
 
         VkBuffer source_buffer_handle =
-            iree_hal_vulkan_vma_buffer_handle(source_buffer.get());
+            iree_hal_vulkan_buffer_handle(source_buffer.get());
         VkBufferImageCopy source_copy_region = {};
         source_copy_region.imageOffset.x = abs_x;
         source_copy_region.imageOffset.y = abs_y;
@@ -1724,7 +1721,7 @@ extern "C" int iree_main(int argc, char** argv) {
                              VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
                              nullptr, 1, &to_dst_barrier);
 
-        VkBuffer target_buffer_handle = iree_hal_vulkan_vma_buffer_handle(
+        VkBuffer target_buffer_handle = iree_hal_vulkan_buffer_handle(
             iree_hal_buffer_view_buffer(target_view.get()));
         VkBufferImageCopy target_copy_region = {};
         target_copy_region.bufferOffset = 0;
@@ -1945,3 +1942,33 @@ extern "C" int iree_main(int argc, char** argv) {
 }
 
 }  // namespace iree
+
+#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
+    defined(IREE_PLATFORM_LINUX)
+
+int main(int argc, char** argv) { return iree::iree_main(argc, argv); }
+
+#elif defined(IREE_PLATFORM_WINDOWS)
+
+#include <combaseapi.h>
+
+// Entry point when using /SUBSYSTEM:CONSOLE is the standard main().
+int main(int argc, char** argv) { return iree::iree_main(argc, argv); }
+
+// Entry point when using /SUBSYSTEM:WINDOWS.
+// https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-winmain
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                   LPSTR lpCmdLine, int nShowCmd) {
+  // Setup COM on the main thread.
+  // NOTE: this may fail if COM has already been initialized - that's OK.
+  CoInitializeEx(NULL, COINIT_MULTITHREADED);
+
+  // Run standard main function.
+  // We use the MSVCRT __argc/__argv to get access to the standard argc/argv
+  // vs. using the flattened string passed to WinMain (that would require
+  // complex unicode splitting/etc).
+  // https://docs.microsoft.com/en-us/cpp/c-runtime-library/argc-argv-wargv
+  return iree::iree_main(__argc, __argv);
+}
+
+#endif  // IREE_PLATFORM_*

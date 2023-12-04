@@ -86,7 +86,6 @@ target_link_libraries(${_NAME}
   Vulkan::Vulkan
   #
   iree_runtime_runtime
-  iree_base_internal_main
   iree_hal_drivers_vulkan_registration_registration
   iree_modules_hal_hal
   iree_samples_vulkan_gui_simple_mul_bytecode_module_c

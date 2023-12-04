@@ -1,4 +1,4 @@
-# RUN: %PYTHON %s
+# RUN: %PYTHON %s %config_flag
 
 import absl.testing
 import coco_test_data
@@ -27,4 +27,3 @@ class SsdMobilenetV1Test(test_util.TFLiteModelTest):
 
 if __name__ == '__main__':
   absl.testing.absltest.main()
-

@@ -16,8 +16,7 @@
 
 iree_status_t Run(const iree_string_view_t image_path) {
   iree_runtime_instance_options_t instance_options;
-  iree_runtime_instance_options_initialize(IREE_API_VERSION_LATEST,
-                                           &instance_options);
+  iree_runtime_instance_options_initialize(&instance_options);
   iree_runtime_instance_options_use_all_available_drivers(&instance_options);
   iree_runtime_instance_t* instance = NULL;
   IREE_RETURN_IF_ERROR(iree_runtime_instance_create(
@@ -58,8 +57,8 @@ iree_status_t Run(const iree_string_view_t image_path) {
   IREE_RETURN_IF_ERROR(
       iree_tools_utils_buffer_view_from_image_rescaled(
           image_path, buffer_shape, IREE_ARRAYSIZE(buffer_shape),
-          hal_element_type, iree_hal_device_allocator(device), input_range,
-          IREE_ARRAYSIZE(input_range), &buffer_view),
+          hal_element_type, device, input_range, IREE_ARRAYSIZE(input_range),
+          &buffer_view),
       "load image");
   IREE_RETURN_IF_ERROR(
       iree_runtime_call_inputs_push_back_buffer_view(&call, buffer_view));

@@ -1,4 +1,5 @@
-# RUN: %PYTHON %s
+# RUN: %PYTHON %s %config_flag
+# XFAIL: vmvx
 
 import absl.testing
 import numpy
