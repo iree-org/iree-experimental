@@ -44,9 +44,9 @@ set(IREE_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
 
 # FetchContent_MakeAvailable(iree)
 # FetchContent_GetProperties(iree SOURCE_DIR IREE_SOURCE_DIR)
-set(IREE_SOURCE_DIR "D:\\Dev\\iree\\")
+set(IREE_SOURCE_DIR "D:\\dev\\projects\\iree\\")
 # include("${IREE_SOURCE_DIR}")
-add_subdirectory("${IREE_SOURCE_DIR}" "D:\\Dev\\iree-build\\iree-samples\\")
+add_subdirectory("${IREE_SOURCE_DIR}" "D:\\dev\\projects\\iree-build\\iree-samples\\")
 
 #-------------------------------------------------------------------------------
 # Individual samples
