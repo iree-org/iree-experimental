@@ -6,7 +6,7 @@
 
 if(NOT IREE_TARGET_BACKEND_VULKAN_SPIRV OR
    NOT IREE_HAL_DRIVER_VULKAN)
-  message(STATUS "Missing Vulkan backend and/or driver, skipping vulkan_gui sample")
+  message(STATUS "Missing Vulkan backend and/or driver, skipping ml_overlay sample")
   return()
 endif()
 
@@ -15,7 +15,7 @@ endif()
 # https://vulkan.lunarg.com/.
 include(FindVulkan)
 if(NOT Vulkan_FOUND)
-  message(STATUS "Could not find Vulkan, skipping vulkan_gui sample")
+  message(STATUS "Could not find Vulkan, skipping ml_overlay sample")
   return()
 endif()
 
@@ -23,7 +23,7 @@ endif()
 #   tested with versions 1.83 - 1.87#1
 find_package(imgui)
 if(NOT imgui_FOUND)
-  message(STATUS "Could not find Dear ImGui, skipping vulkan_gui sample")
+  message(STATUS "Could not find Dear ImGui, skipping ml_overlay sample")
   return()
 endif()
 
@@ -31,7 +31,7 @@ endif()
 #   tested with versions 2.0.14#4 - 2.0.22#1
 find_package(SDL2)
 if(NOT SDL2_FOUND)
-  message(STATUS "Could not find SDL2, skipping vulkan_gui sample")
+  message(STATUS "Could not find SDL2, skipping ml_overlay sample")
   return()
 endif()
 
