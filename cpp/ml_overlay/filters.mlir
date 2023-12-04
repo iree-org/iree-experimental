@@ -13,6 +13,33 @@ func.func @filter_add_inplace(
   return %0 : tensor<?x?x4xi8>
 }
 
+func.func @filter_invert(
+  %source: tensor<?x?x4xi8>
+) -> (tensor<?x?x4xi8>) {
+  %0 = arith.constant dense<[[[255, 255, 255, 255]]]> : tensor<1x1x4xi8>
+  %1 = shape.shape_of %source : tensor<?x?x4xi8> -> tensor<3xindex>
+  %2 = "mhlo.dynamic_broadcast_in_dim"(%0, %1) {broadcast_dimensions = dense<[0, 1, 2]> : tensor<3xi64>} : (tensor<1x1x4xi8>, tensor<3xindex>) -> tensor<?x?x4xi8>
+
+  %3 = arith.constant dense<[[[0, 0, 0, 255]]]> : tensor<1x1x4xi8>
+  %4 = "mhlo.dynamic_broadcast_in_dim"(%3, %1) {broadcast_dimensions = dense<[0, 1, 2]> : tensor<3xi64>} : (tensor<1x1x4xi8>, tensor<3xindex>) -> tensor<?x?x4xi8>
+
+  %5 = arith.subi %2, %source : tensor<?x?x4xi8>
+  %out = arith.addi %5, %4 : tensor<?x?x4xi8>
+  return %out : tensor<?x?x4xi8>
+}
+
+func.func @filter_drain_red(
+  %source: tensor<?x?x4xi8>
+) -> (tensor<?x?x4xi8>) {
+  // bgra
+  %0 = arith.constant dense<[[[255, 255, 200, 255]]]> : tensor<1x1x4xi8>
+  %1 = shape.shape_of %source : tensor<?x?x4xi8> -> tensor<3xindex>
+  %2 = "mhlo.dynamic_broadcast_in_dim"(%0, %1) {broadcast_dimensions = dense<[0, 1, 2]> : tensor<3xi64>} : (tensor<1x1x4xi8>, tensor<3xindex>) -> tensor<?x?x4xi8>
+
+  %out = arith.minsi %2, %source : tensor<?x?x4xi8>
+  return %out : tensor<?x?x4xi8>
+}
+
 func.func @filter_cst(
   %source: tensor<?x?x4xi8>
 ) -> (tensor<?x?x4xi8>) {
