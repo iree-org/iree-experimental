@@ -39,7 +39,7 @@ iree_status_t iree_tools_utils_load_pixel_data(
 iree_status_t iree_tools_utils_buffer_view_from_image(
     const iree_string_view_t filename, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_allocator_t* allocator, iree_hal_buffer_view_t** out_buffer_view);
+    iree_hal_device_t* device, iree_hal_buffer_view_t** out_buffer_view);
 
 // Parse the content in an image file in |filename| into a HAL buffer view
 // |out_buffer_view|. |out_buffer_view| properties are defined by |shape|,
@@ -53,7 +53,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
 iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
     const iree_string_view_t filename, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_allocator_t* allocator, const float* input_range,
+    iree_hal_device_t* device, const float* input_range,
     iree_host_size_t input_range_length,
     iree_hal_buffer_view_t** out_buffer_view);
 
