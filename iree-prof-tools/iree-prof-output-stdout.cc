@@ -104,15 +104,16 @@ absl::flat_hash_map<int, int64_t> GetThreadDurations(
 template <typename T>
 struct Zone {
   const char* name;
-  const T* zone;
 
-  // Total count of zones running on threads filtered. It must be the same to
-  // zone->zones.size() if no threads are filtered out.
+  // Total count of zones running on threads filtered.
   int64_t total_count;
 
-  // Total duration of zones running on threads filtered. It must be the same to
-  // zone->total if no threads are filtered out.
+  // Total duration of zones running on threads filtered.
   int64_t total_duration;
+
+  // Duration per thread filtered. Sum of durations must be the same with
+  // total_duration.
+  absl::flat_hash_map<int, int64_t> duration_per_thread;
 };
 
 // Returns zones running on threads filtered, and sorted by the total duration.
@@ -123,27 +124,28 @@ std::vector<Zone<T>> GetZonesFilteredAndSorted(
     const std::vector<std::string>& zone_substrs,
     const absl::flat_hash_map<int, int64_t>& thread_durations) {
   std::vector<Zone<T>> zones_filtered;
+  absl::flat_hash_map<absl::string_view, int> zones_filtered_index;
   for (const auto& z : zones) {
-    const char* zone_name = GetZoneName(worker, z.first);
-    if (!HasSubstr(zone_name, zone_substrs)) {
-      continue;
-    }
-
-    int64_t total_count = 0;
-    int64_t total_duration = 0;
     for (const auto& t : z.second.zones) {
-      if (thread_durations.contains(GetThreadId(t))) {
-        ++total_count;
-        total_duration += GetEventDuration(*t.Zone());
+      const char* zone_name = worker.GetZoneName(*t.Zone());
+      if (!HasSubstr(zone_name, zone_substrs)) {
+        continue;
+      }
+
+      if (!zones_filtered_index.contains(zone_name)) {
+        zones_filtered_index[zone_name] = zones_filtered.size();
+        zones_filtered.emplace_back(Zone<T>{.name = zone_name});
+      }
+
+      auto& zone = zones_filtered[zones_filtered_index[zone_name]];
+      auto tid = GetThreadId(t);
+      if (thread_durations.contains(tid)) {
+        ++zone.total_count;
+        auto duration = GetEventDuration(*t.Zone());
+        zone.total_duration += duration;
+        zone.duration_per_thread[tid] += duration;
       }
     }
-
-    if (total_count == 0 || total_duration == 0) {
-      continue;
-    }
-
-    zones_filtered.emplace_back(
-        Zone<T>{zone_name, &z.second, total_count, total_duration});
   }
 
   std::sort(zones_filtered.begin(), zones_filtered.end(),
@@ -183,20 +185,12 @@ void FillOutputTableRowWithZone(
     IreeProfOutputStdout::DurationUnit unit,
     const std::vector<std::string>& headers,
     std::vector<std::string>& output_row) {
-  absl::flat_hash_map<int, int64_t> ns_per_thread;
-  for (const auto& t : zone.zone->zones) {
-    auto tid = GetThreadId(t);
-    if (thread_durations.contains(tid)) {
-      ns_per_thread[tid] += GetEventDuration(*t.Zone());
-    }
-  }
-
   output_row[0] = zone.name;
   output_row[1] = absl::StrCat(zone.total_count);
   output_row[2] = absl::StrCat(
       GetDurationStr(zone.total_duration, unit),
       GetPercentage(zone.total_duration, total_duration));
-  for (auto it : ns_per_thread) {
+  for (auto it : zone.duration_per_thread) {
     output_row[GetColOfThread(headers, GetThreadName<U>(worker, it.first))] =
         absl::StrCat(GetDurationStr(it.second, unit),
                      GetPercentage(it.second, thread_durations.at(it.first)));

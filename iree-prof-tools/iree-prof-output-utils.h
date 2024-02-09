@@ -77,10 +77,6 @@ template <>
 int64_t GetThreadDuration<tracy::GpuEvent>(const tracy::Worker& worker,
                                            int thread_id);
 
-// Returns the zone name associated to a source location ID in a trace worker.
-const char* GetZoneName(const tracy::Worker& worker,
-                        int16_t source_location_id);
-
 // Gets source file:line string. May return an empty string if it is unknown.
 std::string GetSourceFileLine(const tracy::Worker& worker,
                               int16_t source_location_id);
