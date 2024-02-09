@@ -157,11 +157,6 @@ int64_t GetThreadDuration<tracy::GpuEvent>(const tracy::Worker& worker,
   return 0;
 }
 
-const char* GetZoneName(const tracy::Worker& worker,
-                        int16_t source_location_id) {
-  return worker.GetZoneName(worker.GetSourceLocation(source_location_id));
-}
-
 std::string GetSourceFileLine(const tracy::Worker& worker,
                               int16_t source_location_id) {
   const auto& zone = worker.GetSourceLocation(source_location_id);
