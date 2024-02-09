@@ -72,7 +72,7 @@ std::string GetDurationStr(int64_t duration_ns,
 
 // Returns the duration per thread, i.e merged durations of all top-level zones
 // running on each thread.
-template <typename T>
+template <typename T, typename U = typename ZoneTypeHelper<T>::EventType>
 absl::flat_hash_map<int, int64_t> GetThreadDurations(
     const tracy::Worker& worker,
     const tracy::unordered_flat_map<int16_t, T>& zones,
@@ -82,7 +82,7 @@ absl::flat_hash_map<int, int64_t> GetThreadDurations(
     for (const auto& t : z.second.zones) {
       auto tid = GetThreadId(t);
       if (!thread_durations.contains(tid)) {
-        thread_durations[tid] = GetThreadDuration<T>(worker, tid);
+        thread_durations[tid] = GetThreadDuration<U>(worker, tid);
       }
     }
   }
@@ -92,7 +92,7 @@ absl::flat_hash_map<int, int64_t> GetThreadDurations(
   if (!thread_substrs.empty()) {
     absl::flat_hash_map<int, int64_t> filtered_thread_durations;
     for (const auto& d : thread_durations) {
-      if (HasSubstr(GetThreadName<T>(worker, d.first), thread_substrs)) {
+      if (HasSubstr(GetThreadName<U>(worker, d.first), thread_substrs)) {
         filtered_thread_durations[d.first] = d.second;
       }
     }
@@ -174,7 +174,7 @@ std::string GetPercentage(int64_t num, int64_t total) {
 }
 
 // Fills the output table with zone information.
-template <typename T>
+template <typename T, typename U = typename ZoneTypeHelper<T>::EventType>
 void FillOutputTableRowWithZone(
     const tracy::Worker& worker,
     const Zone<T>& zone,
@@ -197,7 +197,7 @@ void FillOutputTableRowWithZone(
       GetDurationStr(zone.total_duration, unit),
       GetPercentage(zone.total_duration, total_duration));
   for (auto it : ns_per_thread) {
-    output_row[GetColOfThread(headers, GetThreadName<T>(worker, it.first))] =
+    output_row[GetColOfThread(headers, GetThreadName<U>(worker, it.first))] =
         absl::StrCat(GetDurationStr(it.second, unit),
                      GetPercentage(it.second, thread_durations.at(it.first)));
   }
@@ -206,7 +206,7 @@ void FillOutputTableRowWithZone(
 // Builds the output table.
 // 1st row is for headers, 2nd row is for durations of zones per thread.
 // 1st col is for zone names, 2nd is for counts, 3rd is for total durations.
-template <typename T>
+template <typename T, typename U = typename ZoneTypeHelper<T>::EventType>
 std::vector<std::vector<std::string>> BuildOutputTable(
     const tracy::Worker& worker,
     const std::vector<Zone<T>>& zones,
@@ -224,7 +224,7 @@ std::vector<std::vector<std::string>> BuildOutputTable(
   headers.push_back("Count");
   headers.push_back("Total");
   for (const auto& it : thread_durations) {
-    headers.push_back(GetThreadName<T>(worker, it.first));
+    headers.push_back(GetThreadName<U>(worker, it.first));
   }
   std::sort(headers.begin() + 3, headers.end());
 
@@ -234,7 +234,7 @@ std::vector<std::vector<std::string>> BuildOutputTable(
   // totals[1] is empty since count is not a duration.
   totals[2] = GetDurationStr(total_duration, unit);
   for (const auto& it : thread_durations) {
-    totals[GetColOfThread(headers, GetThreadName<T>(worker, it.first))] =
+    totals[GetColOfThread(headers, GetThreadName<U>(worker, it.first))] =
         GetDurationStr(it.second, unit);
   }
 

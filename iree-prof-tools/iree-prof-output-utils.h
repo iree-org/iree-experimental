@@ -9,6 +9,8 @@
 
 #include <cstdint>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "third_party/tracy/server/TracyWorker.hpp"
@@ -26,6 +28,15 @@ template <typename T>
 const T& GetEvent(const tracy::short_ptr<T>& event) {
   return *event;
 }
+
+// Template to get (GPU)ZoneThreadData or (Gpu)ZoneEvent type from
+// (GPU)SourceLocaitonZones which are private type of tracy::Worker.
+template <typename T>
+struct ZoneTypeHelper {
+  using ThreadDataType = decltype(*std::declval<T>().zones.begin());
+  using EventType =
+      std::remove_reference_t<decltype(*std::declval<ThreadDataType>().Zone())>;
+};
 
 int64_t GetEventStart(const tracy::ZoneEvent& event);
 int64_t GetEventStart(const tracy::GpuEvent& event);
@@ -54,23 +65,17 @@ std::string GetThreadName<tracy::ZoneEvent>(const tracy::Worker& worker,
 template <>
 std::string GetThreadName<tracy::GpuEvent>(const tracy::Worker& worker,
                                            int thread_id);
-template <>
-std::string GetThreadName<tracy::Worker::SourceLocationZones>(
-    const tracy::Worker& worker, int thread_id);
-template <>
-std::string GetThreadName<tracy::Worker::GpuSourceLocationZones>(
-    const tracy::Worker& worker, int thread_id);
 
 // Returns the total duration of the thread of |thread_id|. It is the sum of
 // durations of top-level zones.
 template <typename T>
 int64_t GetThreadDuration(const tracy::Worker& worker, int thread_id);
 template <>
-int64_t GetThreadDuration<tracy::Worker::SourceLocationZones>(
-    const tracy::Worker& worker, int thread_id);
+int64_t GetThreadDuration<tracy::ZoneEvent>(const tracy::Worker& worker,
+                                            int thread_id);
 template <>
-int64_t GetThreadDuration<tracy::Worker::GpuSourceLocationZones>(
-    const tracy::Worker& worker, int thread_id);
+int64_t GetThreadDuration<tracy::GpuEvent>(const tracy::Worker& worker,
+                                           int thread_id);
 
 // Returns the zone name associated to a source location ID in a trace worker.
 const char* GetZoneName(const tracy::Worker& worker,

@@ -118,21 +118,8 @@ std::string GetThreadName<tracy::GpuEvent>(const tracy::Worker& worker,
 }
 
 template <>
-std::string GetThreadName<tracy::Worker::SourceLocationZones>(
-    const tracy::Worker& worker, int thread_id) {
-  return GetThreadName<tracy::ZoneEvent>(worker, thread_id);
-}
-
-template <>
-std::string GetThreadName<tracy::Worker::GpuSourceLocationZones>(
-    const tracy::Worker& worker, int thread_id) {
-  return GetThreadName<tracy::GpuEvent>(worker, thread_id);
-}
-
-template <>
-int64_t GetThreadDuration<tracy::Worker::SourceLocationZones>(
-    const tracy::Worker& worker,
-    int thread_id) {
+int64_t GetThreadDuration<tracy::ZoneEvent>(const tracy::Worker& worker,
+                                            int thread_id) {
   const auto* data = worker.GetThreadData(worker.DecompressThread(thread_id));
   // timeline.is_magic() is false when tracy is collecting live events, i.e.
   // storing zone events in a vector indirectly via tracy::short_ptr.
@@ -148,9 +135,8 @@ int64_t GetThreadDuration<tracy::Worker::SourceLocationZones>(
 }
 
 template <>
-int64_t GetThreadDuration<tracy::Worker::GpuSourceLocationZones>(
-    const tracy::Worker& worker,
-    int thread_id) {
+int64_t GetThreadDuration<tracy::GpuEvent>(const tracy::Worker& worker,
+                                           int thread_id) {
   uint16_t original_id = thread_id - kGpuThreadIndicator;
   int fixed_id = DecompressOrFixGpuThreadId(worker, original_id);
   for (const auto& d : worker.GetGpuData()) {
