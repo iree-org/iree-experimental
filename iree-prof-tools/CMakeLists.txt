@@ -36,12 +36,6 @@ include(external_cc_library)
 set(ABSL_PROPAGATE_CXX_STD ON)
 add_subdirectory(${IREE_SAMPLES_ROOT_DIR}/third_party/abseil-cpp
                  third_party/abseil-cpp EXCLUDE_FROM_ALL)
-
-# set(TRACY_WORKER_SRCS
-#     ${IREE_ROOT_DIR}/third_party/tracy/server/TracyWorker.cpp
-# )
-# add_library(tracy_worker ${TRACY_WORKER_SRCS})
-# add_library(tracy::worker ALIAS tracy_worker)
 add_subdirectory(${IREE_ROOT_DIR}/build_tools/third_party/tracy
                  third_party/tracy EXCLUDE_FROM_ALL)
 
@@ -67,6 +61,7 @@ iree_cc_library(
     "iree-prof-output-tracy.cc"
     "iree-prof-output-utils.cc"
   DEPS
+    IREETracyServer
     absl::flags
     absl::flags_parse
     absl::flat_hash_map
@@ -76,7 +71,6 @@ iree_cc_library(
     absl::status
     absl::strings
     absl::time
-    tracy::worker
 )
 
 iree_cc_binary(
@@ -86,10 +80,10 @@ iree_cc_binary(
     "iree-prof.cc"
   DEPS
     ::iree-prof-output
+    IREETracyServer
     absl::flags
     absl::log
     absl::strings
-    tracy::worker
     $<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>
 )
 
@@ -100,8 +94,8 @@ iree_cc_binary(
     "iree-prof-convert.cc"
   DEPS
     ::iree-prof-output
+    IREETracyServer
     absl::flags
     absl::log
-    tracy::worker
     $<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>
 )
