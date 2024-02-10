@@ -7,6 +7,7 @@
 #ifndef IREE_PROF_OUTPUT_STDOUT_H_
 #define IREE_PROF_OUTPUT_STDOUT_H_
 
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -25,8 +26,10 @@ class IreeProfOutputStdout : public IreeProfOutput {
     kSeconds,
   };
 
-  IreeProfOutputStdout(const std::vector<std::string>& zone_substrs,
-                       const std::vector<std::string>& thread_substrs,
+  IreeProfOutputStdout(bool output_zone_stats,
+                       bool output_per_op_stats,
+                       const std::string& zone_regex,
+                       const std::string& thread_regex,
                        DurationUnit unit);
   ~IreeProfOutputStdout() override;
 
@@ -37,8 +40,10 @@ class IreeProfOutputStdout : public IreeProfOutput {
   absl::Status Output(tracy::Worker& worker) override;
 
  private:
-  const std::vector<std::string> zone_substrs_;
-  const std::vector<std::string> thread_substrs_;
+  const bool output_zone_stats_;
+  const bool output_per_op_stats_;
+  const std::regex zone_regex_;
+  const std::regex thread_regex_;
   const DurationUnit unit_;
 };
 

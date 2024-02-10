@@ -24,13 +24,15 @@ ABSL_FLAG(std::string, output_chrome_file, "",
           "or conversion.");
 ABSL_FLAG(bool, output_stdout, true,
           "Whether to print Tracy result to stdout.");
-ABSL_FLAG(std::vector<std::string>, zone_substrs,
-          std::vector<std::string>({"iree_hal_buffer_map_", "_dispatch_"}),
-          "Comma-separated substrings of tracy zones to output to stdout. "
-          "If empty, no zones will be output.");
-ABSL_FLAG(std::vector<std::string>, thread_substrs, {},
-          "Comma-separated substrings of threads to output to stdout. "
-          "If empty, all thread including main threads will be output.");
+ABSL_FLAG(bool, output_zones_stdout, true,
+          "Whether to print Tracy result of individual zones to stdout.");
+ABSL_FLAG(bool, output_ops_stdout, true,
+          "Whether to print Tracy result of ML operation to stdout.");
+ABSL_FLAG(std::string, zone_regex,
+          "iree_hal_buffer_map_(zero|fill|read|write|copy)|_dispatch_[0-9]+_",
+          "ECMAScript regex of tracy zones to output to stdout.");
+ABSL_FLAG(std::string, thread_regex, ".",
+          "ECMAScript regex of threads to output to stdout.");
 ABSL_FLAG(std::string, duration_unit, "milliseconds",
           "Unit of duration of zone to output to stdout. It must be one of "
           "seconds(s), millseconds(ms), microseconds(us), or nanoseconds(ns).");
@@ -65,8 +67,10 @@ IreeProfOutputStdout::DurationUnit ToUnit(const absl::string_view flag) {
 void Output(tracy::Worker& worker) {
   if (absl::GetFlag(FLAGS_output_stdout)) {
     LogStatusIfError(
-        IreeProfOutputStdout(absl::GetFlag(FLAGS_zone_substrs),
-                             absl::GetFlag(FLAGS_thread_substrs),
+        IreeProfOutputStdout(absl::GetFlag(FLAGS_output_zones_stdout),
+                             absl::GetFlag(FLAGS_output_ops_stdout),
+                             absl::GetFlag(FLAGS_zone_regex),
+                             absl::GetFlag(FLAGS_thread_regex),
                              ToUnit(absl::GetFlag(FLAGS_duration_unit)))
         .Output(worker));
   }
