@@ -22,6 +22,8 @@ ABSL_FLAG(std::string, output_tracy_file, "",
 ABSL_FLAG(std::string, output_chrome_file, "",
           "Chrome tracing viewer json file to write as the output of execution "
           "or conversion.");
+ABSL_FLAG(std::string, output_csv_file, "",
+          "Comman-Separated-Values file to write stdout output.");
 ABSL_FLAG(bool, output_stdout, true,
           "Whether to print Tracy result to stdout.");
 ABSL_FLAG(bool, output_zones_stdout, true,
@@ -65,9 +67,12 @@ IreeProfOutputStdout::DurationUnit ToUnit(const absl::string_view flag) {
 }  // namespace
 
 void Output(tracy::Worker& worker) {
-  if (absl::GetFlag(FLAGS_output_stdout)) {
+  std::string output_csv_file = absl::GetFlag(FLAGS_output_csv_file);
+  if (absl::GetFlag(FLAGS_output_stdout) || !output_csv_file.empty()) {
     LogStatusIfError(
-        IreeProfOutputStdout(absl::GetFlag(FLAGS_output_zones_stdout),
+        IreeProfOutputStdout(absl::GetFlag(FLAGS_output_stdout),
+                             output_csv_file,
+                             absl::GetFlag(FLAGS_output_zones_stdout),
                              absl::GetFlag(FLAGS_output_ops_stdout),
                              absl::GetFlag(FLAGS_zone_regex),
                              absl::GetFlag(FLAGS_thread_regex),
