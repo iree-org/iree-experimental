@@ -82,6 +82,7 @@ iree_cc_library(
     "iree-prof-output-utils.cc"
   DEPS
     IREETracyServer
+    absl::check
     absl::flags
     absl::flags_parse
     absl::flat_hash_map

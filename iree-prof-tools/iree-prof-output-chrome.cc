@@ -113,7 +113,7 @@ void OutputEvent(absl::string_view name,
                  int64_t timestamp_ns,
                  int thread_id,
                  std::vector<std::string> args,
-                 std::fstream& fout) {
+                 std::ofstream& fout) {
   fout << "{";
   if (!name.empty()) {
     fout << "\"name\": \"" << name << "\", ";
@@ -147,7 +147,7 @@ void OutputTimeline(const tracy::Worker& worker,
                     const std::vector<const tracy::MemEvent*>& sorted_by_free,
                     uint16_t thread_id,
                     const tracy::Vector<tracy::short_ptr<T>>& timeline,
-                    std::fstream& fout);
+                    std::ofstream& fout);
 
 // Outputs the zone events from a timeline which might be interleaved by zone
 // events of the child timelines.
@@ -158,7 +158,7 @@ void RealOutputTimeline(
     const std::vector<const tracy::MemEvent*>& sorted_by_free,
     uint16_t thread_id,
     const tracy::Vector<T>& timeline,
-    std::fstream& fout) {
+    std::ofstream& fout) {
   for (const auto& e : timeline) {
     const auto& zone_event = GetEvent(e);
     auto zone_id = zone_event.SrcLoc();
@@ -199,7 +199,7 @@ void OutputTimeline(const tracy::Worker& worker,
                     const std::vector<const tracy::MemEvent*>& sorted_by_free,
                     uint16_t thread_id,
                     const tracy::Vector<tracy::short_ptr<T>>& timeline,
-                    std::fstream& fout) {
+                    std::ofstream& fout) {
   if (timeline.is_magic()) {
     RealOutputTimeline(worker, sorted_by_alloc, sorted_by_free, thread_id,
                        *reinterpret_cast<const tracy::Vector<T>*>(&timeline),
@@ -219,7 +219,7 @@ void OutputThread(const tracy::Worker& worker,
                   const std::vector<const tracy::MemEvent*>& sorted_by_free,
                   uint16_t thread_id,
                   const tracy::Vector<tracy::short_ptr<T>>& timeline,
-                  std::fstream& fout) {
+                  std::ofstream& fout) {
   if (timeline.empty()) {
     return;
   }
@@ -233,7 +233,7 @@ void OutputThread(const tracy::Worker& worker,
 }
 
 // Outputs a tracy worker into a chrome tracing viewer JSON file.
-void OutputJson(const tracy::Worker& worker, std::fstream& fout) {
+void OutputJson(const tracy::Worker& worker, std::ofstream& fout) {
   fout << "[\n";
   OutputEvent("process_name", {}, kTypeMetadata, 0, 0,
               {ToArgField("name", worker.GetCaptureName())}, fout);
@@ -265,7 +265,7 @@ IreeProfOutputChrome::IreeProfOutputChrome(absl::string_view output_file_path)
 IreeProfOutputChrome::~IreeProfOutputChrome() = default;
 
 absl::Status IreeProfOutputChrome::Output(tracy::Worker& worker) {
-  std::fstream fout(output_file_path_.c_str(), std::ios::out|std::ios::binary);
+  std::ofstream fout(output_file_path_.c_str());
   OutputJson(worker, fout);
   return absl::OkStatus();
 }

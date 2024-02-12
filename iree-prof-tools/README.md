@@ -45,7 +45,7 @@ Output looks like:
 
 ```
 <output from iree-run-module>
-[TRACY    ] Capture Name: iree-run-module @ <date>
+[TRACY    ] Capture Name: iree-run-module @ <date> <time>
 [TRACY    ]     Cpu Arch: x86_64
 [TRACY    ]
 [TRACY-CPU]  CPU Threads: 9
@@ -55,12 +55,15 @@ Output looks like:
 
 ## iree-prof-convert
 
-`iree-prof-convert` is a tool to convert a tracy file into a chrome json file.
+`iree-prof-convert` is a tool to convert a tracy file into a chrome json file
+and/or a comma-separate-values (csv) file.
 
 ```shell
 ../../iree-prof-build/iree-prof-convert --input_tracy_file=/tmp/prof.tracy \
-  --output_chrome_file=/tmp/prof.json
+  --output_chrome_file=/tmp/prof.json --output_csv_file=/tmp/prof.csv
 ```
 
 The output json file can be loaded into
 [perfetto UX](http://ui.perfetto.dev) or [chrome://tracing](chrome://tracing).
+Note that the csv file output by `iree-prof-convert` contains the same
+information in stdout, which is different from one by `iree-tracy-csvexport`.
