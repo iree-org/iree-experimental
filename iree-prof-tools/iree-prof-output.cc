@@ -31,7 +31,7 @@ ABSL_FLAG(bool, output_zones_stdout, true,
 ABSL_FLAG(bool, output_ops_stdout, true,
           "Whether to print Tracy result of ML operation to stdout.");
 ABSL_FLAG(std::string, zone_regex,
-          "iree_hal_buffer_map_(zero|fill|read|write|copy)|_dispatch_[0-9]+_",
+          "iree_hal_buffer_map_(zero|fill|read|write|copy)|_dispatch_[0-9]+",
           "ECMAScript regex of tracy zones to output to stdout.");
 ABSL_FLAG(std::string, thread_regex, ".",
           "ECMAScript regex of threads to output to stdout.");
