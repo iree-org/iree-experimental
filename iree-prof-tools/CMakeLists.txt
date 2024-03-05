@@ -22,17 +22,30 @@ message("IREE-samples dir is ${IREE_SAMPLES_ROOT_DIR}")
 # this project.
 set(IREE_ROOT_DIR "${IREE_SAMPLES_ROOT_DIR}/../iree"
     CACHE STRING "Tell where is the local git-clone of IREE")
+set(IREE_BUILD_DIR "${IREE_ROOT_DIR}/../iree-build"
+    CACHE STRING "Tell where is the binary build directory of IREE")
 message("IREE dir is ${IREE_ROOT_DIR}")
+message("IREE build dir is ${IREE_BUILD_DIR}")
 
 # Load useful IREE CMake modules.
 list(APPEND CMAKE_MODULE_PATH ${IREE_ROOT_DIR}/build_tools/cmake/)
 include(iree_macros)
+include(iree_add_all_subdirs)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_install_support)
 include(external_cc_library)
 
-# Add tracy in IREE repo.
+# Add llvm and mlir in IREE repo.
+include(iree_llvm)
+iree_llvm_set_bundled_cmake_options()
+add_subdirectory(${IREE_ROOT_DIR}/third_party/llvm-project/llvm
+                 third_party/llvm-project/llvm EXCLUDE_FROM_ALL)
+add_library(IREELLVMIncludeSetup INTERFACE)
+
+# Add compiler and tracy in IREE repo.
+add_subdirectory(${IREE_ROOT_DIR}/compiler
+                 compiler EXCLUDE_FROM_ALL)
 add_subdirectory(${IREE_ROOT_DIR}/build_tools/third_party/tracy
                  third_party/tracy EXCLUDE_FROM_ALL)
 
@@ -50,6 +63,9 @@ FetchContent_MakeAvailable(abseil-cpp)
 
 include_directories(
   ${IREE_SAMPLES_ROOT_DIR} ${IREE_ROOT_DIR} ${CMAKE_BINARY_DIR}
+  ${IREE_ROOT_DIR}/third_party/llvm-project/llvm/include
+  ${IREE_ROOT_DIR}/third_party/llvm-project/mlir/include
+  ${IREE_BUILD_DIR}/llvm-project/tools/mlir/include
 )
 
 # Set the default build type to Release if unspecified
@@ -119,4 +135,21 @@ iree_cc_binary(
     absl::flags
     absl::log
     $<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>
+)
+
+iree_cc_binary(
+  NAME
+    iree-vis
+  SRCS
+    "iree-vis.cc"
+  DEPS
+    absl::flags
+    absl::flags_parse
+    absl::log
+    absl::log_initialize
+    absl::log_severity
+    absl::strings
+    iree::compiler::bindings::c::headers
+    $<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>
+    ${IREE_BUILD_DIR}/lib/libIREECompiler.so
 )
