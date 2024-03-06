@@ -16,36 +16,25 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(IREE_SAMPLES_ROOT_DIR "${IREE_PACKAGE_ROOT_DIR}/..")
-message("IREE-samples dir is ${IREE_SAMPLES_ROOT_DIR}")
+message("IREE-samples dir is \"${IREE_SAMPLES_ROOT_DIR}\"")
 
 # NOTE: The IREE source code must be cloned to a directory side-by-side with
 # this project.
 set(IREE_ROOT_DIR "${IREE_SAMPLES_ROOT_DIR}/../iree"
     CACHE STRING "Tell where is the local git-clone of IREE")
-set(IREE_BUILD_DIR "${IREE_ROOT_DIR}/../iree-build"
-    CACHE STRING "Tell where is the binary build directory of IREE")
-message("IREE dir is ${IREE_ROOT_DIR}")
-message("IREE build dir is ${IREE_BUILD_DIR}")
+message("IREE dir is \"${IREE_ROOT_DIR}\"")
 
-# Load useful IREE CMake modules.
-list(APPEND CMAKE_MODULE_PATH ${IREE_ROOT_DIR}/build_tools/cmake/)
-include(iree_macros)
-include(iree_add_all_subdirs)
-include(iree_cc_binary)
-include(iree_cc_library)
-include(iree_install_support)
-include(external_cc_library)
+# Add the entire IREE repo as a subdirectory because iree-vis requires dialects
+# which depends on most of IREE packages.
+# TODO(byungchul): Reduce build time when IREE has already been built.
+set(IREE_BUILD_TESTS OFF)
+set(IREE_BUILD_SAMPLES OFF)
+set(IREE_BUILD_BINDINGS_TFLITE OFF)
+set(IREE_BUILD_BINDINGS_TFLITE_JAVA OFF)
+set(IREE_HAL_DRIVER_DEFAULTS OFF)
+add_subdirectory(${IREE_ROOT_DIR} iree EXCLUDE_FROM_ALL)
 
-# Add llvm and mlir in IREE repo.
-include(iree_llvm)
-iree_llvm_set_bundled_cmake_options()
-add_subdirectory(${IREE_ROOT_DIR}/third_party/llvm-project/llvm
-                 third_party/llvm-project/llvm EXCLUDE_FROM_ALL)
-add_library(IREELLVMIncludeSetup INTERFACE)
-
-# Add compiler and tracy in IREE repo.
-add_subdirectory(${IREE_ROOT_DIR}/compiler
-                 compiler EXCLUDE_FROM_ALL)
+# Add tracy in IREE repo since tracy should be disabled for performance.
 add_subdirectory(${IREE_ROOT_DIR}/build_tools/third_party/tracy
                  third_party/tracy EXCLUDE_FROM_ALL)
 
@@ -63,9 +52,6 @@ FetchContent_MakeAvailable(abseil-cpp)
 
 include_directories(
   ${IREE_SAMPLES_ROOT_DIR} ${IREE_ROOT_DIR} ${CMAKE_BINARY_DIR}
-  ${IREE_ROOT_DIR}/third_party/llvm-project/llvm/include
-  ${IREE_ROOT_DIR}/third_party/llvm-project/mlir/include
-  ${IREE_BUILD_DIR}/llvm-project/tools/mlir/include
 )
 
 # Set the default build type to Release if unspecified
@@ -143,13 +129,14 @@ iree_cc_binary(
   SRCS
     "iree-vis.cc"
   DEPS
+    MLIRParser
     absl::flags
     absl::flags_parse
     absl::log
     absl::log_initialize
     absl::log_severity
     absl::strings
+    iree::compiler::API::StaticImpl
     iree::compiler::bindings::c::headers
     $<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>
-    ${IREE_BUILD_DIR}/lib/libIREECompiler.so
 )
