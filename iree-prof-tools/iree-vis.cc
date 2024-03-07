@@ -91,21 +91,15 @@ absl::StatusOr<mlir::func::FuncOp> GetFuncWithName(mlir::ModuleOp module,
 absl::Status AddNode(mlir::func::FuncOp func, graph::Graph& graph) {
   graph.nodes.emplace_back();
   graph::GraphNode& node = graph.nodes.back();
-  node.node_id = func.getSymName().str();
-  node.node_label = func.getSymName().str();
-  node.node_name = func.getSymName().str();
+  node.id = func.getSymName().str();
+  node.label = func.getSymName().str();
+  node.node_namespace = func.getSymName().str();
   return absl::OkStatus();
 }
 
 absl::StatusOr<graph::GraphCollection> GetGraphCollection(
-    mlir::Operation* op,
+    mlir::ModuleOp module,
     absl::string_view label) {
-  if (!llvm::isa<mlir::ModuleOp>(op)) {
-    return absl::InvalidArgumentError("Given module is not valid");
-  }
-
-  auto module = llvm::cast<mlir::ModuleOp>(op);
-
   std::string entrypoint = absl::GetFlag(FLAGS_function);
   auto func = entrypoint.empty() ? GetFuncWithMostStreams(module)
                                  : GetFuncWithName(module, entrypoint);
@@ -123,7 +117,7 @@ absl::StatusOr<graph::GraphCollection> GetGraphCollection(
   return collection;
 }
 
-void ConvertToGraphJson(mlir::Operation* op) {
+void ConvertToGraphJson(mlir::ModuleOp module) {
   std::string output_json_file = absl::GetFlag(FLAGS_output_json_file);
   std::ofstream fout(output_json_file.c_str());
   if (!fout.is_open() || !fout.good()) {
@@ -133,7 +127,7 @@ void ConvertToGraphJson(mlir::Operation* op) {
 
   auto label = std::filesystem::path(absl::GetFlag(FLAGS_input_iree_file))
                .filename().string();
-  auto graph_collection = GetGraphCollection(op, label);
+  auto graph_collection = GetGraphCollection(module, label);
   if (!graph_collection.ok()) {
     LOG(ERROR) << graph_collection.status();
     return;
@@ -156,6 +150,8 @@ int main(int argc, char** argv) {
   absl::InitializeLog();
   absl::ParseCommandLine(argc, argv);
 
+  // TODO(byungchul): Load iree/mlir dialects directly and reduce the dependency
+  // on iree compiler.
   ireeCompilerGlobalInitialize();
   auto* session = ireeCompilerSessionCreate();
 
@@ -176,7 +172,8 @@ int main(int argc, char** argv) {
   if (ireeCompilerInvocationParseSource(invoke, source)) {
     LOG(INFO) << "Parsing " << input_iree_file << " done successfully.";
     auto op = ireeCompilerInvocationExportStealModule(invoke);
-    iree_prof::ConvertToGraphJson(reinterpret_cast<mlir::Operation*>(op.ptr));
+    iree_prof::ConvertToGraphJson(
+        llvm::cast<mlir::ModuleOp>(reinterpret_cast<mlir::Operation*>(op.ptr)));
     // Re-import op into the session to destroy it properly.
     ireeCompilerInvocationImportStealModule(invoke, op);
   }
