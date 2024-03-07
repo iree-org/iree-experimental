@@ -128,13 +128,18 @@ iree_cc_binary(
     iree-vis
   SRCS
     "iree-vis.cc"
+    "graph.cc"
+    "graph.h"
   DEPS
+    LLVMSupport
     MLIRParser
     absl::flags
     absl::flags_parse
     absl::log
     absl::log_initialize
     absl::log_severity
+    absl::status
+    absl::statusor
     absl::strings
     iree::compiler::API::StaticImpl
     iree::compiler::bindings::c::headers
