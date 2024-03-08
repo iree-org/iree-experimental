@@ -89,6 +89,9 @@ std::string GetResourceId(int index, int64_t offset, int64_t size) {
 
 // Returns a function with most stream ops.
 // Returns absl::NotFoundError if no functions have stream ops.
+// TODO(byungchul): It might be better to find a public function with 1+ inputs
+// of !hal.buffer_view type, not starting with "global$" as get/set functions.
+// TODO(byungchul): Consider mlir::FailureOr<> instead of absl::StatusOr<>.
 absl::StatusOr<mlir::func::FuncOp> GetFuncWithMostStreams(
     mlir::ModuleOp module) {
   int max_num_streams = 0;
@@ -150,16 +153,27 @@ GraphNode& AddNode(absl::string_view label,
 }
 
 // Adds an output of |source| as an incoming edge of |node|.
-IncomingEdge& AddIncomingEdge(const GraphNode& source,
+// If the same edge, i.e. with same |source| and |source_output_index| already
+// exists, returns nullptr.
+IncomingEdge* AddIncomingEdge(const GraphNode& source,
                               int source_output_index,
                               GraphNode& node) {
+  const auto& source_node_output_id =
+      source.outputs_metadata[source_output_index].id;
+  for (const auto& e : node.incoming_edges) {
+    if (e.source_node_id == source.id &&
+        e.source_node_output_id == source_node_output_id) {
+      return nullptr;
+    }
+  }
+
   IncomingEdge& input = node.incoming_edges.emplace_back();
   input.source_node_id = source.id;
-  input.source_node_output_id = source.outputs_metadata[source_output_index].id;
+  input.source_node_output_id = source_node_output_id;
   int input_index = node.incoming_edges.size() - 1;
   input.target_node_input_id = absl::StrCat("input-", input_index);
   input.metadata.emplace_back("index", absl::StrCat(input_index));
-  return input;
+  return &input;
 }
 
 // Adds an output with some default metadata into |node|.
@@ -190,6 +204,7 @@ GraphNode& AddNodeForOperation(
 }
 
 // Finds a node whose label is matched with |label_to_match|.
+// TODO(byungchul): Consider a map if this function is called many times.
 GraphNode* FindNodeForLabel(const Graph& graph,
                             absl::string_view label_to_match) {
   for (const auto& n : graph.nodes) {
@@ -232,14 +247,19 @@ void AddResourceAsOutputOrIncomingEdge(IREE::Stream::CmdDispatchOp op,
     output.attrs.emplace_back("offset", absl::StrCat(offset));
     output.attrs.emplace_back("size", absl::StrCat(size));
     output.attrs.emplace_back("type", ToStr(resource.getType()));
-    // Treat ACCESS_READ_WRITE as ACCESS_WRITE.
-    return;
+    if (!(access & ACCESS_READ)) {
+      return;
+    }
   }
 
   CHECK(access & ACCESS_READ);
 
   // First, find the last node which has an output of the same resource id.
+  // TODO(byungchul): Consider the control flow, e.g. scf or cf ops.
   for (auto it = graph.nodes.rbegin(); it != graph.nodes.rend(); ++it) {
+    if (it->get() == &node) {
+      continue;
+    }
     for (int i = 0; i < (*it)->outputs_metadata.size(); ++i) {
       if ((*it)->outputs_metadata[i].id == resource_id) {
         AddIncomingEdge(**it, i, node);
@@ -249,17 +269,14 @@ void AddResourceAsOutputOrIncomingEdge(IREE::Stream::CmdDispatchOp op,
   }
 
   // Find a node from the original operand of this argument.
-  mlir::Operation* parent_op = resource.getOwner()->getParentOp();
-  if (llvm::isa<IREE::Stream::CmdExecuteOp>(parent_op)) {
-    auto original_op = llvm::cast<IREE::Stream::CmdExecuteOp>(parent_op)
-                       .getResourceOperands()[index].getDefiningOp();
+  if (auto parent_op = llvm::dyn_cast<IREE::Stream::CmdExecuteOp>(
+          resource.getOwner()->getParentOp())) {
+    auto operand_op = parent_op.getResourceOperands()[index].getDefiningOp();
     std::string label_to_match;
-    if (llvm::isa<IREE::Stream::TensorImportOp>(original_op)) {
-      label_to_match =
-          GetLabel(llvm::cast<IREE::Stream::TensorImportOp>(original_op));
-    } else if (llvm::isa<IREE::Util::GlobalLoadOp>(original_op)) {
-      label_to_match =
-          GetLabel(llvm::cast<IREE::Util::GlobalLoadOp>(original_op));
+    if (auto op = llvm::dyn_cast<IREE::Stream::TensorImportOp>(operand_op)) {
+      label_to_match = GetLabel(op);
+    } else if (auto op = llvm::dyn_cast<IREE::Util::GlobalLoadOp>(operand_op)) {
+      label_to_match = GetLabel(op);
     }
 
     if (!label_to_match.empty()) {
@@ -333,6 +350,9 @@ void AddNode(
   // TODO(byungchul): Find matching output with source and index.
   auto type_to_match = ToStr(op.getSource().getType());
   for (auto it = graph.nodes.rbegin(); it != graph.nodes.rend(); ++it) {
+    if (it->get() == &node) {
+      continue;
+    }
     for (int i = 0; i < (*it)->outputs_metadata.size(); ++i) {
       for (const auto& a : (*it)->outputs_metadata[i].attrs) {
         if (a.key == "type" && a.value == type_to_match) {
@@ -361,36 +381,30 @@ absl::Status AddNodesForEntrypoint(mlir::func::FuncOp entrypoint,
   absl::flat_hash_map<mlir::Operation*, std::string> op_namespaces;
   op_namespaces[entrypoint] = entrypoint.getSymName().str();
 
-  entrypoint->walk<mlir::WalkOrder::PreOrder>(
-      [&graph, &op_namespaces](mlir::Operation* op) {
-        if (llvm::isa<IREE::Stream::CmdExecuteOp>(op) ||
-            llvm::isa<IREE::Stream::CmdConcurrentOp>(op)) {
-          AddNamespace(op, op_namespaces);
-        } else if (llvm::isa<IREE::Stream::CmdDispatchOp>(op)) {
-          AddNode(llvm::cast<IREE::Stream::CmdDispatchOp>(op),
-                  op_namespaces, graph);
-        } else if (llvm::isa<IREE::Stream::CmdFillOp>(op)) {
-          AddNode(llvm::cast<IREE::Stream::CmdFillOp>(op),
-                  op_namespaces, graph);
-        } else if (llvm::isa<IREE::Stream::TensorImportOp>(op)) {
-          AddNode(llvm::cast<IREE::Stream::TensorImportOp>(op),
-                  op_namespaces, graph);
-        } else if (llvm::isa<IREE::Stream::TensorExportOp>(op)) {
-          AddNode(llvm::cast<IREE::Stream::TensorExportOp>(op),
-                  op_namespaces, graph);
-        } else if (llvm::isa<IREE::Util::GlobalLoadOp>(op)) {
-          AddNode(llvm::cast<IREE::Util::GlobalLoadOp>(op),
-                  op_namespaces, graph);
-        } else if (llvm::isa<IREE::Stream::StreamDialect>(op->getDialect())) {
-          if (!llvm::isa<IREE::Stream::YieldOp>(op) &&
-              !llvm::isa<IREE::Stream::TimepointJoinOp>(op) &&
-              !llvm::isa<IREE::Stream::TimepointAwaitOp>(op) &&
-              !llvm::isa<IREE::Stream::ResourceAllocaOp>(op) &&
-              !llvm::isa<IREE::Stream::ResourceDeallocaOp>(op)) {
-            LOG(INFO) << "Ignore " << ToStr(op->getName());
-          }
-        }
-      });
+  entrypoint->walk<mlir::WalkOrder::PreOrder>([&](mlir::Operation* op) {
+    if (llvm::isa<IREE::Stream::CmdExecuteOp>(op) ||
+        llvm::isa<IREE::Stream::CmdConcurrentOp>(op)) {
+      AddNamespace(op, op_namespaces);
+    } else if (auto cop = llvm::dyn_cast<IREE::Stream::CmdDispatchOp>(op)) {
+      AddNode(cop, op_namespaces, graph);
+    } else if (auto cop = llvm::dyn_cast<IREE::Stream::CmdFillOp>(op)) {
+      AddNode(cop, op_namespaces, graph);
+    } else if (auto cop = llvm::dyn_cast<IREE::Stream::TensorImportOp>(op)) {
+      AddNode(cop, op_namespaces, graph);
+    } else if (auto cop = llvm::dyn_cast<IREE::Stream::TensorExportOp>(op)) {
+      AddNode(cop, op_namespaces, graph);
+    } else if (auto cop = llvm::dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
+      AddNode(cop, op_namespaces, graph);
+    } else if (llvm::isa<IREE::Stream::StreamDialect>(op->getDialect())) {
+      if (!llvm::isa<IREE::Stream::YieldOp>(op) &&
+          !llvm::isa<IREE::Stream::TimepointJoinOp>(op) &&
+          !llvm::isa<IREE::Stream::TimepointAwaitOp>(op) &&
+          !llvm::isa<IREE::Stream::ResourceAllocaOp>(op) &&
+          !llvm::isa<IREE::Stream::ResourceDeallocaOp>(op)) {
+        LOG(INFO) << "Ignore " << ToStr(op->getName());
+      }
+    }
+  });
 
   return absl::OkStatus();
 }
