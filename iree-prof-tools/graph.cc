@@ -6,6 +6,8 @@
 
 #include "iree-prof-tools/graph.h"
 
+#include <memory>
+
 #include "third_party/llvm-project/llvm/include/llvm/Support/JSON.h"
 
 namespace iree_prof::graph {
@@ -74,8 +76,8 @@ llvm::json::Object Graph::Json() const {
   json_graph["id"] = id;
   json_graph["nodes"] = llvm::json::Array();
   llvm::json::Array* json_nodes = json_graph["nodes"].getAsArray();
-  for (const GraphNode& node : nodes) {
-    json_nodes->push_back(node.Json());
+  for (const std::unique_ptr<GraphNode>& node : nodes) {
+    json_nodes->push_back(node->Json());
   }
   return json_graph;
 }
