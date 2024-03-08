@@ -123,24 +123,40 @@ iree_cc_binary(
     $<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>
 )
 
+iree_cc_library(
+  NAME
+    iree-vis-graph
+  SRCS
+    "graph.cc"
+    "graph-util.cc"
+  HDRS
+    "graph.h"
+    "graph-util.h"
+  DEPS
+    LLVMSupport
+    MLIRParser
+    absl::check
+    absl::flat_hash_map
+    absl::log
+    absl::status
+    absl::statusor
+    absl::strings
+    iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::Util::IR
+)
+    
 iree_cc_binary(
   NAME
     iree-vis
   SRCS
     "iree-vis.cc"
-    "graph.cc"
-    "graph.h"
   DEPS
-    LLVMSupport
-    MLIRParser
+    ::iree-vis-graph
     absl::flags
     absl::flags_parse
     absl::log
     absl::log_initialize
     absl::log_severity
-    absl::status
-    absl::statusor
-    absl::strings
     iree::compiler::API::StaticImpl
     iree::compiler::bindings::c::headers
     $<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>

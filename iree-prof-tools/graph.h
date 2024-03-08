@@ -7,6 +7,7 @@
 #ifndef IREE_PROF_GRAPH_H_
 #define IREE_PROF_GRAPH_H_
 
+#include <memory>
 #include <string>
 
 #include "third_party/llvm-project/llvm/include/llvm/Support/JSON.h"
@@ -99,7 +100,9 @@ struct Graph {
   // The id of the graph.
   std::string id;
   // A list of nodes in the graph.
-  std::vector<GraphNode> nodes;
+  // Differently from others, it uses unique_ptr to make references valid after
+  // adding more nodes.
+  std::vector<std::unique_ptr<GraphNode>> nodes;
 
   llvm::json::Object Json() const;
 };
