@@ -8,8 +8,10 @@
 #define IREE_PROF_GRAPH_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 
+#include "third_party/abseil-cpp/absl/strings/str_cat.h"
 #include "third_party/llvm-project/llvm/include/llvm/Support/JSON.h"
 
 namespace iree_prof::graph {
@@ -18,9 +20,13 @@ namespace iree_prof::graph {
 struct Attribute {
   Attribute(std::string key, std::string value)
       : key(std::move(key)), value(std::move(value)) {}
+  Attribute(std::string key, int64_t int_value)
+      : key(std::move(key)), value(absl::StrCat(int_value)),
+        int_value(int_value) {}
 
   std::string key;
   std::string value;
+  std::optional<int64_t> int_value;
 
   llvm::json::Object Json() const;
 };

@@ -87,33 +87,50 @@ std::string GetResourceId(int index, int64_t offset, int64_t size) {
   return absl::StrCat("resource-", index, "[", offset, ":", offset + size, "]");
 }
 
+// Whether an op is of function, i.e. func.func or util.func.
+bool IsFunction(mlir::Operation* op) {
+  return llvm::isa<mlir::func::FuncOp>(op) ||
+         llvm::isa<IREE::Util::FuncOp>(op);
+}
+
+// Returns the function name. IsFunction(op) must return true.
+std::string GetFuncName(mlir::Operation* op) {
+  if (auto func = llvm::dyn_cast<mlir::func::FuncOp>(op)) {
+    return func.getSymName().str();
+  }
+  return llvm::dyn_cast<IREE::Util::FuncOp>(op).getSymName().str();
+}
+
 // Returns a function with most stream ops.
 // Returns absl::NotFoundError if no functions have stream ops.
 // TODO(byungchul): It might be better to find a public function with 1+ inputs
 // of !hal.buffer_view type, not starting with "global$" as get/set functions.
 // TODO(byungchul): Consider mlir::FailureOr<> instead of absl::StatusOr<>.
-absl::StatusOr<mlir::func::FuncOp> GetFuncWithMostStreams(
-    mlir::ModuleOp module) {
+absl::StatusOr<mlir::Operation*> GetFuncWithMostStreams(mlir::ModuleOp module) {
   int max_num_streams = 0;
-  absl::StatusOr<mlir::func::FuncOp> result =
+  absl::StatusOr<mlir::Operation*> result =
       absl::NotFoundError("Can't find a func with streams");
 
-  module->walk([&](mlir::func::FuncOp func) {
+  module->walk([&](mlir::Operation* op) {
+    if (!IsFunction(op)) {
+      return;
+    }
+
     int num_streams = 0;
-    func.walk([&num_streams](mlir::Operation* op) {
-      if (llvm::isa<IREE::Stream::StreamDialect>(op->getDialect())) {
+    op->walk([&num_streams](mlir::Operation* child_op) {
+      if (llvm::isa<IREE::Stream::StreamDialect>(child_op->getDialect())) {
         ++num_streams;
       }
     });
 
     if (num_streams > max_num_streams) {
       max_num_streams = num_streams;
-      result = func;
+      result = op;
     }
   });
 
   if (result.ok()) {
-    LOG(INFO) << "Func with max streams = "  << result->getSymName().str()
+    LOG(INFO) << "Func with max streams = "  << GetFuncName(*result)
               << ", # of streams = " << max_num_streams;
   }
   return result;
@@ -121,21 +138,23 @@ absl::StatusOr<mlir::func::FuncOp> GetFuncWithMostStreams(
 
 // Returns a function matched with function |name|.
 // Returns absl::NotFoundError if no functions are matched.
-absl::StatusOr<mlir::func::FuncOp> GetFuncWithName(mlir::ModuleOp module,
-                                                   absl::string_view name) {
-  absl::StatusOr<mlir::func::FuncOp> result = absl::NotFoundError(
+absl::StatusOr<mlir::Operation*> GetFuncWithName(mlir::ModuleOp module,
+                                                 absl::string_view name) {
+  absl::StatusOr<mlir::Operation*> result = absl::NotFoundError(
       absl::StrCat("Can't find a func of name \"", name, "\""));
 
-  module->walk([&](mlir::func::FuncOp func) -> mlir::WalkResult {
-    if (name == func.getSymName().str()) {
-      result = func;
-      return mlir::WalkResult::skip();
+  module->walk([&](mlir::Operation* op) -> mlir::WalkResult {
+    if (IsFunction(op)) {
+      if (name == GetFuncName(op)) {
+        result = op;
+        return mlir::WalkResult::skip();
+      }
     }
     return mlir::WalkResult::advance();
   });
 
   if (result.ok()) {
-    LOG(INFO) << "Found a func with name = " << result->getSymName().str();
+    LOG(INFO) << "Found a func with name = " << GetFuncName(*result);
   }
   return result;
 }
@@ -172,7 +191,7 @@ IncomingEdge* AddIncomingEdge(const GraphNode& source,
   input.source_node_output_id = source_node_output_id;
   int input_index = node.incoming_edges.size() - 1;
   input.target_node_input_id = absl::StrCat("input-", input_index);
-  input.metadata.emplace_back("index", absl::StrCat(input_index));
+  input.metadata.emplace_back("index", input_index);
   return &input;
 }
 
@@ -181,7 +200,7 @@ Metadata& AddOutputMetadata(GraphNode& node) {
   Metadata& output = node.outputs_metadata.emplace_back();
   int output_index = node.outputs_metadata.size() - 1;
   output.id = absl::StrCat("output-", output_index);
-  output.attrs.emplace_back("index", absl::StrCat(output_index));
+  output.attrs.emplace_back("index", output_index);
   return output;
 }
 
@@ -226,6 +245,65 @@ void AddNamespace(
                                    ToStr(op->getName()), "-", index);
 }
 
+// Whether a node is in a stream.cmd.concurrent op, i.e. last part of
+// namespace contains "stream.cmd.concurrent".
+bool IsInConcurrent(const GraphNode& node) {
+  auto pos = node.node_namespace.rfind('/');
+  if (pos == node.node_namespace.npos) {
+    pos = 0;
+  }
+  return node.node_namespace.find("stream.cmd.concurrent", pos) !=
+         node.node_namespace.npos;
+}
+
+// Whether two nodes are in a stream.cmd.concurrent op, i.e. last part of
+// namespace contains "stream.cmd.concurrent".
+bool IsInSameConcurrent(const GraphNode& a, const GraphNode& b) {
+  return a.node_namespace == b.node_namespace && IsInConcurrent(a);
+}
+
+// Returns
+std::optional<int64_t> GetOutputIntAttr(const Metadata& output,
+                                        absl::string_view key) {
+  for (const auto& a : output.attrs) {
+    if (key == a.key) {
+      return a.int_value;
+    }
+  }
+  return std::nullopt;
+}
+
+// Whether an output is matched with |resource_id| or a tuple of |index|,
+// |offset|, and |size|.
+bool IsOutputMatched(const Metadata& output, absl::string_view resource_id,
+                     int index, int64_t offset, int64_t size) {
+  if (output.id == resource_id) {
+    return true;
+  }
+  if (auto output_index = GetOutputIntAttr(output, "arg_index")) {
+    if (*output_index == index) {
+      // Output doesn't have to be matched with [offset:offset+size] exactly.
+      // As long as they are overlapped, it can be assumed the output is used
+      // as an input resource.
+      // Only if the end of either one is <= the start of the other, it is NOT
+      // overlapped. Note that start is inclusive while the end is not.
+      auto output_offset = GetOutputIntAttr(output, "offset");
+      auto output_size = GetOutputIntAttr(output, "size");
+      if (output_offset && output_size) {
+        auto end = offset + size;
+        auto output_end = *output_offset + *output_size;
+        CHECK_LE(offset, end);
+        CHECK_LE(*output_offset, output_end);
+        if (end <= *output_offset || offset >= output_end) {
+          return false;
+        }
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Adds a |resource| of stream.cmd.dispatch |op| as an output or an incoming
 // edge of |node|.
 void AddResourceAsOutputOrIncomingEdge(IREE::Stream::CmdDispatchOp op,
@@ -243,9 +321,9 @@ void AddResourceAsOutputOrIncomingEdge(IREE::Stream::CmdDispatchOp op,
   if (access & ACCESS_WRITE) {
     auto& output = AddOutputMetadata(node);
     output.id = resource_id;
-    output.attrs.emplace_back("arg_index", absl::StrCat(index));
-    output.attrs.emplace_back("offset", absl::StrCat(offset));
-    output.attrs.emplace_back("size", absl::StrCat(size));
+    output.attrs.emplace_back("arg_index", index);
+    output.attrs.emplace_back("offset", offset);
+    output.attrs.emplace_back("size", size);
     output.attrs.emplace_back("type", ToStr(resource.getType()));
     if (!(access & ACCESS_READ)) {
       return;
@@ -254,16 +332,27 @@ void AddResourceAsOutputOrIncomingEdge(IREE::Stream::CmdDispatchOp op,
 
   CHECK(access & ACCESS_READ);
 
-  // First, find the last node which has an output of the same resource id.
-  // TODO(byungchul): Consider the control flow, e.g. scf or cf ops.
+  // First, find the last node(s) which is not in the same stream.cmd.concurrent
+  // and has an output matched with the resource. Note that they could be more
+  // than one if last nodes are in a stream.cmd.concurrent (which is different
+  // than that of this node).
+  // TODO(byungchul): Consider the control flow, e.g. scf or cf ops. Uses in
+  // Operation may have useful information.
+  const GraphNode* matched = nullptr;
   for (auto it = graph.nodes.rbegin(); it != graph.nodes.rend(); ++it) {
-    if (it->get() == &node) {
+    if (it->get() == &node || IsInSameConcurrent(**it, node)) {
       continue;
     }
+    if (matched != nullptr && !IsInSameConcurrent(**it, *matched)) {
+      // No more matched nodes in the same concurrent.
+      return;
+    }
     for (int i = 0; i < (*it)->outputs_metadata.size(); ++i) {
-      if ((*it)->outputs_metadata[i].id == resource_id) {
-        AddIncomingEdge(**it, i, node);
-        return;
+      if (IsOutputMatched((*it)->outputs_metadata[i], resource_id, index,
+                          offset, size)) {
+        matched = it->get();
+        AddIncomingEdge(*matched, i, node);
+        break;
       }
     }
   }
@@ -316,9 +405,9 @@ void AddNode(
 
   auto& output = AddOutputMetadata(node);
   output.id = resource_id;
-  output.attrs.emplace_back("arg_index", absl::StrCat(index));
-  output.attrs.emplace_back("offset", absl::StrCat(offset));
-  output.attrs.emplace_back("size", absl::StrCat(size));
+  output.attrs.emplace_back("arg_index", index);
+  output.attrs.emplace_back("offset", offset);
+  output.attrs.emplace_back("size", size);
   output.attrs.emplace_back("type", ToStr(op.getTarget().getType()));
 }
 
@@ -376,10 +465,9 @@ void AddNode(
 }
 
 // Adds nodes accessed by |entrypoint| into |graph|.
-absl::Status AddNodesForEntrypoint(mlir::func::FuncOp entrypoint,
-                                   Graph& graph) {
+absl::Status AddNodesForEntrypoint(mlir::Operation* entrypoint, Graph& graph) {
   absl::flat_hash_map<mlir::Operation*, std::string> op_namespaces;
-  op_namespaces[entrypoint] = entrypoint.getSymName().str();
+  op_namespaces[entrypoint] = GetFuncName(entrypoint);
 
   entrypoint->walk<mlir::WalkOrder::PreOrder>([&](mlir::Operation* op) {
     if (llvm::isa<IREE::Stream::CmdExecuteOp>(op) ||
@@ -423,7 +511,7 @@ absl::StatusOr<GraphCollection> GetGraphCollection(
 
   GraphCollection collection;
   collection.label = label;
-  Graph& graph = collection.graphs.emplace_back(func->getSymName().str());
+  Graph& graph = collection.graphs.emplace_back(GetFuncName(*func));
 
   // Add graph input/output nodes.
   GraphNode& input_node = AddNode("GraphInput", "", graph);

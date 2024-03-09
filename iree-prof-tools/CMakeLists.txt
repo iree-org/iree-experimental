@@ -24,6 +24,19 @@ set(IREE_ROOT_DIR "${IREE_SAMPLES_ROOT_DIR}/../iree"
     CACHE STRING "Tell where is the local git-clone of IREE")
 message("IREE dir is \"${IREE_ROOT_DIR}\"")
 
+# Set the default build type to Release if unspecified
+set(DEFAULT_CMAKE_BUILD_TYPE "Release")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS
+          "No build type selected, default to ${DEFAULT_CMAKE_BUILD_TYPE}")
+  set(CMAKE_BUILD_TYPE "${DEFAULT_CMAKE_BUILD_TYPE}" CACHE STRING
+      "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
+endif()
+
+if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
+  add_compile_options(-Wno-unused-local-typedefs)
+endif()
+
 # Add the entire IREE repo as a subdirectory because iree-vis requires dialects
 # which depends on most of IREE packages.
 # TODO(byungchul): Reduce build time when IREE has already been built.
@@ -53,15 +66,6 @@ FetchContent_MakeAvailable(abseil-cpp)
 include_directories(
   ${IREE_SAMPLES_ROOT_DIR} ${IREE_ROOT_DIR} ${CMAKE_BINARY_DIR}
 )
-
-# Set the default build type to Release if unspecified
-set(DEFAULT_CMAKE_BUILD_TYPE "Release")
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-  message(STATUS
-          "No build type selected, default to ${DEFAULT_CMAKE_BUILD_TYPE}")
-  set(CMAKE_BUILD_TYPE "${DEFAULT_CMAKE_BUILD_TYPE}" CACHE STRING
-      "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
-endif()
 
 #-------------------------------------------------------------------------------
 # Build targets
