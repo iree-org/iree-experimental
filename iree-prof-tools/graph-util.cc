@@ -282,7 +282,11 @@ bool IsOutputMatched(const Metadata& output, absl::string_view resource_id,
   }
   if (auto output_index = GetOutputIntAttr(output, "arg_index")) {
     if (*output_index == index) {
-      // Check if [offset:offset+size] is overlapped with output.
+      // Output doesn't have to be matched with [offset:offset+size] exactly.
+      // As long as they are overlapped, it can be assumed the output is used
+      // as an input resource.
+      // Only if the end of either one is <= the start of the other, it is NOT
+      // overlapped. Note that start is inclusive while the end is not.
       auto output_offset = GetOutputIntAttr(output, "offset");
       auto output_size = GetOutputIntAttr(output, "size");
       if (output_offset && output_size) {
@@ -290,7 +294,7 @@ bool IsOutputMatched(const Metadata& output, absl::string_view resource_id,
         auto output_end = *output_offset + *output_size;
         CHECK_LE(offset, end);
         CHECK_LE(*output_offset, output_end);
-        if (end < *output_offset || offset > output_end) {
+        if (end <= *output_offset || offset >= output_end) {
           return false;
         }
         return true;
@@ -332,7 +336,8 @@ void AddResourceAsOutputOrIncomingEdge(IREE::Stream::CmdDispatchOp op,
   // and has an output matched with the resource. Note that they could be more
   // than one if last nodes are in a stream.cmd.concurrent (which is different
   // than that of this node).
-  // TODO(byungchul): Consider the control flow, e.g. scf or cf ops.
+  // TODO(byungchul): Consider the control flow, e.g. scf or cf ops. Uses in
+  // Operation may have useful information.
   const GraphNode* matched = nullptr;
   for (auto it = graph.nodes.rbegin(); it != graph.nodes.rend(); ++it) {
     if (it->get() == &node || IsInSameConcurrent(**it, node)) {
