@@ -27,6 +27,9 @@ ABSL_FLAG(std::string, input_iree_file, "",
 ABSL_FLAG(std::string, output_json_file, "", "Graph JSON file to write.");
 ABSL_FLAG(std::string, function, "",
           "Entrypoint function. If empty, pick one with most stream ops.");
+ABSL_FLAG(int, min_num_ops_to_group, 3,
+          "Minimum number of operations to group in a namespace when same "
+          "operations continue in a row. If <0, grouping is diabled.");
 
 namespace iree_prof::graph {
 namespace {
@@ -42,7 +45,8 @@ void ConvertToGraphJson(mlir::ModuleOp module) {
   auto label = std::filesystem::path(absl::GetFlag(FLAGS_input_iree_file))
                .filename().string();
   auto graph_collection =
-      GetGraphCollection(module, label, absl::GetFlag(FLAGS_function));
+      GetGraphCollection(module, label, absl::GetFlag(FLAGS_function),
+                         absl::GetFlag(FLAGS_min_num_ops_to_group));
   if (!graph_collection.ok()) {
     LOG(ERROR) << graph_collection.status();
     return;
@@ -84,8 +88,9 @@ int main(int argc, char** argv) {
   }
 
   auto* invoke = ireeCompilerInvocationCreate(session);
+  LOG(INFO) << "Parsing " << input_iree_file << "...";
   if (ireeCompilerInvocationParseSource(invoke, source)) {
-    LOG(INFO) << "Parsing " << input_iree_file << " done successfully.";
+    LOG(INFO) << "Parsed " << input_iree_file << " successfully.";
     auto op = ireeCompilerInvocationExportStealModule(invoke);
     iree_prof::graph::ConvertToGraphJson(
         llvm::cast<mlir::ModuleOp>(reinterpret_cast<mlir::Operation*>(op.ptr)));

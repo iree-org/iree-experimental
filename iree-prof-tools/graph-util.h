@@ -19,7 +19,8 @@ namespace iree_prof::graph {
 absl::StatusOr<GraphCollection> GetGraphCollection(
     mlir::ModuleOp module,
     absl::string_view label,
-    absl::string_view entrypoint);
+    absl::string_view entrypoint,
+    int min_num_ops_to_group);
 
 }  // namespace iree_prof::graph
 

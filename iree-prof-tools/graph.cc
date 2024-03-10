@@ -12,7 +12,7 @@
 
 namespace iree_prof::graph {
 
-llvm::json::Object Attribute::Json() const {
+llvm::json::Object KeyValuePair::Json() const {
   llvm::json::Object json_attr;
   json_attr["key"] = key;
   json_attr["value"] = value;
@@ -24,8 +24,8 @@ llvm::json::Object Metadata::Json() const {
   json_metadata["id"] = id;
   json_metadata["attrs"] = llvm::json::Array();
   llvm::json::Array* json_attrs = json_metadata["attrs"].getAsArray();
-  for (const Attribute& attr : attrs) {
-    json_attrs->push_back(attr.Json());
+  for (const KeyValuePair& a : attrs) {
+    json_attrs->push_back(a.Json());
   }
   return json_metadata;
 }
@@ -37,8 +37,8 @@ llvm::json::Object IncomingEdge::Json() const {
   json_edge["targetNodeInputId"] = target_node_input_id;
   json_edge["metadata"] = llvm::json::Array();
   llvm::json::Array* json_attrs = json_edge["metadata"].getAsArray();
-  for (const Attribute& attr : metadata) {
-    json_attrs->push_back(attr.Json());
+  for (const KeyValuePair& m : metadata) {
+    json_attrs->push_back(m.Json());
   }
   return json_edge;
 }
@@ -52,8 +52,8 @@ llvm::json::Object GraphNode::Json() const {
 
   json_node["attrs"] = llvm::json::Array();
   llvm::json::Array* json_attrs = json_node["attrs"].getAsArray();
-  for (const Attribute& attr : node_attrs) {
-    json_attrs->push_back(attr.Json());
+  for (const KeyValuePair& a : node_attrs) {
+    json_attrs->push_back(a.Json());
   }
 
   json_node["incomingEdges"] = llvm::json::Array();
