@@ -12,17 +12,19 @@
 #include <string>
 
 #include "third_party/abseil-cpp/absl/strings/str_cat.h"
+#include "third_party/abseil-cpp/absl/strings/string_view.h"
 #include "third_party/llvm-project/llvm/include/llvm/Support/JSON.h"
 
 namespace iree_prof::graph {
 
 // An object with a pair of |key| and |value|.
-struct Attribute {
-  Attribute(std::string key, std::string value)
-      : key(std::move(key)), value(std::move(value)) {}
-  Attribute(std::string key, int64_t int_value)
-      : key(std::move(key)), value(absl::StrCat(int_value)),
-        int_value(int_value) {}
+struct KeyValuePair {
+  KeyValuePair(absl::string_view arg_key, absl::string_view arg_value)
+      : key(arg_key), value(arg_value) {}
+  KeyValuePair(absl::string_view arg_key, int64_t arg_int_value)
+      : key(arg_key),
+        value(absl::StrCat(arg_int_value)),
+        int_value(arg_int_value) {}
 
   std::string key;
   std::string value;
@@ -34,7 +36,7 @@ struct Attribute {
 // An item in output metadata of a node.
 struct Metadata {
   std::string id;
-  std::vector<Attribute> attrs;
+  std::vector<KeyValuePair> attrs;
 
   llvm::json::Object Json() const;
 };
@@ -49,7 +51,7 @@ struct IncomingEdge {
   // connects to.
   std::string target_node_input_id;
   // Other associated metadata for this edge.
-  std::vector<Attribute> metadata;
+  std::vector<KeyValuePair> metadata;
 
   llvm::json::Object Json() const;
 };
@@ -86,7 +88,7 @@ struct GraphNode {
   std::vector<std::string> subgraph_ids;
 
   // The attributes of the node.
-  std::vector<Attribute> node_attrs;
+  std::vector<KeyValuePair> node_attrs;
   // A list of incoming edges.
   std::vector<IncomingEdge> incoming_edges;
   // Metadata for outputs.
