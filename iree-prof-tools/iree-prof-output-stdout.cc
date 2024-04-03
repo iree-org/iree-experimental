@@ -12,7 +12,9 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <optional>
 #include <regex>
+#include <string>
 #include <vector>
 
 #include "iree-prof-tools/iree-prof-output-utils.h"
@@ -104,6 +106,16 @@ absl::flat_hash_map<int, int64_t> GetThreadDurations(
   return filtered_thread_durations;
 }
 
+bool HasSubstr(const absl::string_view str,
+               const std::vector<std::string>& substrs) {
+  for (const auto& s : substrs) {
+    if (str.find(s) != str.npos) {
+      return true;
+    }
+  }
+  return false;
+}
+
 template <typename T>
 struct Stat {
   absl::string_view name;
@@ -133,14 +145,18 @@ template <typename T>
 std::vector<Stat<T>> GetZoneStatsFilteredAndSorted(
     const tracy::Worker& worker,
     const tracy::unordered_flat_map<int16_t, T>& zones,
-    const std::regex& zone_regex,
+    const std::vector<std::string>& zone_substrs,
+    const std::optional<std::regex>& zone_regex,
     const absl::flat_hash_map<int, int64_t>& thread_durations) {
   std::vector<Stat<T>> zone_stats_filtered;
   absl::flat_hash_map<absl::string_view, int> zone_stats_filtered_index;
   for (const auto& z : zones) {
     for (const auto& t : z.second.zones) {
       const char* zone_name = worker.GetZoneName(*t.Zone());
-      if (!std::regex_search(zone_name, zone_regex)) {
+      bool matched =
+          !zone_substrs.empty() && HasSubstr(zone_name, zone_substrs) ||
+          zone_regex && std::regex_search(zone_name, *zone_regex);
+      if (!matched) {
         continue;
       }
 
@@ -313,14 +329,15 @@ void OutputTable(const std::vector<std::vector<std::string>>& output_table,
   }
 }
 
-// Output tabulated information of tracy zones filtered with |zone_regex| and
-// |thread_regex|.
+// Output tabulated information of tracy zones filtered with |zone_substrs|,
+// |zone_regex| and |thread_regex|.
 template <typename T>
 void OutputToStream(const tracy::Worker& worker,
                     const tracy::unordered_flat_map<int16_t, T>& zones,
                     bool output_zone_stats,
                     bool output_per_op_stats,
-                    const std::regex& zone_regex,
+                    const std::vector<std::string>& zone_substrs,
+                    const std::optional<std::regex>& zone_regex,
                     const std::regex& thread_regex,
                     absl::string_view header,
                     IreeProfOutputStdout::DurationUnit unit,
@@ -340,7 +357,7 @@ void OutputToStream(const tracy::Worker& worker,
   }
 
   auto zone_stats_filtered = GetZoneStatsFilteredAndSorted(
-      worker, zones, zone_regex, thread_durations);
+      worker, zones, zone_substrs, zone_regex, thread_durations);
   if (output_zone_stats) {
     os << header << "   Zone Stats" << ": "
        << zone_stats_filtered.size() << "\n";
@@ -533,16 +550,20 @@ std::unique_ptr<IreeProfOutputStdout::OutputStream> CreateOutputStream(
 
 }  // namespace
 
-IreeProfOutputStdout::IreeProfOutputStdout(bool output_stdout,
-                                           absl::string_view csv_file_path,
-                                           bool output_zone_stats,
-                                           bool output_per_op_stats,
-                                           const std::string& zone_regex,
-                                           const std::string& thread_regex,
-                                           DurationUnit unit)
+IreeProfOutputStdout::IreeProfOutputStdout(
+    bool output_stdout,
+    absl::string_view csv_file_path,
+    bool output_zone_stats,
+    bool output_per_op_stats,
+    const std::vector<std::string>& zone_substrs,
+    const std::string& zone_regex,
+    const std::string& thread_regex,
+    DurationUnit unit)
     : output_zone_stats_(output_zone_stats),
       output_per_op_stats_(output_per_op_stats),
-      zone_regex_(zone_regex),
+      zone_substrs_(zone_substrs),
+      zone_regex_(zone_regex.empty() ? std::nullopt
+                                     : std::optional<std::regex>(zone_regex)),
       thread_regex_(thread_regex),
       unit_(unit),
       os_(CreateOutputStream(output_stdout, csv_file_path, unit)) {
@@ -565,8 +586,8 @@ absl::Status IreeProfOutputStdout::Output(tracy::Worker& worker) {
     os() << "[TRACY-CPU]" << "    CPU Zones" << ": "
          << worker.GetZoneCount() << "\n";
     OutputToStream(worker, worker.GetSourceLocationZones(), output_zone_stats_,
-                   output_per_op_stats_, zone_regex_, thread_regex_,
-                   "[TRACY-CPU]", unit_, os());
+                   output_per_op_stats_, zone_substrs_, zone_regex_,
+                   thread_regex_, "[TRACY-CPU]", unit_, os());
   }
 
   if (!worker.GetGpuData().empty()) {
@@ -580,8 +601,8 @@ absl::Status IreeProfOutputStdout::Output(tracy::Worker& worker) {
     os() << "[TRACY-GPU]" << "    GPU Zones" << ": "
          << worker.GetGpuZoneCount() << "\n";
     OutputToStream(worker, worker.GetGpuSourceLocationZones(),
-                   output_zone_stats_, output_per_op_stats_,  zone_regex_,
-                   thread_regex_, "[TRACY-GPU]", unit_, os());
+                   output_zone_stats_, output_per_op_stats_,  zone_substrs_,
+                   zone_regex_, thread_regex_, "[TRACY-GPU]", unit_, os());
   }
 
   if (!worker.GetMemNameMap().empty()) {

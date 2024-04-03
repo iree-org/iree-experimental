@@ -30,9 +30,16 @@ ABSL_FLAG(bool, output_zones_stdout, true,
           "Whether to print Tracy result of individual zones to stdout.");
 ABSL_FLAG(bool, output_ops_stdout, true,
           "Whether to print Tracy result of ML operation to stdout.");
-ABSL_FLAG(std::string, zone_regex,
-          "iree_hal_buffer_map_(zero|fill|read|write|copy)|_dispatch_[0-9]+",
-          "ECMAScript regex of tracy zones to output to stdout.");
+ABSL_FLAG(std::vector<std::string>, zone_substrs,
+          (std::vector<std::string>{"iree_hal_buffer_map_", "_dispatch_"}),
+          "Comma-separated substrings of tracy zones to output to stdout. If "
+          "empty, no zones will be matched with substrs. Note that zones can "
+          "still be matched with --zone_regex flag.");
+ABSL_FLAG(std::string, zone_regex, "",
+          "ECMAScript regex of tracy zones to output to stdout. If empty, no "
+          "zones will be matched with regex. Note that it could be much slow "
+          "if the model has too many zones. Zones would be matched faster with "
+          "--zone_substrs flag.");
 ABSL_FLAG(std::string, thread_regex, ".",
           "ECMAScript regex of threads to output to stdout.");
 ABSL_FLAG(std::string, duration_unit, "milliseconds",
@@ -74,6 +81,7 @@ void Output(tracy::Worker& worker) {
                              output_csv_file,
                              absl::GetFlag(FLAGS_output_zones_stdout),
                              absl::GetFlag(FLAGS_output_ops_stdout),
+                             absl::GetFlag(FLAGS_zone_substrs),
                              absl::GetFlag(FLAGS_zone_regex),
                              absl::GetFlag(FLAGS_thread_regex),
                              ToUnit(absl::GetFlag(FLAGS_duration_unit)))
