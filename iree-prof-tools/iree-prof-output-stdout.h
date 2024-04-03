@@ -8,6 +8,7 @@
 #define IREE_PROF_OUTPUT_STDOUT_H_
 
 #include <memory>
+#include <optional>
 #include <regex>
 #include <string>
 #include <vector>
@@ -33,6 +34,7 @@ class IreeProfOutputStdout : public IreeProfOutput {
                        absl::string_view csv_file_path,
                        bool output_zone_stats,
                        bool output_per_op_stats,
+                       const std::vector<std::string>& zone_substrs,
                        const std::string& zone_regex,
                        const std::string& thread_regex,
                        DurationUnit unit);
@@ -52,7 +54,8 @@ class IreeProfOutputStdout : public IreeProfOutput {
 
   const bool output_zone_stats_;
   const bool output_per_op_stats_;
-  const std::regex zone_regex_;
+  const std::vector<std::string> zone_substrs_;
+  const std::optional<std::regex> zone_regex_;
   const std::regex thread_regex_;
   const DurationUnit unit_;
   const std::unique_ptr<OutputStream> os_;
