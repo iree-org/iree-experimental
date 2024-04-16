@@ -21,7 +21,7 @@ source "$VENV_DIR/bin/activate" || die "Could not activate venv"
 # Upgrade pip and install requirements. 'python' is used here in order to
 # reference to the python executable from the venv.
 python -m pip install --upgrade pip || die "Could not upgrade pip"
-python -m pip install iree-tools-tf -f https://openxla.github.io/iree/pip-release-links.html
+python -m pip install iree-tools-tf -f https://iree.dev/pip-release-links.html
 python -m pip install tf-nightly
 
 echo "Activate venv with:"
