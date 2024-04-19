@@ -1,6 +1,6 @@
 # IREE Python API
 # Use nightly releases instead of PyPi
--f https://openxla.github.io/iree/pip-release-links.html
+-f https://iree.dev/pip-release-links.html
 iree-compiler
 iree-runtime
 iree-tools-tflite
