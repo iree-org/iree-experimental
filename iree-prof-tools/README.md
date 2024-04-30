@@ -10,6 +10,8 @@ converting tracy files into chrome json files which can be loaded into
 
 ## Build
 
+For Android build, see [Build for Android](#build-for-android) below.
+
 IREE profiling tools assume IREE repository has already been cloned in the same
 build machine. Once both iree and iree-samples are cloned, IREE profiling can be
 built with cmake. `../../iree-prof-build` is given as output directory not to
@@ -17,7 +19,7 @@ mix output files with source files.
 
 ```shell
 cd iree-samples/iree-prof-tools
-cmake -G Ninja -B ../../iree-prof-build/ -S .
+cmake -G Ninja -B ../../iree-prof-build/ .
 cmake --build ../../iree-prof-build/
 ```
 
@@ -67,3 +69,35 @@ The output json file can be loaded into
 [perfetto UX](http://ui.perfetto.dev) or [chrome://tracing](chrome://tracing).
 Note that the csv file output by `iree-prof-convert` contains the same
 information in stdout, which is different from one by `iree-tracy-csvexport`.
+
+## Build for Android
+
+Once IREE is built for Android as explained
+[here](https://iree.dev/building-from-source/android/), IREE profiling tools
+can be built for Android with 2 more options,
+`-DIREE_PROF_BUILD_TRACY_DEPS=ON` and `-DCMAKE_CXX_FLAGS="-DNO_PARALLEL_SORT"`.
+
+```shell
+cd iree-samples/iree-prof-tools
+cmake -G Ninja -B ../../iree-prof-build-android/ \
+  -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
+  -DIREE_HOST_BIN_DIR="$PWD/../../iree-build/install/bin" \
+  -DANDROID_ABI="arm64-v8a" \
+  -DANDROID_PLATFORM="android-29" \
+  -DIREE_BUILD_COMPILER=OFF \
+  -DIREE_PROF_BUILD_TRACY_DEPS=ON \
+  -DCMAKE_CXX_FLAGS="-DNO_PARALLEL_SORT" \
+  .
+cmake --build ../../iree-prof-build-android/
+```
+
+On latest arm64 Android devices,
+[memory tagged extension (MTE)](https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/enhancing-memory-safety)
+is enabled by default while Tracy packs pointers to reduce space and cause
+`iree-prof` and `iree-prof-convert` to crash. To disable it globally, set
+`/proc/sys/abi/tagged_addr_disabled` to `0` with `adb`.
+
+```shell
+adb root
+adb shell "echo 1 > /proc/sys/abi/tagged_addr_disabled"
+```
