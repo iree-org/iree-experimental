@@ -47,10 +47,6 @@ set(IREE_BUILD_BINDINGS_TFLITE_JAVA OFF)
 set(IREE_HAL_DRIVER_DEFAULTS OFF)
 add_subdirectory(${IREE_ROOT_DIR} iree EXCLUDE_FROM_ALL)
 
-# Add tracy in IREE repo since tracy should be disabled for performance.
-add_subdirectory(${IREE_ROOT_DIR}/build_tools/third_party/tracy
-                 third_party/tracy EXCLUDE_FROM_ALL)
-
 # Get abseil-cpp in ${CMAKE_BINARY_DIR}/third_party/abseil-cpp.
 set(ABSL_PROPAGATE_CXX_STD ON)
 include(FetchContent)
@@ -62,6 +58,47 @@ FetchContent_Declare(
   EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(abseil-cpp)
+# Make command line flags available on all platforms.
+add_compile_options("-DABSL_FLAGS_STRIP_NAMES=0")
+
+option(IREE_PROF_BUILD_TRACY_DEPS "Build tracy deps." OFF)
+if(IREE_PROF_BUILD_TRACY_DEPS)
+  FetchContent_Declare(
+    tbb
+    GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
+    GIT_TAG v2021.12.0-rc2
+    SOURCE_DIR third_party/oneTBB
+    EXCLUDE_FROM_ALL
+  )
+  #set(BUILD_SHARED_LIBS OFF)
+  FetchContent_MakeAvailable(tbb)
+
+  FetchContent_Declare(
+    zstd
+    GIT_REPOSITORY https://github.com/facebook/zstd.git
+    GIT_TAG v1.5.6
+    SOURCE_DIR third_party/zstd
+    SOURCE_SUBDIR build/cmake
+    EXCLUDE_FROM_ALL
+  )
+  set(ZSTD_BUILD_PROGRAMS OFF)
+  FetchContent_MakeAvailable(zstd)
+  add_library(zstd ALIAS libzstd_static)
+
+  FetchContent_Declare(
+    capstone
+    GIT_REPOSITORY https://github.com/libcapstone/libcapstone.git
+    GIT_TAG 4.0.2
+    SOURCE_DIR third_party/libcapstone
+    EXCLUDE_FROM_ALL
+  )
+  FetchContent_MakeAvailable(capstone)
+  add_library(capstone ALIAS capstone-static)
+endif()
+
+# Add tracy in IREE repo since tracy should be disabled for performance.
+add_subdirectory(${IREE_ROOT_DIR}/build_tools/third_party/tracy
+                 third_party/tracy EXCLUDE_FROM_ALL)
 
 include_directories(
   ${IREE_SAMPLES_ROOT_DIR} ${IREE_ROOT_DIR} ${CMAKE_BINARY_DIR}
@@ -114,6 +151,7 @@ iree_cc_binary(
     $<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>
 )
 
+
 iree_cc_binary(
   NAME
     iree-prof-convert
@@ -127,41 +165,43 @@ iree_cc_binary(
     $<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>
 )
 
-iree_cc_library(
-  NAME
-    iree-vis-graph
-  SRCS
-    "graph.cc"
-    "graph-util.cc"
-  HDRS
-    "graph.h"
-    "graph-util.h"
-  DEPS
-    LLVMSupport
-    MLIRParser
-    absl::check
-    absl::flat_hash_map
-    absl::log
-    absl::status
-    absl::statusor
-    absl::strings
-    iree::compiler::Dialect::Stream::IR
-    iree::compiler::Dialect::Util::IR
-)
+if(IREE_BUILD_COMPILER)
+  iree_cc_library(
+    NAME
+      iree-vis-graph
+    SRCS
+      "graph.cc"
+      "graph-util.cc"
+    HDRS
+      "graph.h"
+      "graph-util.h"
+    DEPS
+      LLVMSupport
+      MLIRParser
+      absl::check
+      absl::flat_hash_map
+      absl::log
+      absl::status
+      absl::statusor
+      absl::strings
+      iree::compiler::Dialect::Stream::IR
+      iree::compiler::Dialect::Util::IR
+  )
     
-iree_cc_binary(
-  NAME
-    iree-vis
-  SRCS
-    "iree-vis.cc"
-  DEPS
-    ::iree-vis-graph
-    absl::flags
-    absl::flags_parse
-    absl::log
-    absl::log_initialize
-    absl::log_severity
-    iree::compiler::API::StaticImpl
-    iree::compiler::bindings::c::headers
-    $<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>
-)
+  iree_cc_binary(
+    NAME
+      iree-vis
+    SRCS
+      "iree-vis.cc"
+    DEPS
+      ::iree-vis-graph
+      absl::flags
+      absl::flags_parse
+      absl::log
+      absl::log_initialize
+      absl::log_severity
+      iree::compiler::API::StaticImpl
+      iree::compiler::bindings::c::headers
+      $<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>
+  )
+endif()
