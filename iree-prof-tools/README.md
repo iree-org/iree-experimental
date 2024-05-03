@@ -13,12 +13,12 @@ converting tracy files into chrome json files which can be loaded into
 For Android build, see [Build for Android](#build-for-android) below.
 
 IREE profiling tools assume IREE repository has already been cloned in the same
-build machine. Once both iree and iree-samples are cloned, IREE profiling can be
-built with cmake. `../../iree-prof-build` is given as output directory not to
-mix output files with source files.
+build machine. Once both iree and iree-experimental are cloned, IREE profiling
+can be built with cmake. `../../iree-prof-build` is given as output directory
+not to mix output files with source files.
 
 ```shell
-cd iree-samples/iree-prof-tools
+cd iree-experimental/iree-prof-tools
 cmake -G Ninja -B ../../iree-prof-build/ .
 cmake --build ../../iree-prof-build/
 ```
@@ -78,7 +78,7 @@ can be built for Android with 2 more options,
 `-DIREE_PROF_BUILD_TRACY_DEPS=ON` and `-DCMAKE_CXX_FLAGS="-DNO_PARALLEL_SORT"`.
 
 ```shell
-cd iree-samples/iree-prof-tools
+cd iree-experimental/iree-prof-tools
 cmake -G Ninja -B ../../iree-prof-build-android/ \
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
   -DIREE_HOST_BIN_DIR="$PWD/../../iree-build/install/bin" \
