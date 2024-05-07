@@ -1,0 +1,30 @@
+{
+    "name": "model-explorer",
+    "displayName": "Model Explorer",
+    "description": "Machine learning model explorer for VS Code",
+    "version": "0.1.0",
+    "publisher": "iree.org",
+    "repository": "https://github.com/iree-org/iree-experimental/iree-prof-tools/model-explorer-extension",
+    "main": "./out/extension.js",
+    "engines": {
+        "vscode": "^1.87.0"
+    },
+    "activationEvents": [],
+    "contributes": {
+        "commands": [
+            {
+                "command": "model-explorer.show",
+                "title": "Model Explorer"
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.87.0",
+        "typescript": "^5.4.5"
+    }
+}
