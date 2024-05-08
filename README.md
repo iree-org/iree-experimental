@@ -1,6 +1,6 @@
 # IREE Experimental Repository
 
-This repository contains various experiments and prototypes associated with the [IREE](https://github.com/iree-org/iree) project.
+This repository contains various experiments and prototypes associated with the [IREE](https://github.com/iree-org/iree) project. It shows some creative ways of using IREE.
 
 Contact the [IREE Team](https://github.com/iree-org/iree#communication-channels) for questions about this repository.
 
