@@ -1,5 +1,6 @@
 # Developer Certificate of Origin configuration
 # https://github.com/dcoapp/app
 # Add a comment from the GitHub UI
+# Add another comment
 require:
   members: true
