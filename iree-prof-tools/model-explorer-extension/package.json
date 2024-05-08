@@ -13,10 +13,25 @@
     "contributes": {
         "commands": [
             {
-                "command": "model-explorer.show",
-                "title": "Model Explorer"
+                "command": "modelExplorer.show",
+                "title": "Explore Model"
             }
-        ]
+        ],
+        "configuration": {
+            "title": "Model Explorer",
+            "properties": {
+                "modelExplorer.externalModelExplorerUrl": {
+                    "type": "string",
+                    "description": "URL of model explorer web server to connect. If empty, one will be started internally.",
+                    "default": ""
+                },
+                "modelExplorer.internalModelExplorerPath": {
+                    "type": "string",
+                    "description": "Executable path to start model explorer internally when externalModelExplorerUrl is empty.",
+                    "default": "model-explorer"
+                }
+            }
+        }
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",
