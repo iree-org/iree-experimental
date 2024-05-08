@@ -3,4 +3,4 @@
 # Add a comment from the GitHub UI
 # Add another comment
 require:
-  members: true
+  members: false
