@@ -34,12 +34,12 @@ ABSL_FLAG(int, min_num_ops_to_group, 3,
 namespace iree_prof::graph {
 namespace {
 
-void ConvertToGraphJson(mlir::ModuleOp module) {
+int ConvertToGraphJson(mlir::ModuleOp module) {
   std::string output_json_file = absl::GetFlag(FLAGS_output_json_file);
   std::ofstream fout(output_json_file.c_str());
   if (!fout.is_open() || !fout.good()) {
     LOG(ERROR) << "Can't open output file: " << output_json_file;
-    return;
+    return 1;
   }
 
   auto label = std::filesystem::path(absl::GetFlag(FLAGS_input_iree_file))
@@ -49,7 +49,7 @@ void ConvertToGraphJson(mlir::ModuleOp module) {
                          absl::GetFlag(FLAGS_min_num_ops_to_group));
   if (!graph_collection.ok()) {
     LOG(ERROR) << graph_collection.status();
-    return;
+    return 1;
   }
 
   {
@@ -59,6 +59,7 @@ void ConvertToGraphJson(mlir::ModuleOp module) {
 
   LOG(INFO) << "Wrote " << fout.tellp() << " bytes to " << output_json_file;
   fout.close();
+  return 0;
 }
 
 }  // namespace
@@ -89,18 +90,21 @@ int main(int argc, char** argv) {
 
   auto* invoke = ireeCompilerInvocationCreate(session);
   LOG(INFO) << "Parsing " << input_iree_file << "...";
+  int ret_val = 0;
   if (ireeCompilerInvocationParseSource(invoke, source)) {
     LOG(INFO) << "Parsed " << input_iree_file << " successfully.";
     auto op = ireeCompilerInvocationExportStealModule(invoke);
-    iree_prof::graph::ConvertToGraphJson(
+    ret_val = iree_prof::graph::ConvertToGraphJson(
         llvm::cast<mlir::ModuleOp>(reinterpret_cast<mlir::Operation*>(op.ptr)));
     // Re-import op into the session to destroy it properly.
     ireeCompilerInvocationImportStealModule(invoke, op);
+  } else {
+    ret_val = 1;
   }
 
   ireeCompilerInvocationDestroy(invoke);
   ireeCompilerSourceDestroy(source);
   ireeCompilerSessionDestroy(session);
   ireeCompilerGlobalShutdown();
-  return 0;
+  return ret_val;
 }
