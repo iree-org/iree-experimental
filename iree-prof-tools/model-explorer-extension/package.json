@@ -29,6 +29,11 @@
                     "type": "string",
                     "description": "Executable path to start model explorer internally when externalModelExplorerUrl is empty.",
                     "default": "model-explorer"
+                },
+                "modelExplorer.ireeVisPath": {
+                    "type": "string",
+                    "description": "Executable path to convert IREE intermediate MLIR asm files to graph JSON files.",
+                    "default": ""
                 }
             }
         }
