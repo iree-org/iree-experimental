@@ -13,8 +13,12 @@
     "contributes": {
         "commands": [
             {
-                "command": "modelExplorer.show",
-                "title": "Explore Model"
+                "command": "modelExplorer.start",
+                "title": "Explore Model: Start"
+            },
+            {
+                "command": "modelExplorer.focus",
+                "title": "Explore Model: Focus"
             }
         ],
         "configuration": {

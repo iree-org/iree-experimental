@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 
+// Converts an IREE MLIR file to a graph JSON file with iree-vis program.
 export async function convertMlirToJsonIfNecessary(
   modelFile: string
 ): Promise<string> {
