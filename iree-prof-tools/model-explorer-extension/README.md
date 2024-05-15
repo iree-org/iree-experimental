@@ -5,17 +5,16 @@ model explorer within VS Code.
 
 ## How to run it
 
-Model explorer must be installed before this extension get started.
+[Model explorer](https://github.com/google-ai-edge/model-explorer) must be
+installed before this extension get started. Please follow the
+[instruction](https://github.com/google-ai-edge/model-explorer/wiki/1.-Installation)
+to install it.
 
-```
-pip install model-explorer
-```
-
-This extension is started by executing `Explore Model` command from the Command
-Palette on a VS code active text editor of a graph json file. The extension
-loads the file of the current focused editor to the model explorer web server.
-If the model explorer is not running, it starts one with a random port number
-in a terminal.
+This extension is started by executing `Explore Model: Start` command from the
+Command Palette on a VS code active text editor of a graph json file. The
+extension loads the file of the current focused editor to the model explorer
+web server. If the model explorer is not running, it starts one with a random
+port number in a terminal.
 
 Currently, it supports Tensorflow saved_model.pb files, TFLite files, StableHLO
 MLIR files, IREE MLIR files, and graph json files. For IREE MLIR files, it
@@ -31,6 +30,14 @@ Once `iree-vis` is built, set its path in `ModelExplorer: Iree Vis Path`
 setting.
 
 ![Model Explorer Settings](model-explorer-settings.png)
+
+The model explorer interacts with the editor of the original model file. When a
+node is clicked on the model explorer, corresponding areas in the original
+model file are highlighted.
+
+From a position or a selected area in the oringal model file, executing
+`Explore Model: Focus` command from the Command Palette moves the focus on a
+corresponding node in the model explorer.
 
 ## How to make changes into it
 
