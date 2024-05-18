@@ -160,21 +160,21 @@
 //          CHECK:     memref.dealloc %{{.*}} : memref<5x16x128xf32, #gpu.address_space<workgroup>>
 
 transform.sequence failures(propagate) {
-^bb1(%variant_op: !pdl.operation):
+^bb1(%variant_op: !transform.any_op):
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
-    : (!pdl.operation) -> !pdl.operation
+    : (!transform.any_op) -> !transform.any_op
   %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
-    : (!pdl.operation) -> !pdl.operation
+    : (!transform.any_op) -> !transform.any_op
 
   // Step 1. Tile to forall and sequential scf.for.
   // ======================================================
   %forall_l1, %matmul_l1 =
     transform.structured.tile_to_forall_op %matmul tile_sizes [128, 128]
-      ( mapping = [#gpu.block<y>, #gpu.block<x>] )
+      ( mapping = [#gpu.block<y>, #gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice
-    %forall_l1 : (!pdl.operation) -> ()
-  %fill_l1 = transform.structured.fuse_into_containing_op %fill into %forall_l1
-  %matmul_l2, %loops:1 = transform.structured.tile_to_scf_for %matmul_l1 [0, 0, 16]
+    %forall_l1 : (!transform.any_op) -> ()
+  %fill_l1 = transform.structured.fuse_into_containing_op %fill into %forall_l1  : (!transform.any_op, !transform.any_op) -> !transform.any_op
+  %matmul_l2, %loops:1 = transform.structured.tile_to_scf_for %matmul_l1 [0, 0, 16] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   // // Post-tiling canonicalizations and cleanups.
   // transform.iree.apply_patterns %variant_op 
   //   {canonicalization, cse, licm, tiling_canonicalization}
@@ -187,32 +187,32 @@ transform.sequence failures(propagate) {
     padding_values = [0.0 : f32, 0.0 : f32, 0.0 : f32], 
     padding_dimensions = [0, 1, 2], 
     pack_paddings=[1, 1, 1]
-  }
+  } : (!transform.any_op) -> !transform.any_op
   // Post-padding canonicalizations and cleanups.
   transform.iree.apply_patterns %variant_op 
-    {canonicalization, cse, licm, tiling_canonicalization} : (!pdl.operation) -> ()
+    {canonicalization, cse, licm, tiling_canonicalization} : (!transform.any_op) -> ()
 
   // Step 3. Rewrite tensor.pad in DPS, this creates linalg.copy ops.
   // ================================================================
   %pad = transform.structured.match ops{["tensor.pad"]} in %variant_op 
-    : (!pdl.operation) -> !pdl.operation
+    : (!transform.any_op) -> !transform.any_op
   %padded = transform.structured.rewrite_in_destination_passing_style %pad 
-    : (!pdl.operation) -> !pdl.operation
+    : (!transform.any_op) -> !transform.any_op
   
   // Step 4. Map to threads, **SIMT** programming model.
   // ===================================================
   %copy_lhs = transform.get_producer_of_operand %matmul_padded_l2[0] 
-     : (!pdl.operation) -> !pdl.operation
+     : (!transform.any_op) -> !transform.any_op
   transform.structured.tile_to_forall_op %copy_lhs num_threads [32, 4]
-      ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
+      ( mapping = [#gpu.linear<y>, #gpu.linear<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   %copy_rhs = transform.get_producer_of_operand %matmul_padded_l2[1]
-     : (!pdl.operation) -> !pdl.operation
+     : (!transform.any_op) -> !transform.any_op
   transform.structured.tile_to_forall_op %copy_rhs num_threads [4, 32]
-      ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
+      ( mapping = [#gpu.linear<y>, #gpu.linear<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // %copy_res = transform.get_producer_of_operand %matmul_padded_l2[2]
-  //    : (!pdl.operation) -> !pdl.operation
+  //    : (!transform.any_op) -> !transform.any_op
   // transform.structured.tile_to_forall_op %copy_res num_threads [4, 32]
   //     ( mapping = [#gpu.linear<y>, #gpu.linear<x>] )
 
@@ -220,48 +220,48 @@ transform.sequence failures(propagate) {
   // =============================================================================
   %forall_l3, %matmul_padded_l3 = 
     transform.structured.tile_to_forall_op %matmul_padded_l2 num_threads [2, 2]
-      ( mapping = [#gpu.warp<y>, #gpu.warp<x>] )
+      ( mapping = [#gpu.warp<y>, #gpu.warp<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   %forall_fill_l3, %fill_l3 = 
     transform.structured.tile_to_forall_op %fill_l1 num_threads [2, 2]
-      ( mapping = [#gpu.warp<y>, #gpu.warp<x>] )
+      ( mapping = [#gpu.warp<y>, #gpu.warp<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Step 6. Rank-reduce and vectorize.
   // ==================================
   %func_v = transform.structured.match ops{["func.func"]} in %variant_op
-    : (!pdl.operation) -> !pdl.operation
+    : (!transform.any_op) -> !transform.any_op
   transform.iree.apply_patterns %func_v { rank_reducing_linalg, rank_reducing_vector }
-    : (!pdl.operation) -> ()
-  %func_v_3 = transform.structured.vectorize %func_v { vectorize_padding }
+    : (!transform.any_op) -> ()
+  %func_v_3 = transform.structured.vectorize %func_v { vectorize_padding }  : (!transform.any_op) -> !transform.any_op
   // Post-vectorization canonicalizations and hoistings to avoid roundtripping 
   // vectors in memory and prepare for bufferization.
   transform.iree.apply_patterns %func_v_3 {canonicalization, cse, licm }
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
   transform.structured.hoist_redundant_tensor_subsets %func_v_3
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
 
   // Step 7. Bufferize and drop HAL descriptor from memref ops.
   // ==========================================================
   // Pre-buferization canonicalizations and cleanups help avoid extra copies.
   transform.iree.apply_patterns %func_v_3 {canonicalization, cse, licm}
-    : (!pdl.operation) -> ()
-  transform.iree.eliminate_empty_tensors %variant_op : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
+  transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op
-    : (!pdl.operation) -> (!pdl.operation)
+    : (!transform.any_op) -> (!transform.any_op)
   %func_m = transform.structured.match ops{["func.func"]} in %variant_op_3 
-    : (!pdl.operation) -> !pdl.operation
+    : (!transform.any_op) -> !transform.any_op
   transform.iree.erase_hal_descriptor_type_from_memref %func_m
-    : (!pdl.operation) -> ()
-  transform.iree.apply_buffer_optimizations %func_m : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
+  transform.iree.apply_buffer_optimizations %func_m : (!transform.any_op) -> ()
 
   // Step 8. Post-bufferization mapping blocks/workgroup and threads/subgroup.
   // =========================================================================
   transform.iree.apply_patterns %variant_op_3 
     {canonicalization, cse, licm, tiling_canonicalization}
-    : (!pdl.operation) -> ()
-  transform.iree.forall_to_workgroup %func_m : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
+  transform.iree.forall_to_workgroup %func_m : (!transform.any_op) -> ()
   transform.iree.map_nested_forall_to_gpu_threads %func_m
       workgroup_dims = [64, 2, 1] warp_dims = [2, 2, 1]
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
 
   //===---------------------------------------------------------------------===//
   // BEGIN - Annoying phase-ordered section
@@ -273,36 +273,36 @@ transform.sequence failures(propagate) {
   // scf.for after unrolling dur to insert_strided_slice / extract_strided_slice
   // across iter_args boundaries.
   // transform.iree.apply_patterns %func_m {canonicalization, cse, fold_memref_aliases}
-  //   : (!pdl.operation) -> ()
+  //   : (!transform.any_op) -> ()
   transform.iree.apply_patterns %func_m {canonicalization, cse, licm}
-    : (!pdl.operation) -> ()
-  transform.iree.hoist_static_alloc %func_m : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
+  transform.iree.hoist_static_alloc %func_m : (!transform.any_op) -> ()
   transform.iree.apply_patterns %func_m { fold_memref_aliases }
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
   transform.iree.apply_patterns %func_m { extract_address_computations }
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
   transform.iree.apply_patterns %func_m {canonicalization, cse, licm}
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
   transform.iree.apply_patterns %func_m { unroll_vectors_gpu_wmma }
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
     
   // Hoist redundant vector transfers to allow vectorization to proceed.
   // We really don't want to do this after bufferization but we need to atm.
   // One way to work around this is to hoist the pad ops on the output earlier 
   // but this has other tradeoffs. Still needs some investigation.
   %func_m_2 = transform.structured.hoist_redundant_vector_transfers %func_m
-    : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_buffer_optimizations %func_m_2 : (!pdl.operation) -> ()
+    : (!transform.any_op) -> !transform.any_op
+  transform.iree.apply_buffer_optimizations %func_m_2 : (!transform.any_op) -> ()
 
   // This must occur after bufferization because of the fancy CUDA types.
   transform.iree.apply_patterns %func_m_2 { fold_memref_aliases }
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
   transform.iree.apply_patterns %func_m_2 {canonicalization, cse, licm}
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
   transform.iree.vector.vector_to_mma_conversion %func_m_2 { use_wmma }
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
   transform.iree.apply_patterns %func_m_2 {canonicalization, cse, licm}
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
   // //===---------------------------------------------------------------------===//
   // // END - Annoying phase-ordered section
   // //===---------------------------------------------------------------------===//
@@ -310,13 +310,13 @@ transform.sequence failures(propagate) {
   // Step 9. Multi-buffering.
   // =========================================================================
   transform.iree.apply_patterns %func_m_2 {canonicalization, cse}
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
   // Hoist static allocs to allow multi-buffering to proceed.
-  transform.iree.hoist_static_alloc %func_m_2 : (!pdl.operation) -> ()
+  transform.iree.hoist_static_alloc %func_m_2 : (!transform.any_op) -> ()
   %allocs = transform.structured.match ops{["memref.alloc"]} in %func_m_2
-    : (!pdl.operation) -> !transform.op<"memref.alloc">
+    : (!transform.any_op) -> !transform.op<"memref.alloc">
   %mb_allocs = transform.memref.multibuffer %allocs {factor = 4 : i64, skip_analysis } 
-    : (!transform.op<"memref.alloc">) -> !pdl.operation
+    : (!transform.op<"memref.alloc">) -> !transform.any_op
 
   // Step 10. Cp-async.
   // ===========================================================================
@@ -325,25 +325,25 @@ transform.sequence failures(propagate) {
   // wanted a specific target shape.
   %func_m_9 = transform.vector.transfer_to_scf %func_m_2
     max_transfer_rank = 1 full_unroll = true
-      : (!pdl.operation) -> !pdl.operation
+      : (!transform.any_op) -> !transform.any_op
   transform.iree.create_async_groups %func_m_9 {use_mma_sync = false} 
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
   transform.iree.apply_patterns %func_m_9 {canonicalization, cse, fold_memref_aliases, licm}
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
 
   // Step 11. Pipeline shared memory copies.
   // ===========================================================================
   %mma_compute = transform.structured.match ops{["gpu.subgroup_mma_compute"]} in %variant_op_3
-    : (!pdl.operation) -> !pdl.operation
+    : (!transform.any_op) -> !transform.any_op
   // Pre pipelining cleanups.
   transform.iree.apply_patterns %func_m_9 {canonicalization, cse}
-    : (!pdl.operation) -> ()
-  %for = transform.loop.get_parent_for %mma_compute : (!pdl.operation) -> !transform.op<"scf.for">
+    : (!transform.any_op) -> ()
+  %for = transform.loop.get_parent_for %mma_compute : (!transform.any_op) -> !transform.op<"scf.for">
   %pipelined_for = transform.iree.pipeline_shared_memory_copies %for { depth = 4 } 
     : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
 
   // Late canonicalizations and cleanups.
   transform.iree.apply_patterns %variant_op_3 
     {canonicalization, cse, licm, tiling_canonicalization}
-    : (!pdl.operation) -> ()
+    : (!transform.any_op) -> ()
 }
